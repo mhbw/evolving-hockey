@@ -1,0 +1,2962 @@
+#################################################################################
+#####          SHINY All Stats            ||             09/22/18           #####
+#################################################################################
+
+# ALLSCRAPE Dependencies
+library(RCurl); library(rjson); library(lubridate); library(doMC); library(rvest)
+
+# Script Dependencies
+library(Matrix); library(RSQLite)
+library(xgboost); library(glmnet)
+
+library(doMC);  
+library(ggridges); library(tidyverse)
+
+options(scipen = 999)
+set.seed(123)
+
+
+# Source ALLSCRAPE.R & Shiny_All_Functions.R Scripts
+source("ALLSCRAPE.R")
+source("Shiny_All_Functions.R")
+
+
+###  Load basics
+#####################################
+
+## -------- ##
+##   Load   ##
+## -------- ##
+
+# New skater positions - from NHL JSON data
+player_position_historic <- readRDS("data/player_position_new.rds")
+
+# New no_xg object after ARI '07-10 issue was fixed
+no_xg <- readRDS("data/no_xG_2.rds")
+
+# NHL Schedule objects
+schedule_full <- readRDS("data/team_results_with1617_pl.rds")
+schedule_1718 <- readRDS("data/schedule_1718.rds")
+schedule_1819 <- readRDS("data/schedule_trim_1819.rds") 
+
+# xG models 
+xG_model_XGB_7_EV <- readRDS("data/xG_model_XGB_7yr_EV_final_3.rds")
+xG_model_XGB_7_UE <- readRDS("data/xG_model_XGB_7yr_UE_final_1.rds")
+xG_model_XGB_10_SH <- readRDS("data/xG_model_XGB_10yr_SH_1.rds")
+xG_model_XGB_10_EN <- readRDS("data/xG_model_XGB_10yr_EN_1.rds")
+
+# Score adjustment lists
+score_adj_EV <- readRDS("data/score_adj_EV_list.rds") # all together in a list - EV
+score_adj_PP <- readRDS("data/score_adj_PP_list.rds") # all together in a list - PP
+score_adj_SH <- readRDS("data/score_adj_SH_list.rds") # all together in a list - SH
+
+# Penalty Goals Scoring Rates
+scoring_rates <- readRDS("data/scoring_rates2.rds") # updated with newest version including '17-18 data
+pen_score_adj <- data.frame(readRDS("data/penalty_adj_state.RDS")) # not updated as of now
+
+# SPM Model Lists
+mod_list_EVO_F <- readRDS("data/model_list_EVO_F.rds")
+mod_list_EVO_D <- readRDS("data/model_list_EVO_D.rds")
+mod_list_EVD_F <- readRDS("data/model_list_EVD_F.rds") # not using version # 2 (in directory)
+mod_list_EVD_D <- readRDS("data/model_list_EVD_D.rds")
+mod_list_PPO_F <- readRDS("data/model_list_PPO_F.rds")
+mod_list_PPO_D <- readRDS("data/model_list_PPO_D.rds")
+mod_list_SHD_F <- readRDS("data/model_list_SHD_F.rds")
+mod_list_SHD_D <- readRDS("data/model_list_SHD_D.rds")
+
+
+## ----------- ##
+##   Process   ##
+## ----------- ##
+
+# Schedule / btb object
+schedule_full <- schedule_full %>% 
+  filter(game_id <= 2016021230)
+
+btb <- rbind(
+  schedule_full %>% 
+    select(game_id, home_btb, away_btb) %>% 
+    mutate(home_btb = ifelse(home_btb > 1, 1, home_btb), 
+            away_btb = ifelse(away_btb > 1, 1, away_btb)), 
+  
+  schedule_1718 %>% 
+     select(game_id, home_btb, away_btb) %>% 
+     mutate(home_btb = ifelse(home_btb > 1, 1, home_btb), 
+            away_btb = ifelse(away_btb > 1, 1, away_btb)), 
+  
+  schedule_1819 %>% 
+     select(game_id, home_btb, away_btb) %>% 
+     mutate(home_btb = ifelse(home_btb > 1, 1, home_btb), 
+            away_btb = ifelse(away_btb > 1, 1, away_btb))
+  )
+
+rm(schedule_full, schedule_1718, schedule_1819)
+
+
+# Strength State Adjustment - EV (all 11 seasons, including no_xG games)
+# Position in list: 1 = 5v5, 2 = 4v4, 3 = 3v3
+state_adj_EV <- list(Goals =   c(1, (2.271070 / 2.700524), (2.271070 / 5.787857)), 
+                     Shots =   c(1, (29.19077 / 31.36268), (29.19077 / 39.11144)), 
+                     Fenwick = c(1, (40.48002 / 42.57123), (40.48002 / 51.89824)), 
+                     Corsi =   c(1, (54.21396 / 55.06157), (54.21396 / 61.97019)), 
+                     xG =      c(1, (2.222845 / 2.569587), (2.222845 / 5.403740)))
+
+# Strength State Adjustment - PP/SH (all 11 seasons, including no_xG games)
+# Position in list: 1 = 5v4, 2 = 5v3, 3 = 4v3
+state_adj_PP <- list(Goals =   c(1, (6.251871 / 20.533388), (6.251871 / 12.073648)), 
+                     Shots =   c(1, (50.44825 / 95.010960), (50.44825 / 75.990970)), 
+                     Fenwick = c(1, (70.55257 / 131.02005), (70.55257 / 105.66536)), 
+                     Corsi =   c(1, (94.36919 / 165.28401), (94.36919 / 138.24361)), 
+                     xG =      c(1, (6.131036 / 19.581912), (6.131036 / 11.051610)))
+
+
+# Make penalty score state data
+fun.pen_GF <- function(data) {
+  
+  penrate_GF <- data.frame(matrix(ncol = 10, nrow = 9))
+  penrate_GF$X1 <- c("5v5", "4v4", "3v3", "5v4", "5v3", "4v3", "6v5", "6v4", "6v3")
+  names(penrate_GF) <- c("x", "5v5", "4v4", "3v3", "5v4", "5v3", "4v3", "6v5", "6v4", "6v3")
+  
+  penrate_GF[1, ] <- c("5v5", 0, 0, 0, data[4, 4] - data[1, 4], 0, 0, 0, 0, 0)
+  penrate_GF[2, ] <- c("4v4", 0, 0, 0, 0, 0, data[6, 4] - data[2, 4], 0, 0, 0)                      
+  penrate_GF[3, ] <- c("3v3", 0, 0, 0, 0, 0, data[6, 4] - data[3, 4], 0, 0, 0) 
+  penrate_GF[4, ] <- c("5v4", 0, data[2, 4] - data[4, 4], 0, 0, data[5, 4] - data[4, 4], 0, 0, 0, 0) 
+  penrate_GF[5, ] <- c("5v3", 0, 0, 0, 0, 0, data[6, 4] - data[5, 4], 0, 0, 0) 
+  penrate_GF[6, ] <- c("4v3", 0, 0, data[3, 4] - data[6, 4], 0, 0, 0, 0, 0, 0) 
+  penrate_GF[7, ] <- c("6v5", 0, 0, 0, data[4, 4] - data[7, 4], 0, 0, 0, data[8, 4] - data[7, 4], 0)
+  penrate_GF[8, ] <- c("6v4", 0, data[2, 4] - data[8, 4], 0, 0, 0, 0, 0, 0, data[9, 4] - data[8, 4])
+  penrate_GF[9, ] <- c("6v3", 0, 0, 0, 0, 0, data[6, 4] - data[9, 4], 0, 0, 0)
+  
+  df <- suppressWarnings(data.frame(sapply(penrate_GF, function(x) as.numeric(x))))
+  df$x <- c("5v5", "4v4", "3v3", "5v4", "5v3", "4v3", "6v5", "6v4", "6v3")
+  names(df) <- c("x", "5v5", "4v4", "3v3", "5v4", "5v3", "4v3", "6v5", "6v4", "6v3")
+  
+  return(df)
+
+  } 
+penrate_GF <- fun.pen_GF(data = scoring_rates)
+
+fun.pen_GA <- function(data) {
+  
+  penrate_GA <- data.frame(matrix(ncol = 10, nrow = 9))
+  penrate_GA$X1 <- c("5v5", "4v4", "3v3", "5v4", "5v3", "4v3", "6v5", "6v4", "6v3")
+  names(penrate_GA) <- c("x", "5v5", "4v4", "3v3", "5v4", "5v3", "4v3", "6v5", "6v4", "6v3")
+  
+  penrate_GA[1, ] <- c("5v5", 0, 0, 0, data[4, 6] - data[1, 6], 0, 0, 0, 0, 0)
+  penrate_GA[2, ] <- c("4v4", 0, 0, 0, 0, 0, data[6, 6] - data[2, 6], 0, 0, 0)                      
+  penrate_GA[3, ] <- c("3v3", 0, 0, 0, 0, 0, data[6, 6] - data[3, 6], 0, 0, 0) 
+  penrate_GA[4, ] <- c("5v4", 0, data[2, 6] - data[4, 6], 0, 0, data[5, 6] - data[4, 6], 0, 0, 0, 0) 
+  penrate_GA[5, ] <- c("5v3", 0, 0, 0, 0, 0, data[6, 6] - data[5, 6], 0, 0, 0) 
+  penrate_GA[6, ] <- c("4v3", 0, 0, data[3, 6] - data[6, 6], 0, 0, 0, 0, 0, 0) 
+  penrate_GA[7, ] <- c("6v5",  0, 0, 0, data[4, 6] - data[7, 6], 0, 0, 0, data[8, 6] - data[7, 6], 0)
+  penrate_GA[8, ] <- c("6v4", 0, data[2, 6] - data[8, 6], 0, 0, 0, 0, 0, 0, data[9, 6] - data[8, 6])
+  penrate_GA[9, ] <- c("6v3", 0, 0, 0, 0, 0, data[6, 6] - data[9, 6], 0, 0, 0)
+  
+  df <- suppressWarnings(data.frame(sapply(penrate_GA, function(x) as.numeric(x))))
+  df$x <- c("5v5", "4v4", "3v3", "5v4", "5v3", "4v3", "6v5", "6v4", "6v3")
+  names(df) <- c("x", "5v5", "4v4", "3v3", "5v4", "5v3", "4v3", "6v5", "6v4", "6v3")
+  
+  
+  return(df)
+
+  }
+penrate_GA <- fun.pen_GA(data = scoring_rates)
+
+rm(fun.pen_GF, fun.pen_GA)
+
+
+## Manny Perry's Objects
+st.shot_events <- c("SHOT",  "GOAL")
+st.fenwick_events <- c("SHOT", "GOAL", "MISS")
+st.corsi_events <- c("SHOT", "GOAL", "MISS", "BLOCK" )
+st.strength_states <- c("3v3", "5v5", "4v4", "5v4", "4v5", "5v3", "3v5", "4v3", "3v4", "5vE", "Ev5", "4vE", "Ev4", "3vE", "Ev3") %>% as.factor()
+st.even_strength <- c("5v5", "4v4", "3v3") %>% as.factor()
+st.pp_strength <- c("5v4", "4v5", "5v3", "3v5", "4v3", "3v4") %>% as.factor()
+st.empty_net <- c("5vE", "Ev5", "4vE", "Ev4", "3vE", "Ev3") %>% as.factor()
+
+
+#####################################
+
+
+
+
+## ----------------------- START NEW DATA PREP ------------------------ ##
+
+
+
+
+## ----------------------- ##
+##   Scrape New PBP Data   ##
+## ----------------------- ##
+
+#############################
+
+
+## ALLSCRAPE Script Sourced Above
+
+
+# Create Team IDs Data Frame 
+fun.Team_IDs <- function() { 
+  
+  IDs <- data.frame(matrix(nrow = 33, ncol = 2))
+  IDs$X1 <- c("N.J", "NYI", "NYR", "PHI", "PIT", "BOS", "BUF", "MTL", "OTT", "TOR", 
+              "1000", "CAR", "FLA", "T.B", "WSH", "CHI", "DET", "NSH", "STL", "CGY", 
+              "COL", "EDM", "VAN", "ANA", "DAL", "L.A", "1000", "S.J", "CBJ", "MIN", 
+              "WPG", "ARI", "VGK")
+  
+  IDs$X2 <- seq(1:33)
+  IDs$X2 <- ifelse(IDs$X2 == 31, 52, IDs$X2)
+  IDs$X2 <- ifelse(IDs$X2 == 32, 53, IDs$X2)
+  IDs$X2 <- ifelse(IDs$X2 == 33, 54, IDs$X2)
+  names(IDs) <- c("Team", "ID")
+  
+  return(IDs)
+  
+  }
+Team_ID <- fun.Team_IDs()
+
+
+# Scrape Schedule of previous games
+fun.schedule <- function(start, end) { 
+  
+  sched <- ds.scrape_schedule(start,
+                              end, 
+                              try_tolerance = 5, 
+                              agents = ds.user_agents)
+  
+  sched <- filter(sched, session != "PR")
+  
+  sched$home_team_id <- Team_ID$Team[match(sched$home_team_id, Team_ID$ID)]
+  sched$away_team_id <- Team_ID$Team[match(sched$away_team_id, Team_ID$ID)]
+  
+  sched$test <- format(as.POSIXct(sched$game_datetime, 
+                                  tz = "UTC", 
+                                  format = "%Y-%m-%d %H:%M:%S"), 
+                       tz = "Canada/Eastern")
+  
+  sched$test <- as.Date(sched$test)
+  sched$test <- as.Date(ifelse(is.na(sched$test), 
+                               as.Date(sched$game_datetime) - 1,
+                               sched$test), 
+                        origin = "1970-01-01")
+  
+  sched$game_date <- sched$test
+  
+  sched <- sched %>% 
+    arrange(game_id) %>% 
+    rename(home_team = home_team_id, 
+           away_team = away_team_id)
+  
+  }
+schedule_current <- fun.schedule(Sys.Date() - 1,
+                                 Sys.Date() - 1)
+
+
+# Scrape pbp data
+fun.scrape_pbp <- function(year) { 
+  
+  scrape <- as.character(unique(schedule_current$game_id))
+  scrape <- gsub(paste0(substr(year, 1, 4), 0), "", scrape)
+  
+  Year <- year
+  hold_running <- data.frame()
+  new_pbp <- data.frame()
+  runs <- as.numeric(length(scrape))
+  
+  for(i in 1:runs) {
+    
+    tryCatch({
+      
+      game_num <- (as.numeric(scrape[1]) - 1) + i
+      
+      pbp_list <- ds.compile_games(games = as.character(game_num),
+                                   season = Year,
+                                   pause = 2,
+                                   try_tolerance = 5,
+                                   agents = ds.user_agents)
+      
+      hold_running <- pbp_list[[1]]
+      hold_rosters <- pbp_list[[2]]
+      hold_shifts <-  pbp_list[[3]]
+      
+      if(i == 1) { 
+        new_pbp <-     pbp_list[[1]]
+        new_rosters <- pbp_list[[2]]
+        new_shifts <-  pbp_list[[3]]
+        
+        } 
+      else if(i > 1) { 
+        new_pbp <-     rbind(new_pbp, hold_running) 
+        new_rosters <- rbind(new_rosters, hold_rosters) 
+        new_shifts <-  rbind(new_shifts, hold_shifts) 
+        
+        }
+      
+      }, 
+    
+    # tryCatch Error function
+    error = function(e) {cat("ERROR :", conditionMessage(e), "\n")}
+    
+    )
+    
+    }
+  
+  # Return List
+  return_list <- list(new_pbp =     new_pbp, 
+                      new_rosters = new_rosters, 
+                      new_shifts =  new_shifts)
+  
+  return(return_list)
+  
+  }
+pbp_list_new <- fun.scrape_pbp(year = "20182019")
+
+# Pull out new data
+pbp_new <- pbp_list_new$new_pbp
+
+shifts_new <- pbp_list_new$new_shifts %>% 
+  rename(player = player_name)
+
+rosters_new <- pbp_list_new$new_rosters %>% 
+  mutate(position = ifelse(player_position == "G", 3, 
+                           ifelse(player_position == "D", 2, 1)))
+
+
+#############################
+
+
+
+## --------------------------- ##
+##   Get Positions In Season   ##
+## --------------------------- ##
+
+#################################
+
+# Scrape NHL skater JSON information
+NHL_player_info <- fun.NHL_info_scrape(season_ = "20182019")
+
+
+# Update player_posittion data.frame
+player_position <- player_position_historic %>% 
+  rbind(., NHL_player_info %>% select(player, position)) %>% 
+  group_by(player, position) %>% 
+  summarise() %>% 
+  ungroup() %>% 
+  mutate(test = 1 * (lag(player, default = "A") == player)) %>%  # test for and remove duplicates
+  filter(test != 1) %>%
+  select(-c(test)) %>% 
+  
+  ##        ***  Manual Addition  ***            ##
+  #rbind(., data.frame(player = "ALEX.FORTIN", 
+  #                    position = 1)
+  #      ) %>% 
+  
+  arrange(player) %>% 
+  data.frame()
+
+
+#################################
+
+
+
+## --------------------------------------------- ##
+##   Fix Names in PBP, Rosters, and Shift Data   ## *** PATRICK.MAROON Name Fix Added
+## --------------------------------------------- ##
+
+###################################################
+
+# Update skater names in home_on_1:away_on_6 pbp slots
+pbp_new <- pbp_new %>% 
+  mutate_at(vars(event_player_1, event_player_2, event_player_3, home_on_1:home_on_6, away_on_1:away_on_6), 
+            funs(ifelse(. == "ANDREI.KASTSITSYN", "ANDREI.KOSTITSYN", 
+                        ifelse(. == "AJ.GREER", "A.J..GREER", 
+                               ifelse(. == "ANDREW.GREENE", "ANDY.GREENE", 
+                                      ifelse(. == "ANDREW.WOZNIEWSKI", "ANDY.WOZNIEWSKI", 
+                                             ifelse(. == "ANTHONY.DEANGELO", "TONY.DEANGELO", 
+                                                    ifelse(. == "BATES (JON).BATTAGLIA", "BATES.BATTAGLIA", 
+                                                           ifelse(. == "BRADLEY.MILLS", "BRAD.MILLS", 
+                                                                  ifelse(. == "COLIN (JOHN).WHITE", "COLIN.WHITE", 
+                                                                         ifelse(. == "CRISTOVAL.NIEVES", "BOO.NIEVES", 
+                                                                                ifelse(. == "DANNY.BRIERE", "DANIEL.BRIERE", 
+                                                                                       ifelse(. %in% c("DAN.CLEARY", "DANNY.CLEARY"), "DANIEL.CLEARY", 
+                  ifelse(. == "DANNY.O'REGAN", "DANIEL.O'REGAN", 
+                         ifelse(. == "DENIS JR..GAUTHIER", "DENIS.GAUTHIER", 
+                                ifelse(. == "FREDERICK.MEYER IV", "FREDDY.MEYER", 
+                                       ifelse(. == "JACOB.DOWELL", "JAKE.DOWELL", 
+                                              ifelse(. == "JAMES.VANDERMEER", "JIM.VANDERMEER", 
+                                                     ifelse(. == "JAMES.WYMAN", "JT.WYMAN", 
+                                                            ifelse(. == "JOHN.HILLEN III", "JACK.HILLEN", 
+                                                                   ifelse(. == "JOHN.ODUYA", "JOHNNY.ODUYA", 
+                                                                          ifelse(. == "JOHN.PEVERLEY", "RICH.PEVERLEY", 
+                                                                                 ifelse(. == "JONATHAN.SIM", "JON.SIM", 
+                                                                                        ifelse(. == "JONATHON.KALINSKI", "JON.KALINSKI", 
+                                                                                               ifelse(. == "JOSEPH.CRABB", "JOEY.CRABB", 
+                                                                                                      ifelse(. == "JOSHUA.BAILEY", "JOSH.BAILEY", 
+                                                                                                             ifelse(. == "JOSHUA.MORRISSEY", "JOSH.MORRISSEY", 
+                  ifelse(. == "JT.COMPHER", "J.T..COMPHER", 
+                         ifelse(. == "KRYSTOFER.KOLANOS", "KRYS.KOLANOS", 
+                                ifelse(. == "MARC.POULIOT", "MARC-ANTOINE.POULIOT", 
+                                       ifelse(. == "MARTIN.ST. PIERRE", "MARTIN.ST PIERRE", 
+                                              ifelse(. == "MARTY.HAVLAT", "MARTIN.HAVLAT", 
+                                                     ifelse(. == "MATHEW.DUMBA", "MATT.DUMBA", 
+                                                            ifelse(. == "MATTHEW.IRWIN", "MATT.IRWIN", 
+                                                                   ifelse(. == "MATTHEW.NIETO", "MATT.NIETO", 
+                                                                          ifelse(. == "MATTHEW.STAJAN", "MATT.STAJAN", 
+                                                                                 ifelse(. == "MAXIM.MAYOROV", "MAKSIM.MAYOROV", 
+                                                                                        ifelse(. == "MAXWELL.REINHART", "MAX.REINHART", 
+                                                                                               ifelse(. == "MICHAEL.BLUNDEN", "MIKE.BLUNDEN", 
+                                                                                                      ifelse(. == "MICHAËL.BOURNIVAL", "MICHAEL.BOURNIVAL", 
+                                                                                                             ifelse(. == "MICHAEL.GRIER", "MIKE.GRIER",
+                                                                                                                    ifelse(. == "MICHAEL.KNUBLE", "MIKE.KNUBLE", 
+                   ifelse(. == "MICHAEL.KOMISAREK", "MIKE.KOMISAREK", 
+                          ifelse(. == "MICHAEL.MATHESON", "MIKE.MATHESON", 
+                                 ifelse(. == "MICHAEL.MODANO", "MIKE.MODANO", 
+                                        ifelse(. == "MICHAEL.RUPP", "MIKE.RUPP", 
+                                               ifelse(. == "MICHAEL.SILLINGER", "MIKE.SILLINGER", 
+                                                      ifelse(. == "NATHAN.GUENIN", "NATE.GUENIN", 
+                                                             ifelse(. == "NICHOLAS.BOYNTON", "NICK.BOYNTON", 
+                                                                    ifelse(. == "NICHOLAS.DRAZENOVIC", "NICK.DRAZENOVIC", .)
+                                                                    )))))))))))))))))))))))))))))))))))))))))))))))))
+
+pbp_new <- pbp_new %>% 
+  mutate_at(vars(event_player_1, event_player_2, event_player_3, home_on_1:home_on_6, away_on_1:away_on_6), 
+            funs(ifelse(. == "NICKLAS.BERGFORS", "NICLAS.BERGFORS",
+                        ifelse(. == "NIKLAS.KRONVALL", "NIKLAS.KRONWALL", 
+                               ifelse(. == "NIKOLAI.ANTROPOV", "NIK.ANTROPOV", 
+                                      ifelse(. == "NIKOLAI.ZHERDEV", "NIKOLAY.ZHERDEV", 
+                                             ifelse(. == "OLIVIER.MAGNAN-GRENIER", "OLIVIER.MAGNAN", 
+                                                    ifelse(. %in% c("P. J..AXELSSON", "PER JOHAN.AXELSSON"), "P.J..AXELSSON", 
+                                                           ifelse(. == "PIERRE-ALEX.PARENTEAU", "P.A..PARENTEAU", 
+                                                                  ifelse(. == "PHILIP.VARONE", "PHIL.VARONE", 
+                                                                         ifelse(. == "RAYMOND.MACIAS", "RAY.MACIAS", 
+                                                                                ifelse(. == "RJ.UMBERGER", "R.J..UMBERGER", 
+                                                                                       ifelse(. == "ROBERT.BLAKE", "ROB.BLAKE", 
+                                                                                              ifelse(. == "ROBERT.EARL", "ROBBIE.EARL", 
+                                                                                                     ifelse(. == "ROBERT.HOLIK", "BOBBY.HOLIK", 
+                                                                                                            ifelse(. == "ROBERT.SCUDERI", "ROB.SCUDERI", 
+                                                                                                                   ifelse(. == "RODNEY.PELLEY", "ROD.PELLEY", 
+                        ifelse(. == "SIARHEI.KASTSITSYN", "SERGEI.KOSTITSYN", 
+                               ifelse(. == "STAFFAN.KRONVALL", "STAFFAN.KRONWALL", 
+                                      ifelse(. == "STEVEN.REINPRECHT", "STEVE.REINPRECHT", 
+                                             ifelse(. == "TJ.GALIARDI", "T.J..GALIARDI", 
+                                                    ifelse(. == "TJ.HENSICK", "T.J..HENSICK", 
+                                                           ifelse(. == "TOMMY.SESTITO", "TOM.SESTITO", 
+                                                                  ifelse(. == "VACLAV.PROSPAL", "VINNY.PROSPAL", 
+                                                                         ifelse(. == "VINCENT.HINOSTROZA", "VINNIE.HINOSTROZA", 
+                                                                                ifelse(. == "WILLIAM.THOMAS", "BILL.THOMAS", 
+                                                                                       ifelse(. == "ZACHARY.ASTON-REESE", "ZACH.ASTON-REESE", 
+                                                                                              ifelse(. == "ZACHARY.SANFORD", "ZACH.SANFORD", 
+                                                                                                     ifelse(. == "ZACHERY.STORTINI", "ZACK.STORTINI", 
+                                                                                                            
+                                                                                                            ## EXTRAS
+                                                                                                            ifelse(. == "PAT.MAROON", "PATRICK.MAROON", 
+                                                                                                            .)
+                                                                                                     )))))))))))))))))))))))))))))
+
+
+# Update skater names roster data
+rosters_new <- rosters_new %>% 
+  mutate_at(vars(player_name), 
+            funs(ifelse(. == "ANDREI.KASTSITSYN", "ANDREI.KOSTITSYN", 
+                        ifelse(. == "AJ.GREER", "A.J..GREER", 
+                               ifelse(. == "ANDREW.GREENE", "ANDY.GREENE", 
+                                      ifelse(. == "ANDREW.WOZNIEWSKI", "ANDY.WOZNIEWSKI", 
+                                             ifelse(. == "ANTHONY.DEANGELO", "TONY.DEANGELO", 
+                                                    ifelse(. == "BATES (JON).BATTAGLIA", "BATES.BATTAGLIA", 
+                                                           ifelse(. == "BRADLEY.MILLS", "BRAD.MILLS", 
+                                                                  ifelse(. == "COLIN (JOHN).WHITE", "COLIN.WHITE", 
+                                                                         ifelse(. == "CRISTOVAL.NIEVES", "BOO.NIEVES", 
+                                                                                ifelse(. == "DANNY.BRIERE", "DANIEL.BRIERE", 
+                                                                                       ifelse(. %in% c("DAN.CLEARY", "DANNY.CLEARY"), "DANIEL.CLEARY", 
+                                                                                              ifelse(. == "DANNY.O'REGAN", "DANIEL.O'REGAN", 
+                         ifelse(. == "DENIS JR..GAUTHIER", "DENIS.GAUTHIER", 
+                                ifelse(. == "FREDERICK.MEYER IV", "FREDDY.MEYER", 
+                                       ifelse(. == "JACOB.DOWELL", "JAKE.DOWELL", 
+                                              ifelse(. == "JAMES.VANDERMEER", "JIM.VANDERMEER", 
+                                                     ifelse(. == "JAMES.WYMAN", "JT.WYMAN", 
+                                                            ifelse(. == "JOHN.HILLEN III", "JACK.HILLEN", 
+                                                                   ifelse(. == "JOHN.ODUYA", "JOHNNY.ODUYA", 
+                                                                          ifelse(. == "JOHN.PEVERLEY", "RICH.PEVERLEY", 
+                                                                                 ifelse(. == "JONATHAN.SIM", "JON.SIM", 
+                                                                                        ifelse(. == "JONATHON.KALINSKI", "JON.KALINSKI", 
+                                                                                               ifelse(. == "JOSEPH.CRABB", "JOEY.CRABB", 
+                                                                                                      ifelse(. == "JOSHUA.BAILEY", "JOSH.BAILEY", 
+                                                                                                             ifelse(. == "JOSHUA.MORRISSEY", "JOSH.MORRISSEY", 
+                          ifelse(. == "JT.COMPHER", "J.T..COMPHER", 
+                                 ifelse(. == "KRYSTOFER.KOLANOS", "KRYS.KOLANOS", 
+                                        ifelse(. == "MARC.POULIOT", "MARC-ANTOINE.POULIOT", 
+                                               ifelse(. == "MARTIN.ST. PIERRE", "MARTIN.ST PIERRE", 
+                                                      ifelse(. == "MARTY.HAVLAT", "MARTIN.HAVLAT", 
+                                                             ifelse(. == "MATHEW.DUMBA", "MATT.DUMBA", 
+                                                                    ifelse(. == "MATTHEW.IRWIN", "MATT.IRWIN", 
+                                                                           ifelse(. == "MATTHEW.NIETO", "MATT.NIETO", 
+                                                                                  ifelse(. == "MATTHEW.STAJAN", "MATT.STAJAN", 
+                                                                                         ifelse(. == "MAXIM.MAYOROV", "MAKSIM.MAYOROV", 
+                                                                                                ifelse(. == "MAXWELL.REINHART", "MAX.REINHART", 
+                                                                                                       ifelse(. == "MICHAEL.BLUNDEN", "MIKE.BLUNDEN", 
+                                                                                                              ifelse(. == "MICHAËL.BOURNIVAL", "MICHAEL.BOURNIVAL", 
+                                                                                                                     ifelse(. == "MICHAEL.GRIER", "MIKE.GRIER",
+                                                                                                                            ifelse(. == "MICHAEL.KNUBLE", "MIKE.KNUBLE", 
+                           ifelse(. == "MICHAEL.KOMISAREK", "MIKE.KOMISAREK", 
+                                  ifelse(. == "MICHAEL.MATHESON", "MIKE.MATHESON", 
+                                         ifelse(. == "MICHAEL.MODANO", "MIKE.MODANO", 
+                                                ifelse(. == "MICHAEL.RUPP", "MIKE.RUPP", 
+                                                       ifelse(. == "MICHAEL.SILLINGER", "MIKE.SILLINGER", 
+                                                              ifelse(. == "NATHAN.GUENIN", "NATE.GUENIN", 
+                                                                     ifelse(. == "NICHOLAS.BOYNTON", "NICK.BOYNTON", 
+                                                                            ifelse(. == "NICHOLAS.DRAZENOVIC", "NICK.DRAZENOVIC", .)
+                                                                     )))))))))))))))))))))))))))))))))))))))))))))))))
+
+rosters_new <- rosters_new %>% 
+  mutate_at(vars(player_name), 
+            funs(ifelse(. == "NICKLAS.BERGFORS", "NICLAS.BERGFORS",
+                        ifelse(. == "NIKLAS.KRONVALL", "NIKLAS.KRONWALL", 
+                               ifelse(. == "NIKOLAI.ANTROPOV", "NIK.ANTROPOV", 
+                                      ifelse(. == "NIKOLAI.ZHERDEV", "NIKOLAY.ZHERDEV", 
+                                             ifelse(. == "OLIVIER.MAGNAN-GRENIER", "OLIVIER.MAGNAN", 
+                                                    ifelse(. %in% c("P. J..AXELSSON", "PER JOHAN.AXELSSON"), "P.J..AXELSSON", 
+                                                           ifelse(. == "PIERRE-ALEX.PARENTEAU", "P.A..PARENTEAU", 
+                                                                  ifelse(. == "PHILIP.VARONE", "PHIL.VARONE", 
+                                                                         ifelse(. == "RAYMOND.MACIAS", "RAY.MACIAS", 
+                                                                                ifelse(. == "RJ.UMBERGER", "R.J..UMBERGER", 
+                                                                                       ifelse(. == "ROBERT.BLAKE", "ROB.BLAKE", 
+                                                                                              ifelse(. == "ROBERT.EARL", "ROBBIE.EARL", 
+                                                                                                     ifelse(. == "ROBERT.HOLIK", "BOBBY.HOLIK", 
+                                                                                                            ifelse(. == "ROBERT.SCUDERI", "ROB.SCUDERI", 
+                                                                                                                   ifelse(. == "RODNEY.PELLEY", "ROD.PELLEY", 
+                        ifelse(. == "SIARHEI.KASTSITSYN", "SERGEI.KOSTITSYN", 
+                               ifelse(. == "STAFFAN.KRONVALL", "STAFFAN.KRONWALL", 
+                                      ifelse(. == "STEVEN.REINPRECHT", "STEVE.REINPRECHT", 
+                                             ifelse(. == "TJ.GALIARDI", "T.J..GALIARDI", 
+                                                    ifelse(. == "TJ.HENSICK", "T.J..HENSICK", 
+                                                           ifelse(. == "TOMMY.SESTITO", "TOM.SESTITO", 
+                                                                  ifelse(. == "VACLAV.PROSPAL", "VINNY.PROSPAL", 
+                                                                         ifelse(. == "VINCENT.HINOSTROZA", "VINNIE.HINOSTROZA", 
+                                                                                ifelse(. == "WILLIAM.THOMAS", "BILL.THOMAS", 
+                                                                                       ifelse(. == "ZACHARY.ASTON-REESE", "ZACH.ASTON-REESE", 
+                                                                                              ifelse(. == "ZACHARY.SANFORD", "ZACH.SANFORD", 
+                                                                                                     ifelse(. == "ZACHERY.STORTINI", "ZACK.STORTINI", 
+                                                                                                            
+                                                                                                            ## EXTRAS
+                                                                                                            ifelse(. == "PAT.MAROON", "PATRICK.MAROON", 
+                                                                                                            .)
+                                                                                              )))))))))))))))))))))))))))))
+
+
+# Update skater names roster data
+shifts_new <- shifts_new %>% 
+  mutate_at(vars(player), 
+            funs(ifelse(. == "ANDREI.KASTSITSYN", "ANDREI.KOSTITSYN", 
+                        ifelse(. == "AJ.GREER", "A.J..GREER", 
+                               ifelse(. == "ANDREW.GREENE", "ANDY.GREENE", 
+                                      ifelse(. == "ANDREW.WOZNIEWSKI", "ANDY.WOZNIEWSKI", 
+                                             ifelse(. == "ANTHONY.DEANGELO", "TONY.DEANGELO", 
+                                                    ifelse(. == "BATES (JON).BATTAGLIA", "BATES.BATTAGLIA", 
+                                                           ifelse(. == "BRADLEY.MILLS", "BRAD.MILLS", 
+                                                                  ifelse(. == "COLIN (JOHN).WHITE", "COLIN.WHITE", 
+                                                                         ifelse(. == "CRISTOVAL.NIEVES", "BOO.NIEVES", 
+                                                                                ifelse(. == "DANNY.BRIERE", "DANIEL.BRIERE", 
+                                                                                       ifelse(. %in% c("DAN.CLEARY", "DANNY.CLEARY"), "DANIEL.CLEARY", 
+                                                                                              ifelse(. == "DANNY.O'REGAN", "DANIEL.O'REGAN", 
+                         ifelse(. == "DENIS JR..GAUTHIER", "DENIS.GAUTHIER", 
+                                ifelse(. == "FREDERICK.MEYER IV", "FREDDY.MEYER", 
+                                       ifelse(. == "JACOB.DOWELL", "JAKE.DOWELL", 
+                                              ifelse(. == "JAMES.VANDERMEER", "JIM.VANDERMEER", 
+                                                     ifelse(. == "JAMES.WYMAN", "JT.WYMAN", 
+                                                            ifelse(. == "JOHN.HILLEN III", "JACK.HILLEN", 
+                                                                   ifelse(. == "JOHN.ODUYA", "JOHNNY.ODUYA", 
+                                                                          ifelse(. == "JOHN.PEVERLEY", "RICH.PEVERLEY", 
+                                                                                 ifelse(. == "JONATHAN.SIM", "JON.SIM", 
+                                                                                        ifelse(. == "JONATHON.KALINSKI", "JON.KALINSKI", 
+                                                                                               ifelse(. == "JOSEPH.CRABB", "JOEY.CRABB", 
+                                                                                                      ifelse(. == "JOSHUA.BAILEY", "JOSH.BAILEY", 
+                                                                                                             ifelse(. == "JOSHUA.MORRISSEY", "JOSH.MORRISSEY", 
+                          ifelse(. == "JT.COMPHER", "J.T..COMPHER", 
+                                 ifelse(. == "KRYSTOFER.KOLANOS", "KRYS.KOLANOS", 
+                                        ifelse(. == "MARC.POULIOT", "MARC-ANTOINE.POULIOT", 
+                                               ifelse(. == "MARTIN.ST. PIERRE", "MARTIN.ST PIERRE", 
+                                                      ifelse(. == "MARTY.HAVLAT", "MARTIN.HAVLAT", 
+                                                             ifelse(. == "MATHEW.DUMBA", "MATT.DUMBA", 
+                                                                    ifelse(. == "MATTHEW.IRWIN", "MATT.IRWIN", 
+                                                                           ifelse(. == "MATTHEW.NIETO", "MATT.NIETO", 
+                                                                                  ifelse(. == "MATTHEW.STAJAN", "MATT.STAJAN", 
+                                                                                         ifelse(. == "MAXIM.MAYOROV", "MAKSIM.MAYOROV", 
+                                                                                                ifelse(. == "MAXWELL.REINHART", "MAX.REINHART", 
+                                                                                                       ifelse(. == "MICHAEL.BLUNDEN", "MIKE.BLUNDEN", 
+                                                                                                              ifelse(. == "MICHAËL.BOURNIVAL", "MICHAEL.BOURNIVAL", 
+                                                                                                                     ifelse(. == "MICHAEL.GRIER", "MIKE.GRIER",
+                                                                                                                            ifelse(. == "MICHAEL.KNUBLE", "MIKE.KNUBLE", 
+                           ifelse(. == "MICHAEL.KOMISAREK", "MIKE.KOMISAREK", 
+                                  ifelse(. == "MICHAEL.MATHESON", "MIKE.MATHESON", 
+                                         ifelse(. == "MICHAEL.MODANO", "MIKE.MODANO", 
+                                                ifelse(. == "MICHAEL.RUPP", "MIKE.RUPP", 
+                                                       ifelse(. == "MICHAEL.SILLINGER", "MIKE.SILLINGER", 
+                                                              ifelse(. == "NATHAN.GUENIN", "NATE.GUENIN", 
+                                                                     ifelse(. == "NICHOLAS.BOYNTON", "NICK.BOYNTON", 
+                                                                            ifelse(. == "NICHOLAS.DRAZENOVIC", "NICK.DRAZENOVIC", .)
+                                                                     )))))))))))))))))))))))))))))))))))))))))))))))))
+
+shifts_new <- shifts_new %>% 
+  mutate_at(vars(player), 
+            funs(ifelse(. == "NICKLAS.BERGFORS", "NICLAS.BERGFORS",
+                        ifelse(. == "NIKLAS.KRONVALL", "NIKLAS.KRONWALL", 
+                               ifelse(. == "NIKOLAI.ANTROPOV", "NIK.ANTROPOV", 
+                                      ifelse(. == "NIKOLAI.ZHERDEV", "NIKOLAY.ZHERDEV", 
+                                             ifelse(. == "OLIVIER.MAGNAN-GRENIER", "OLIVIER.MAGNAN", 
+                                                    ifelse(. %in% c("P. J..AXELSSON", "PER JOHAN.AXELSSON"), "P.J..AXELSSON", 
+                                                           ifelse(. == "PIERRE-ALEX.PARENTEAU", "P.A..PARENTEAU", 
+                                                                  ifelse(. == "PHILIP.VARONE", "PHIL.VARONE", 
+                                                                         ifelse(. == "RAYMOND.MACIAS", "RAY.MACIAS", 
+                                                                                ifelse(. == "RJ.UMBERGER", "R.J..UMBERGER", 
+                                                                                       ifelse(. == "ROBERT.BLAKE", "ROB.BLAKE", 
+                                                                                              ifelse(. == "ROBERT.EARL", "ROBBIE.EARL", 
+                                                                                                     ifelse(. == "ROBERT.HOLIK", "BOBBY.HOLIK", 
+                                                                                                            ifelse(. == "ROBERT.SCUDERI", "ROB.SCUDERI", 
+                                                                                                                   ifelse(. == "RODNEY.PELLEY", "ROD.PELLEY", 
+                        ifelse(. == "SIARHEI.KASTSITSYN", "SERGEI.KOSTITSYN", 
+                               ifelse(. == "STAFFAN.KRONVALL", "STAFFAN.KRONWALL", 
+                                      ifelse(. == "STEVEN.REINPRECHT", "STEVE.REINPRECHT", 
+                                             ifelse(. == "TJ.GALIARDI", "T.J..GALIARDI", 
+                                                    ifelse(. == "TJ.HENSICK", "T.J..HENSICK", 
+                                                           ifelse(. == "TOMMY.SESTITO", "TOM.SESTITO", 
+                                                                  ifelse(. == "VACLAV.PROSPAL", "VINNY.PROSPAL", 
+                                                                         ifelse(. == "VINCENT.HINOSTROZA", "VINNIE.HINOSTROZA", 
+                                                                                ifelse(. == "WILLIAM.THOMAS", "BILL.THOMAS", 
+                                                                                       ifelse(. == "ZACHARY.ASTON-REESE", "ZACH.ASTON-REESE", 
+                                                                                              ifelse(. == "ZACHARY.SANFORD", "ZACH.SANFORD", 
+                                                                                                     ifelse(. == "ZACHERY.STORTINI", "ZACK.STORTINI", 
+                                                                                                            
+                                                                                                            ## EXTRAS
+                                                                                                            ifelse(. == "PAT.MAROON", "PATRICK.MAROON", 
+                                                                                                            .)
+                                                                                              )))))))))))))))))))))))))))))
+
+
+###################################################
+
+
+
+# Test for NA positions in new pbp data
+fun.position_test <- function(pbp_data) { 
+  
+  position_test <- data.frame(player = as.character(sort(unique(c(
+    sort(na.omit(unique(pbp_data$home_on_1))), 
+    sort(na.omit(unique(pbp_data$home_on_2))), 
+    sort(na.omit(unique(pbp_data$home_on_3))), 
+    sort(na.omit(unique(pbp_data$home_on_4))), 
+    sort(na.omit(unique(pbp_data$home_on_5))), 
+    sort(na.omit(unique(pbp_data$home_on_6))), 
+    
+    sort(na.omit(unique(pbp_data$away_on_1))), 
+    sort(na.omit(unique(pbp_data$away_on_2))), 
+    sort(na.omit(unique(pbp_data$away_on_3))), 
+    sort(na.omit(unique(pbp_data$away_on_4))), 
+    sort(na.omit(unique(pbp_data$away_on_5))), 
+    sort(na.omit(unique(pbp_data$away_on_6)))))))
+    ) %>% 
+    left_join(., player_position, by = "player") %>% 
+    filter(is.na(position))
+  
+  # Print result
+  if(nrow(position_test) > 0) { 
+    print(paste0("NA Players: ", position_test$player), quote = F)
+    
+    }
+  else if(nrow(position_test) == 0) { 
+    print(paste0("No position mismatches!"), quote = F)
+    
+    }
+  
+  return(position_test)
+  
+  }
+position_test <- fun.position_test(pbp_data = pbp_new)
+
+
+
+## --------------------------------- ##
+##   Prep / Add xG Data to New PBP   ##
+## --------------------------------- ##
+
+#######################################
+
+# Functions to expand, index, and add xG (4 models) to scraped pbp df (version current 2/26/18)
+pbp_xG_add_list <- fun.pbp_full_add(data = pbp_new, 
+                                    model_EV = xG_model_XGB_7_EV, 
+                                    model_UE = xG_model_XGB_7_UE, 
+                                    model_SH = xG_model_XGB_10_SH, 
+                                    model_EN = xG_model_XGB_10_EN)
+
+# Return data from function
+pbp_df <- pbp_xG_add_list$pbp_full
+
+
+# Check densities
+hist(na.omit(filter(pbp_df, event_type %in% st.fenwick_events, game_strength_state %in% st.even_strength)$pred_XGB_7), breaks = 50)
+hist(na.omit(filter(pbp_df, event_type %in% st.fenwick_events, game_strength_state %in% st.pp_strength)$pred_XGB_7), breaks = 50)
+hist(na.omit(filter(pbp_df, event_type %in% st.fenwick_events, grepl("E", game_strength_state))$pred_XGB_7), breaks = 50)
+
+
+if (nrow(pbp_new) == nrow(pbp_df) & ncol(pbp_new) == ncol(pbp_df) - 14) { 
+  rm(pbp_xG_add_list)
+  print("Success! All Rows Intact! All Columns Added!")
+  
+  } else { 
+    print("UH-OH!! Data Not Added as Intended :(")  
+  
+    }
+
+# Test
+paste0("Season: ", unique(pbp_df$season), "  //  Games: ", length(unique(pbp_df$game_id)), 
+       "  //  Goals: ", sum((pbp_df$event_type == "GOAL")), "  //  xG: ", round(sum(na.omit(pbp_df$pred_XGB_7)), 2), 
+       "  //  NA fenwicks: ", 1 - sum(pbp_df$event_type %in% st.fenwick_events & !is.na(pbp_df$pred_XGB_7)) / sum((pbp_df$event_type %in% st.fenwick_events)))
+
+
+#######################################
+
+
+
+
+
+
+## -------------------- RUN GAME BY GAME FUNCTIONS --------------------- ##
+
+
+
+## ----------------------- ##
+##   Even-Strength Games   ##
+## ----------------------- ##
+
+games_EV_new <- fun.combine_counts(data = pbp_df)
+
+
+## -------------------------- ##
+##   Powerplay Games Script   ##
+## -------------------------- ##
+
+games_PP_new <- fun.combine_counts_PP(data = pbp_df)
+
+
+## ------------------------------ ##
+##    Shorthanded Games Script    ##
+## ------------------------------ ##
+
+games_SH_new <- fun.combine_counts_SH(data = pbp_df)
+
+
+## ------------------------ ##
+##   All Sit Games Script   ##
+## ------------------------ ##
+
+games_all_sit_new <- fun.all_sit_standard(data_ = pbp_df)
+
+
+## ------------------------------- ##
+##   Rel_TM - TOI Together Games   ##
+## ------------------------------- ##
+
+teammate_TOI_EV_new <- fun.teammate(pbp_data = pbp_df, strength = "even")
+teammate_TOI_PP_new <- fun.teammate(pbp_data = pbp_df, strength = "powerplay")
+teammate_TOI_SH_new <- fun.teammate(pbp_data = pbp_df, strength = "shorthanded")
+
+
+## -------------------------- ##
+##   Goalies - Game by Game   ##
+## -------------------------- ##
+
+goalie_games_all_sit_new <- fun.goalie_games(data = pbp_df)
+
+
+## ---------------------------- ##
+##   Penalty Goals Calculaton   ##
+## ---------------------------- ##
+
+# Run Functions
+pen_source <- fun.pen_setup(data = pbp_df)
+pen_enhanced <- fun.pen_assign(data = pen_source)
+pen_calc_main <- fun.pen_value_main(pen_data = pen_enhanced, pbp_data = pbp_df)
+pen_calc_xtras <- fun.pen_value_xtra(data = pen_enhanced)
+adj_pen_games_new <- fun.pen_value_sum(main_data = pen_calc_main, xtra_data = pen_calc_xtras)
+pen_team_take <- fun.pen_team_take(data = pen_calc_main)
+
+rm(pen_source, pen_enhanced, pen_calc_main, pen_calc_xtras)
+
+
+# Update adj_pen_diff data.frame with Teams and TOI (need all sit TOI and goalie data created above)
+adj_pen_games_new <- adj_pen_games_new %>% 
+  left_join(., games_all_sit_new %>%                      ## Skaters 
+              select(player:Team), 
+            by = c("player", "game_id", "season")
+            ) %>% 
+  left_join(., player_position, by = "player") %>% 
+  left_join(., goalie_games_all_sit_new %>%               ## Goalies
+              select(player, game_id, season, Team) %>%  
+              rename(Team_goalie = Team), 
+            by = c("player", "game_id", "season")
+            ) %>% 
+  mutate(position = ifelse(is.na(position) & !is.na(Team_goalie), 3, position), 
+         Team =     ifelse(is.na(Team) & !is.na(Team_goalie), Team_goalie, Team)
+         ) %>% 
+  select(player, position, game_id, season, Team, take_count:adj_pen_diff)
+
+
+## ------------------------------ ##
+##   Team Stats Games Functions   ##
+## ------------------------------ ##
+
+team_games_all_sit_new <- fun.team_games_all_sit(data = pbp_df)
+team_games_EV_new <-      fun.team_games_EV(data = pbp_df)
+team_games_PP_new <-      fun.team_games_PP(data = pbp_df)
+team_games_SH_new <-      fun.team_games_SH(data = pbp_df)
+
+
+
+## ----------------------------- ##
+##   Create Game Charts Labels   ## *** For New PBP Data
+## ----------------------------- ##
+
+team_games_new_pbp <- pbp_df %>% 
+  group_by(home_team, away_team, season, game_id, game_date) %>% 
+  summarise() %>% 
+  rename(Team = home_team, 
+         Opponent = away_team
+         ) %>% 
+  data.frame() %>%
+  rbind(., pbp_df %>% 
+          group_by(away_team, home_team, season, game_id, game_date) %>% 
+          summarise() %>% 
+          rename(Team = away_team, 
+                 Opponent = home_team
+          ) %>% 
+          data.frame()
+        ) %>% 
+  mutate(game_label = paste0(Team, " vs. ", Opponent, ", ", game_date)) %>% 
+  arrange(Team, game_id) %>% 
+  data.frame()
+
+
+
+
+# Verify All Games Are Included in All Data Frames from Above
+fun.check_new_games <- function() { 
+  
+  check_games <- list(
+    schedule  = sort(unique(schedule_current$game_id)), 
+      
+    pbp =      sort(unique(pbp_df$game_id)),
+    shifts =   sort(unique(shifts_new$game_id)),
+    rosters =  sort(unique(rosters_new$game_id)),
+    
+    games_all = sort(unique(games_all_sit_new$game_id)), 
+    games_EV =  sort(unique(games_EV_new$game_id)), 
+    games_PP =  sort(unique(games_PP_new$game_id)), 
+    games_SH =  sort(unique(games_SH_new$game_id)), 
+    
+    TOI_tog_EV = sort(unique(teammate_TOI_EV_new$game_id)), 
+    TOI_tog_PP = sort(unique(teammate_TOI_PP_new$game_id)), 
+    TOI_tog_SH = sort(unique(teammate_TOI_SH_new$game_id)), 
+    
+    teams_all = sort(unique(team_games_all_sit_new$game_id)), 
+    teams_EV =  sort(unique(team_games_EV_new$game_id)), 
+    teams_PP =  sort(unique(team_games_PP_new$game_id)), 
+    teams_SH =  sort(unique(team_games_SH_new$game_id)), 
+    
+    pen_goals =       sort(unique(adj_pen_games_new$game_id)), 
+    goalies_all_sit = sort(unique(goalie_games_all_sit_new$game_id))
+    )
+  
+  NA_check <- c(0, 0, 0, 0, 
+                sum(is.na(games_all_sit_new)), sum(is.na(games_EV_new)), sum(is.na(games_PP_new)), sum(is.na(games_SH_new)), 
+                sum(is.na(teammate_TOI_EV_new)), sum(is.na(teammate_TOI_PP_new)), sum(is.na(teammate_TOI_SH_new)), 
+                sum(is.na(team_games_all_sit_new)), sum(is.na(team_games_EV_new)), sum(is.na(team_games_PP_new)), sum(is.na(team_games_SH_new)), 
+                sum(is.na(adj_pen_games_new)), 
+                sum(is.na(goalie_games_all_sit_new))
+                )
+    
+  
+  # Check Game Totals
+  total_games <- length(check_games$pbp)
+  
+  check <- data.frame(game_count = do.call(rbind, lapply(check_games, function(x) length(x))), 
+                      NAs = NA_check
+                      ) %>% 
+    rownames_to_column(., var = "table") %>% 
+    mutate(test = 1 * (game_count == total_games))
+  
+  print(check)
+  
+  # Print message
+  if (mean(check$test) == 1 & sum(NA_check) == 0) { 
+    print("Success! - All Games Match! No NAs! Great Job! :)", quote = F)
+    
+    } 
+  else if (mean(check$test) != 1 & sum(NA_check) == 0) { 
+    print("Games Don't Match... but No NAs!", quote = F)
+    
+    }
+  else if (mean(check$test) == 1 & sum(NA_check) != 0) { 
+    print("All Games Match... NAs present")
+    
+    }
+  else if (mean(check$test) != 1 & sum(NA_check) != 0) { 
+    print("Oh No! Games Don't Match, NAs present :(")
+    
+    }
+  
+  # Return
+  return(check)
+  
+  }
+check_new_games <- fun.check_new_games()
+
+
+
+
+
+## ---------------- SAVE NEW DATA AND LOAD TOTAL DATA ---------------- ##
+
+
+# Save New Data
+db <- DBI::dbConnect(SQLite(), dbname = "data/NHL_db_1819.sqlite") # NEW DATABASE NAME (second time)
+
+#dbWriteTable(db, "games_data_all_sit", games_all_sit_new, overwrite = F, append = T)
+#dbWriteTable(db, "games_data_EV", games_EV_new, overwrite = F, append = T)
+#dbWriteTable(db, "games_data_PP", games_PP_new, overwrite = F, append = T)
+#dbWriteTable(db, "games_data_SH", games_SH_new, overwrite = F, append = T)
+
+#dbWriteTable(db, "TOI_together_data_EV", teammate_TOI_EV_new, overwrite = F, append = T)
+#dbWriteTable(db, "TOI_together_data_PP", teammate_TOI_PP_new, overwrite = F, append = T)
+#dbWriteTable(db, "TOI_together_data_SH", teammate_TOI_SH_new, overwrite = F, append = T)
+
+#dbWriteTable(db, "goalie_games_all_sit", goalie_games_all_sit_new, overwrite = F, append = T)
+#dbWriteTable(db, "adj_pen_games_all_sit", adj_pen_games_new, overwrite = F, append = T)
+
+#dbWriteTable(db, "team_data_all_sit", team_games_all_sit_new, overwrite = F, append = T)
+#dbWriteTable(db, "team_data_EV", team_games_EV_new, overwrite = F, append = T)
+#dbWriteTable(db, "team_data_PP", team_games_PP_new, overwrite = F, append = T)
+#dbWriteTable(db, "team_data_SH", team_games_SH_new, overwrite = F, append = T)
+
+#dbWriteTable(db, "pbp_full", pbp_df, overwrite = F, append = T)
+#dbWriteTable(db, "shifts_full", shifts_new, overwrite = F, append = T)
+#dbWriteTable(db, "rosters_full", rosters_new, overwrite = F, append = T)
+
+#dbWriteTable(db, "game_charts_labels", team_games_new_pbp, overwrite = F, append = T)
+
+dbDisconnect(db)
+
+
+
+
+## Remove a Table - *** if needed ***
+#dbRemoveTable(db, "game_score_games")
+#dbRemoveTable(db, "on_ice_games_all_sit")
+
+#dbRemoveTable(db, "games_data_all_sit")
+#dbRemoveTable(db, "games_data_EV")
+#dbRemoveTable(db, "games_data_PP")
+#dbRemoveTable(db, "games_data_SH")
+
+#dbRemoveTable(db, "goalie_games_all_sit")
+
+#dbRemoveTable(db, "team_data_all_sit")
+#dbRemoveTable(db, "team_data_EV")
+#dbRemoveTable(db, "team_data_PP")
+#dbRemoveTable(db, "team_data_SH")
+
+
+
+
+# Deprecated - *** removed from database ***
+#dbWriteTable(db, "game_score_games", game_score_games_new, overwrite = F, append = T)
+#dbWriteTable(db, "on_ice_games_all_sit", on_ice_all_sit_games_new, overwrite = F, append = T)
+
+
+
+
+# Check game_id counts in database
+fun.check_db_games <- function(db_name) { 
+  
+  db <- DBI::dbConnect(SQLite(), dbname = db_name)
+  
+  check_games <- list(
+    pbp =      sort(dbGetQuery(db, "SELECT distinct(game_id) FROM pbp_full WHERE season == 20182019")$game_id),
+    shifts =   sort(dbGetQuery(db, "SELECT distinct(game_id) FROM shifts_full WHERE season == 20182019")$game_id),
+    rosters =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM rosters_full WHERE season == 20182019")$game_id),
+    
+    game_labels =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM game_charts_labels WHERE season == 20182019")$game_id),
+    
+    games_all = sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_all_sit WHERE season == 20182019")$game_id), 
+    games_EV =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_EV WHERE season == 20182019")$game_id), 
+    games_PP =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_PP WHERE season == 20182019")$game_id), 
+    games_SH =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_SH WHERE season == 20182019")$game_id), 
+    
+    TOI_tog_EV = sort(dbGetQuery(db, "SELECT distinct(game_id) FROM TOI_together_data_EV WHERE season == 20182019")$game_id), 
+    TOI_tog_PP = sort(dbGetQuery(db, "SELECT distinct(game_id) FROM TOI_together_data_PP WHERE season == 20182019")$game_id), 
+    TOI_tog_SH = sort(dbGetQuery(db, "SELECT distinct(game_id) FROM TOI_together_data_SH WHERE season == 20182019")$game_id), 
+    
+    teams_all = sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_all_sit WHERE season == 20182019")$game_id), 
+    teams_EV = sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_EV WHERE season == 20182019")$game_id), 
+    teams_PP = sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_PP WHERE season == 20182019")$game_id), 
+    teams_SH = sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_SH WHERE season == 20182019")$game_id), 
+    
+    pen_goals =       sort(dbGetQuery(db, "SELECT distinct(game_id) FROM adj_pen_games_all_sit WHERE season == 20182019")$game_id), 
+    goalies_all_sit = sort(dbGetQuery(db, "SELECT distinct(game_id) FROM goalie_games_all_sit WHERE season == 20182019")$game_id)
+    )
+  
+  dbDisconnect(db)
+  
+  
+  # Check Game Totals
+  total_games <- length(check_games$pbp)
+  
+  check <- data.frame(game_count = do.call(rbind, lapply(check_games, function(x) length(x)))) %>% 
+    rownames_to_column(., var = "table") %>% 
+    mutate(test = 1 * (game_count == total_games))
+  
+  print(check)
+  
+  # Print message
+  if (mean(check$test) == 1) { 
+    print("Success! - All Games Match! Great Job! :)", quote = F)
+    
+    } 
+  else if (mean(check$test) != 1) { 
+    print("UH-OH!! - Games Don't Match! :(", quote = F)
+    
+    }
+  
+  # Return
+  return(check)
+  
+  }
+check_db_games <- fun.check_db_games(db_name = "data/NHL_db_1819.sqlite") # NEW DATABASE NAME
+
+
+# Remove New Data
+rm(pbp_new, shifts_new, rosters_new,
+   games_EV_new, games_PP_new, games_SH_new, games_all_sit_new, 
+   teammate_TOI_EV_new, teammate_TOI_PP_new, teammate_TOI_SH_new, 
+   team_games_EV_new, team_games_PP_new, team_games_SH_new, team_games_all_sit_new, 
+   goalie_games_all_sit_new, adj_pen_games_new, 
+   xG_model_XGB_7_EV, xG_model_XGB_7_UE, xG_model_XGB_10_SH, xG_model_XGB_10_EN)
+gc()
+
+
+
+
+
+## ------------------------------------------------------ ##
+
+
+
+
+
+# Load Full Joined Data
+db <- DBI::dbConnect(SQLite(), dbname = "data/NHL_db_1819.sqlite") # NEW DATABASE NAME
+
+pbp_joined <-     db %>% tbl("pbp_full") %>% data.frame()
+shifts_joined <-  db %>% tbl("shifts_full") %>% data.frame()
+rosters_joined <- db %>% tbl("rosters_full") %>% data.frame()
+
+games_all_sit_joined <- db %>% tbl("games_data_all_sit") %>% data.frame()
+games_EV_joined <-      db %>% tbl("games_data_EV") %>% data.frame()
+games_PP_joined <-      db %>% tbl("games_data_PP") %>% data.frame()
+games_SH_joined <-      db %>% tbl("games_data_SH") %>% data.frame()
+
+TOI_together_EV_joined <- db %>% tbl("TOI_together_data_EV") %>% data.frame()
+TOI_together_PP_joined <- db %>% tbl("TOI_together_data_PP") %>% data.frame()
+TOI_together_SH_joined <- db %>% tbl("TOI_together_data_SH") %>% data.frame()
+
+team_games_all_sit_joined <- db %>% tbl("team_data_all_sit") %>% data.frame()
+team_games_EV_joined <- db %>% tbl("team_data_EV") %>% data.frame()
+team_games_PP_joined <- db %>% tbl("team_data_PP") %>% data.frame()
+team_games_SH_joined <- db %>% tbl("team_data_SH") %>% data.frame()
+
+goalie_games_all_sit_joined <- db %>% tbl("goalie_games_all_sit") %>% data.frame()
+adj_pen_games_joined <-        db %>% tbl("adj_pen_games_all_sit") %>% data.frame()
+
+game_labels_joined <- db %>% tbl("game_charts_labels") %>% data.frame()
+
+dbDisconnect(db)
+
+
+# DEPRECATED
+#on_ice_all_sit_games_joined <- db %>% tbl("on_ice_games_all_sit") %>% data.frame() # replaced with games_all_sit_joined
+#game_score_games_joined <-     db %>% tbl("game_score_games") %>% data.frame()     # not used anymore
+
+
+
+
+
+
+
+
+## ------------------- COMPUTE SUMMED TABLES ------------------- ##
+
+
+
+## ------------------ ##
+##   Sum Count Data   ##
+## ------------------ ##
+
+########################
+
+# Run Functions - Totals
+counts_EV_season <-      fun.playercounts_season_EV(data = games_EV_joined, type = "per_team", per_60 = "F")
+counts_PP_season <-      fun.playercounts_season_PP(data = games_PP_joined, type = "per_team", per_60 = "F")
+counts_SH_season <-      fun.playercounts_season_SH(data = games_SH_joined, type = "per_team", per_60 = "F")
+counts_all_sit_season <- fun.playercounts_season_all_sit(data = games_all_sit_joined, position_data = player_position)
+
+
+# Run Functions - per 60 (for GAR calculations)
+counts_EV_season_60 <- fun.playercounts_season_EV(data = games_EV_joined, type = "per_team", per_60 = "T")
+counts_PP_season_60 <- fun.playercounts_season_PP(data = games_PP_joined, type = "per_team", per_60 = "T")
+counts_SH_season_60 <- fun.playercounts_season_SH(data = games_SH_joined, type = "per_team", per_60 = "T")
+
+
+########################
+
+
+## ----------------------------- ##
+##   Sum Rel_TM / WOWY Metrics   ##
+## ----------------------------- ##
+
+##################################
+
+# Run Function
+rel_TM_player_EV_list <- fun.relative_teammate(TM_data = TOI_together_EV_joined, 
+                                               games_data = games_EV_joined, 
+                                               position_data = player_position, 
+                                               strength = "even", 
+                                               sum_type = "per_team") # "per_team", "per_season", "multiple_seasons"
+
+rel_TM_player_PP_list <- fun.relative_teammate(TM_data = TOI_together_PP_joined, 
+                                               games_data = games_PP_joined, 
+                                               position_data = player_position, 
+                                               strength = "powerplay", 
+                                               sum_type = "per_team") # "per_team", "per_season", "multiple_seasons"
+
+rel_TM_player_SH_list <- fun.relative_teammate(TM_data = TOI_together_SH_joined, 
+                                               games_data = games_SH_joined, 
+                                               position_data = player_position, 
+                                               strength = "shorthanded", 
+                                               sum_type = "per_team") # "per_team", "per_season", "multiple_seasons"
+
+
+# Pull out rel_TM data
+rel_TM_player_EV_season <- rel_TM_player_EV_list$rel_TM_data
+rel_TM_player_PP_season <- rel_TM_player_PP_list$rel_TM_data
+rel_TM_player_SH_season <- rel_TM_player_SH_list$rel_TM_data
+
+
+# Pull out WOWY data and reorder / rename - EV
+WOWY_EV_season <- rel_TM_player_EV_list$WOWY_data %>% 
+  select(player, teammate, 
+         season, 
+         Team, position_p, position_t, 
+         GP_p, TOI_p, GP_t, TOI_t, TOI_tog, player_TOI_perc_w, GF60_p:xGA60_p, GF60_t:xGA60_t) %>% 
+  mutate(player_TOI_perc_w = player_TOI_perc_w * 100) %>% 
+  mutate_if(is.numeric, funs(round(., 2))) %>% 
+  data.frame()
+
+# Pull out WOWY data and reorder / rename - PP
+WOWY_PP_season <- rel_TM_player_PP_list$WOWY_data %>% 
+  select(player, teammate, 
+         season, 
+         Team, position_p, position_t, 
+         TOI_p, TOI_t, TOI_tog, player_TOI_perc_w, GF60_p:xGF60_p, GF60_t:xGF60_t) %>% 
+  mutate(player_TOI_perc_w = player_TOI_perc_w * 100) %>% 
+  mutate_if(is.numeric, funs(round(., 2))) %>% 
+  data.frame()
+
+# Pull out WOWY data and reorder / rename - SH
+WOWY_SH_season <- rel_TM_player_SH_list$WOWY_data %>% 
+  select(player, teammate, 
+         season, 
+         Team, position_p, position_t, 
+         TOI_p, TOI_t, TOI_tog, player_TOI_perc_w, GA60_p:xGA60_p, GA60_t:xGA60_t) %>% 
+  mutate(player_TOI_perc_w = player_TOI_perc_w * 100) %>% 
+  mutate_if(is.numeric, funs(round(., 2))) %>% 
+  data.frame()
+
+
+##################################
+
+
+## --------------------- ##
+##   Sum Penalty Goals   ##
+## --------------------- ##
+
+###########################
+
+# Per player, season, Team
+adj_pen_season <- adj_pen_games_joined %>% 
+  group_by(player, position, season, Team) %>% 
+  summarise_at(vars(take_count, draw_count, adj_take, adj_draw), funs(sum)) %>% 
+  left_join(., rbind(games_all_sit_joined %>% 
+                       group_by(player, season, Team) %>% 
+                       summarise(TOI = sum(TOI)) %>% 
+                       data.frame(),
+                     goalie_games_all_sit_joined %>% 
+                       group_by(player, season, Team) %>% 
+                       summarise(TOI = sum(TOI)) %>% 
+                       data.frame()
+                     ), 
+            by = c("player", "season", "Team")
+            ) %>% 
+  group_by(position, season) %>% 
+  mutate(take_AA = ((adj_take / TOI) - (sum(na.omit(adj_take)) / sum(na.omit(TOI)))) * TOI, 
+         draw_AA = ((adj_draw / TOI) - (sum(na.omit(adj_draw)) / sum(na.omit(TOI)))) * TOI, 
+         pens =    take_AA + draw_AA
+         ) %>% 
+  mutate_at(vars(take_AA:pens), funs(round(., 1))) %>% 
+  select(player:Team, TOI, take_count, draw_count, adj_take, adj_draw, take_AA, draw_AA, pens) %>% 
+  ungroup() %>% 
+  mutate(position = ifelse(position == 1, "F", 
+                           ifelse(position == 2, "D", 
+                                  ifelse(position == 3, "G", "U")))
+         ) %>% 
+  rename(TOI_all = TOI) %>% 
+  data.frame()
+
+
+###########################
+
+
+## -------------------- ##
+##   Sum Goalie Stats   ##
+## -------------------- ##
+
+##########################
+
+goalie_season <- goalie_games_all_sit_joined %>% 
+  group_by(player, season, Team) %>% 
+  summarise_at(vars(TOI, GA, SA, GA_, FA, xGA), funs(sum)) %>% 
+  ungroup() %>% 
+  arrange(desc(TOI)) %>% 
+  mutate(n = row_number(),  
+         qual = 1 * (n <= 60), 
+         SV_perc = 100 * (1 - (GA / SA)), 
+         FSV_perc = 100 * (1 - (GA_ / FA)), 
+         xFSV_perc = 100 * (1 - (xGA / FA)), 
+         d_FSV_perc = FSV_perc - xFSV_perc, 
+         GSAA = ((sum(GA) / sum(SA)) * SA) - GA, 
+         GSAx = xGA - GA_
+         ) %>% 
+  mutate_if(is.numeric, funs(round(., 2))) %>% 
+  select(player:Team, TOI, 
+         qual, 
+         GA, SA, 
+         SV_perc, 
+         GA_, FA, xGA, 
+         FSV_perc, xFSV_perc, d_FSV_perc, GSAA, GSAx
+         ) %>% 
+  arrange(player) %>% 
+  data.frame()
+
+
+##########################
+
+
+## ------------------ ##
+##   Sum Team Stats   ##
+## ------------------ ##
+
+########################
+
+# Run Functions
+team_games_sum_all_sit_season <- fun.team_sum_all_sit(data = team_games_all_sit_joined)
+team_sum_EV_season <- fun.team_sum_EV(data = team_games_EV_joined)
+team_sum_PP_season <- fun.team_sum_PP(data = team_games_PP_joined)
+team_sum_SH_season <- fun.team_sum_SH(data = team_games_SH_joined)
+
+
+########################
+
+
+## ---------------------- ##
+##   TEAM RAPM RUN - EV   ## 
+## ---------------------- ##
+
+############################
+
+# Run Functions
+team_strength_list_EV <- fun.team_RAPM(data = pbp_joined, regularized = "TRUE")
+team_strength_RAPM_EV <- team_strength_list_EV$team_data
+
+
+############################
+
+
+## ---------------------- ##
+##   TEAM RAPM RUN - PP   ##
+## ---------------------- ##
+
+############################
+
+# Run Functions
+team_strength_list_PP <- fun.team_RAPM_PP_SH(data = pbp_joined)
+team_strength_RAPM_PP <- team_strength_list_PP$team_PP
+team_strength_RAPM_SH <- team_strength_list_PP$team_SH
+
+
+############################
+
+
+## -------------------- ##
+##   SPM/GAR/WAR Prep   ##
+## -------------------- ##
+
+##########################
+
+## ----------------- ##
+##   Goals to Wins   ##
+## ----------------- ##
+
+# Goals in all situations
+NHL_league_goals <- pbp_joined %>% 
+  group_by(game_id, season, home_team, away_team) %>% 
+  filter(event_type == "GOAL") %>% 
+  summarise(GF_home = sum(event_type == "GOAL" & event_team == home_team & game_period < 5), 
+            GF_away = sum(event_type == "GOAL" & event_team == away_team & game_period < 5)
+            ) %>% 
+  data.frame()
+
+# Calculate Goals to Wins Conversion - in season
+goals_to_wins_season <- NHL_league_goals %>% 
+  mutate(n = 1) %>% 
+  group_by(season) %>% 
+  summarise(games = sum(n),  
+            GF = (sum(GF_home) + sum(GF_away)) / games / 2, 
+            GPW = 4 * GF / 2.091048 # exponent determined in GAR_predictions_2.R script
+            ) %>% 
+  rename(season_ID = season) %>% 
+  data.frame()
+
+rm(NHL_league_goals)
+
+
+## -------------------------- ##
+##   Join Counts and Rel_TM   ##
+## -------------------------- ##
+
+all_metrics_season_EV <- counts_EV_season_60 %>% 
+  select(-c(t_GF:t_xGA_state)) %>% 
+  left_join(., select(rel_TM_player_EV_season, player, season, Team, rel_TM_GF60:rel_TM_xGA60_state), by = c("player", "season", "Team"))
+
+
+all_metrics_season_PP <- counts_PP_season_60 %>% 
+  select(-c(t_GF:t_xGA_state)) %>% 
+  left_join(., select(rel_TM_player_PP_season, player, season, Team, rel_TM_GF60:rel_TM_xGF60_state), by = c("player", "season", "Team"))
+
+
+all_metrics_season_SH <- counts_SH_season_60 %>% 
+  select(-c(t_GF:t_xGA_state)) %>% 
+  left_join(., select(rel_TM_player_SH_season, player, season, Team, rel_TM_GA60:rel_TM_xGA60_state), by = c("player", "season", "Team"))
+
+
+## ----------------------- ##
+##   Prepare All Sit TOI   ##
+## ----------------------- ##
+
+on_ice_all_sit_season <- games_all_sit_joined %>% 
+  mutate(GP = 1) %>% 
+  group_by(player, season, Team) %>% 
+  summarise(TOI_all = sum(TOI), 
+            GP = sum(GP)
+            ) %>% 
+  data.frame()
+
+
+
+## ---------------------- ##
+##   Prepare Team RAPMs   ##
+## ---------------------- ##
+
+team_strength_PP_full_AA <- team_strength_RAPM_PP %>% 
+  group_by(season) %>% 
+  mutate(PPO_GF_AA_team = ((GF_expand / TOI_PP) - (sum(GF_expand) / sum(TOI_PP))) * 60) %>% 
+  select(Team, season, TOI_PP, skaters_PP, PPO_GF, PPO_GF_AA_team) %>% 
+  mutate_if(is.numeric, funs(round(., 3))) %>% 
+  rename(t_PPO_GF = PPO_GF, 
+         t_TOI_PP = TOI_PP
+         ) %>% 
+  data.frame()
+
+team_strength_SH_full_AA <- team_strength_RAPM_SH %>% 
+  group_by(season) %>% 
+  mutate(SHD_xG_AA_team = ((xGA_expand / TOI_SH) - (sum(xGA_expand) / sum(TOI_SH))) * 60) %>% 
+  select(Team, season, TOI_SH, skaters_SH, SHD_xG, SHD_xG_AA_team) %>% 
+  mutate_if(is.numeric, funs(round(., 3))) %>% 
+  rename(t_SHD_xG = SHD_xG, 
+         t_TOI_SH = TOI_SH
+         ) %>% 
+  data.frame()
+
+
+
+## -------------------------- ##
+##   Set Weights & Features   ##
+## -------------------------- ##
+
+## -- Weights -- ##
+
+mod_EVO_F_weights <- c("lm" = 0.252551, "bagEarth" = 0.3448017, "svmLinear" = 0.4026653)
+mod_EVO_D_weights <- c("lm" = 0.37921, "cubist" = 0.3210417, "svmLinear" = 0.299772)
+mod_EVD_F_weights <- c("bagEarth" = 0.413722, "svmLinear" = 0.297881, "glmnet" = 0.288418)
+mod_EVD_D_weights <- c("lm" = 0.3688093, "cubist" = 0.2741847, "glmnet" = 0.3570327)
+mod_PPO_F_weights <- c("cubist" = 0.3791753, "bagEarth" = 0.3650347, "svmLinear" = 0.2558133)
+mod_PPO_D_weights <- c("lm" = 0.3972313, "svmLinear" = 0.352244, "glmnet" = 0.2505447)
+mod_SHD_F_weights <- c("cubist" = 0.3101013, "bagEarth" = 0.3426613, "svmLinear" = 0.3472623)
+mod_SHD_D_weights <- c("cubist" = 0.282119, "bagEarth" = 0.443778, "glmnet" = 0.274121)
+
+
+## -- Features -- ##
+
+# EVO_F
+features_EVO_F_small <- c("TOI_perc", "G", "GIVE_d", "TAKE_o", "TAKE_n", "TAKE_d", "iHF_d", "iHA_o", 
+                          "OZS_perc", "NZS_perc", "r_FO_perc", "rel_TM_GF60", "rel_TM_SF60")
+
+features_EVO_F_large <- c("TOI_perc", "G", "iSF", "GIVE_o", "GIVE_n", "GIVE_d", "TAKE_o", "TAKE_n", "TAKE_d", 
+                          "iHF_n", "iHF_d", "iHA_o", "OZS_perc", "NZS_perc", "r_FO_perc", "rel_TM_GF60", "rel_TM_xGF60", "rel_TM_SF60")
+
+# EVO_D
+features_EVO_D_small <- c("A1", "iCF", "GIVE_d", "TAKE_o", "iHA_n", "NZS_perc", "DZS_perc", "rel_TM_GF60", "rel_TM_SF60")
+
+features_EVO_D_large <- c("TOI_perc","A1", "iCF", "GIVE_o", "GIVE_d", "TAKE_o", "TAKE_d", "iHF_o", "iHF_d", "iHA_o", "iHA_d", 
+                          "NZS_perc", "DZS_perc", "rel_TM_GF60", "rel_TM_SF60") 
+
+# EVD_F
+features_EVD_F_large <- c("TOI_perc", "iBLK", "GIVE_o", "GIVE_d", "TAKE_o", "TAKE_n", "iHF_o", "iHF_d", 
+                          "iHA_o", "iHA_d", "NZS_perc", "DZS_perc", "rel_TM_xGA60_state")
+
+# EVD_D
+features_EVD_D_large <- c("TOI_perc", "iBLK", "GIVE_o", "GIVE_d", "TAKE_n", "iHF_n", "iHF_d", "iHA_n", "iHA_d", 
+                          "OZS_perc", "DZS_perc", "rel_TM_xGA60_state")
+
+features_EVD_D_small <- c("TOI_perc", "iHA_n", "OZS_perc", "DZS_perc", "rel_TM_xGA60_state") 
+
+# PPO_F
+features_PPO_F_large <- c("TOI_perc", "A1", "A2", "ixG", "GIVE_all", "TAKE_all", "iHF_all", "iHA_all",   
+                          "OZS_perc", "DZS_perc", "r_FO_perc", "rel_TM_GF60", "rel_TM_CF60")
+
+# PPO_D
+features_PPO_D_large <- c("TOI_perc", "G", "A1", "A2", "ixG", "GIVE_all", "TAKE_all", "iHF_all", "iHA_all", 
+                          "OZS_perc", "DZS_perc", "rel_TM_GF60", "rel_TM_xGF60")
+
+features_PPO_D_small <- c("TOI_perc", "G", "A1", "A2", "OZS_perc", "DZS_perc", "rel_TM_GF60")
+
+# SHD_F
+features_SHD_F_large <- c("TOI_perc", "GIVE_all", "TAKE_all", "iHA_all", "OZS_perc", "DZS_perc", "r_FO_perc", "rel_TM_CA60", "rel_TM_xGA60")
+
+# SHD_D 
+features_SHD_D_large <- c("TOI_perc", "GIVE_all", "TAKE_all", "iHF_all", "iHA_all", "OZS_perc", "DZS_perc", "rel_TM_CA60",  "rel_TM_xGA60")
+
+
+# TOI Cutoffs for Predictions
+TOI_cut_EV <- 60
+TOI_cut_PP <- 25
+TOI_cut_SH <- 25
+
+
+
+## ------------------------ ##
+##   Prepare SPM/GAR Data   ##
+## ------------------------ ##
+
+### Even-Strength
+metrics_EV <- all_metrics_season_EV
+
+### --- Offense --- ###
+EVO_box_rates <- metrics_EV %>% 
+  mutate(FO_perc = ifelse(FOW > 0 & FOL > 0, 100 * FOW / (FOW + FOL), 0), 
+         r_FO_perc = (FOL + 50) / (FOW + 50)
+         ) %>% 
+  select(player:Team, 
+         TOI,                      ### ADD IN TOI for others as well
+         GP, TOI_GP, TOI_perc,
+         G, A1, A2, Points, 
+         G_adj, A1_adj, A2_adj, Points_adj, 
+         iSF, iFF, iCF, ixG, iCF_adj, ixG_adj, 
+         GIVE_o:iHA_adj, 
+         OZS_perc, NZS_perc, DZS_perc, 
+         FO_perc, r_FO_perc,
+         rel_TM_GF60, rel_TM_SF60, rel_TM_FF60, rel_TM_CF60, rel_TM_xGF60)
+
+# Join
+pred_EVO_F_join <- EVO_box_rates %>% filter(position == 1)
+pred_EVO_D_join <- EVO_box_rates %>% filter(position == 2)
+
+
+### --- Defense --- ###
+EVD_box_rates <- metrics_EV %>% 
+  mutate(FO_perc = ifelse(FOW > 0 & FOL > 0, 100 * FOW / (FOW + FOL), 0), 
+         r_FO_perc = (FOL + 50) / (FOW + 50)
+         ) %>% 
+  select(player:Team, 
+         TOI,
+         GP, TOI_GP, TOI_perc, 
+         iBLK, iBLK_adj, 
+         GIVE_o:iHA_adj, 
+         OZS_perc, NZS_perc, DZS_perc, 
+         FO_perc, r_FO_perc, 
+         rel_TM_GA60, rel_TM_SA60, rel_TM_FA60, rel_TM_CA60, rel_TM_xGA60, 
+         rel_TM_GA60_state, rel_TM_SA60_state, rel_TM_FA60_state, rel_TM_CA60_state, rel_TM_xGA60_state
+         )
+
+# Join
+pred_EVD_F_join <- EVD_box_rates %>% filter(position == 1)
+pred_EVD_D_join <- EVD_box_rates %>% filter(position == 2)
+
+
+### Powerplay 
+metrics_PP <- all_metrics_season_PP
+
+PPO_box_rates <- metrics_PP %>% 
+  mutate(FO_perc = ifelse(FOW > 0 & FOL > 0, 100 * FOW / (FOW + FOL), 0), 
+         r_FO_perc = (FOL + 50) / (FOW + 50), 
+         TOI_perc = 100 * (TOI / (t_TOI + 5.58 * 8)), # determined here: mean(games_PP_full_new_names$t_TOI) / checked with team grouping
+         GIVE_all = GIVE_o + GIVE_n + GIVE_d, 
+         TAKE_all = TAKE_o + TAKE_n + TAKE_d,
+         iHF_all = iHF_o + iHF_n + iHF_d, 
+         iHA_all = iHA_o + iHA_n + iHA_d
+         ) %>% 
+  select(player:Team, 
+         TOI,
+         GP, TOI_perc, TOI_GP, 
+         G, A1, A2, G_adj, A1_adj, A2_adj, Points,
+         iSF, iFF, iCF, ixG, iCF_adj, ixG_adj, 
+         GIVE_o:iHA_adj, GIVE_all:iHA_all,
+         OZS_perc, NZS_perc, DZS_perc, FO_perc, r_FO_perc,
+         rel_TM_GF60, rel_TM_SF60, rel_TM_FF60, rel_TM_CF60, rel_TM_xGF60, 
+         rel_TM_GF60_state, rel_TM_SF60_state, rel_TM_FF60_state, rel_TM_CF60_state, rel_TM_xGF60_state
+         ) 
+
+# Join
+pred_PPO_F_join <- PPO_box_rates %>% filter(position == 1)
+pred_PPO_D_join <- PPO_box_rates %>% filter(position == 2)
+
+
+### Shorthanded
+metrics_SH <- all_metrics_season_SH
+
+SHD_box_rates <- metrics_SH %>% 
+  mutate(FO_perc = ifelse(FOW > 0 & FOL > 0, 100 * FOW / (FOW + FOL), 0), 
+         r_FO_perc = (FOL + 50) / (FOW + 50),
+         TOI_perc = 100 * (TOI / (t_TOI + 5.58 * 8)), # determined here: mean(games_PP_full_new_names$t_TOI) / checked with team grouping
+         GIVE_all = GIVE_o + GIVE_n + GIVE_d, 
+         TAKE_all = TAKE_o + TAKE_n + TAKE_d,
+         iHF_all = iHF_o + iHF_n + iHF_d, 
+         iHA_all = iHA_o + iHA_n + iHA_d 
+         ) %>% 
+  select(player:Team, 
+         TOI,
+         GP, TOI_perc, TOI_GP, 
+         iBLK, iBLK_adj, 
+         GIVE_o:iHA_adj, 
+         GIVE_all:iHA_all,
+         OZS_perc, NZS_perc, DZS_perc, 
+         FO_perc, r_FO_perc, 
+         rel_TM_GA60, rel_TM_SA60, rel_TM_FA60, rel_TM_CA60, rel_TM_xGA60, 
+         rel_TM_GA60_state, rel_TM_SA60_state, rel_TM_FA60_state, rel_TM_CA60_state, rel_TM_xGA60_state
+         )
+
+# Join
+pred_SHD_F_join <- SHD_box_rates %>% filter(position == 1)
+pred_SHD_D_join <- SHD_box_rates %>% filter(position == 2)
+
+
+# Remove Excess
+rm(EVO_box_rates, EVD_box_rates, metrics_EV, PPO_box_rates, metrics_PP, SHD_box_rates, metrics_SH)
+gc()
+
+
+##########################
+
+
+## ------------------------------------- ##
+##   SPM/GAR/WAR Predictions / Combine   ##
+## ------------------------------------- ##
+
+###########################################
+
+
+###    Even-Strength Offense & Defense    ###
+
+
+## ------------- ##
+##     EVO_F     ##
+## ------------- ##
+
+eval_pred_EVO_F <- pred_EVO_F_join %>% 
+  select(player:GP)
+
+
+eval_pred_EVO_F$pred_1 <- predict(object = mod_list_EVO_F$lm, 
+                                  pred_EVO_F_join[, features_EVO_F_small],
+                                  type = "raw")
+
+eval_pred_EVO_F$pred_2 <- predict(object = mod_list_EVO_F$bagEarth, 
+                                  pred_EVO_F_join[, features_EVO_F_large], 
+                                  type = "raw")
+
+eval_pred_EVO_F$pred_3 <- predict(object = mod_list_EVO_F$svmLinear, 
+                                  pred_EVO_F_join[, features_EVO_F_large], 
+                                  type = "raw")
+
+eval_pred_EVO_F <- eval_pred_EVO_F %>% 
+  mutate(ensemble = 
+           pred_1 * mod_EVO_F_weights[1] + 
+           pred_2 * mod_EVO_F_weights[2] + 
+           pred_3 * mod_EVO_F_weights[3], 
+         EVO = (ensemble / 60) * TOI)
+
+
+# Combine for full join
+EVO_F_GAA <- eval_pred_EVO_F %>% 
+  group_by(player, position, season, Team) %>%  # added Team
+  summarise_at(vars(TOI, GP, EVO), funs(sum)) %>% 
+  mutate(EVO_60 = (EVO / TOI) * 60) %>% 
+  data.frame()
+
+
+
+## ------------- ##
+##     EVD_F     ##
+## ------------- ##
+
+eval_pred_EVD_F <- pred_EVD_F_join %>% 
+  select(player:GP)
+
+eval_pred_EVD_F$pred_1 <- predict(object = mod_list_EVD_F$bagEarth, 
+                                  pred_EVD_F_join[, features_EVD_F_large],
+                                  type = "raw")
+
+eval_pred_EVD_F$pred_2 <- predict(object = mod_list_EVD_F$svmLinear, 
+                                  pred_EVD_F_join[, features_EVD_F_large], 
+                                  type = "raw")
+
+eval_pred_EVD_F$pred_3 <- predict(object = mod_list_EVD_F$glmnet, 
+                                  pred_EVD_F_join[, features_EVD_F_large], 
+                                  type = "raw")
+
+eval_pred_EVD_F <- eval_pred_EVD_F %>% 
+  mutate(ensemble = 
+           pred_1 * mod_EVD_F_weights[1] + 
+           pred_2 * mod_EVD_F_weights[2] + 
+           pred_3 * mod_EVD_F_weights[3], 
+         EVD = (ensemble / 60) * TOI)
+
+
+# Combine for full join
+EVD_F_GAA <- eval_pred_EVD_F %>% 
+  group_by(player, position, season, Team) %>%  # added Team
+  summarise_at(vars(TOI, GP, EVD), funs(sum)) %>% 
+  mutate(EVD_60 = (EVD / TOI) * 60) %>% 
+  data.frame()
+
+
+## ---------------- ##
+##  Combine EV - F  ##
+## ---------------- ##
+
+EV_F_overall <- EVO_F_GAA %>% 
+  left_join(., EVD_F_GAA, by = c("player", "position", "season", "Team", "TOI", "GP")) %>% 
+  filter(TOI > TOI_cut_EV) %>% 
+  group_by(season) %>% 
+  mutate(EVO_AA =    ((EVO / TOI) - (sum(EVO) / sum(TOI))) * TOI, 
+         EVD_AA =    ((EVD / TOI) - (sum(EVD) / sum(TOI))) * TOI, 
+         EVO_AA_60 = (EVO_AA / TOI) * 60, 
+         EVD_AA_60 = (EVD_AA / TOI) * 60)
+
+
+# EV FINAL JOIN: Forwards
+EV_F_team_final <- EV_F_overall %>% 
+  left_join(., team_strength_RAPM_EV %>% select(season, Team, TOI, skaters, GF, xGA), 
+            by = c("season", "Team"), 
+            suffix = c("_player", "_team")
+            ) %>% 
+  group_by(player, season) %>% 
+  mutate(TOI_perc_tot =  TOI_player / TOI_team, 
+         #adj_off =       (1.6 * GF - (TOI_perc_tot * EVO_AA_60)) / skaters, 
+         adj_off =       (1.7 * GF - (TOI_perc_tot * EVO_AA_60)) / skaters, # new team adjustment 
+         #adj_def =       (1.4 * xGA - (TOI_perc_tot * EVD_AA_60)) / skaters, 
+         adj_def =       (1.45 * xGA - (TOI_perc_tot * EVD_AA_60)) / skaters, # new team adjustment 
+         EVO_AA_60_adj = EVO_AA_60 + adj_off, 
+         EVD_AA_60_adj = EVD_AA_60 + adj_def, 
+         EVO_AA_adj =    (EVO_AA_60_adj / 60) * TOI_player, 
+         EVD_AA_adj =    -1 * ((EVD_AA_60_adj / 60) * TOI_player), 
+         EVD_AA =        -1 * EVD_AA,
+         off_diff =      EVO_AA_adj - EVO_AA, 
+         def_diff =      EVD_AA_adj - EVD_AA
+         ) %>% 
+  rename(TOI = TOI_player) %>% 
+  select(player:GP, 
+         EVO_AA, EVD_AA,
+         GF, xGA, 
+         off_diff, def_diff, 
+         EVO_AA_adj, EVD_AA_adj) %>% 
+  data.frame()
+
+
+## ----------------------------------------------------------------- ##
+
+
+## ------------- ##
+##     EVO_D     ##
+## ------------- ##
+
+eval_pred_EVO_D <- pred_EVO_D_join %>% 
+  select(player:GP)
+
+
+eval_pred_EVO_D$pred_1 <- predict(object = mod_list_EVO_D$lm, 
+                                  pred_EVO_D_join[, features_EVO_D_small],
+                                  type = "raw")
+
+eval_pred_EVO_D$pred_2 <- predict(object = mod_list_EVO_D$cubist, 
+                                  pred_EVO_D_join[, features_EVO_D_large], 
+                                  type = "raw")
+
+eval_pred_EVO_D$pred_3 <- predict(object = mod_list_EVO_D$svmLinear, 
+                                  pred_EVO_D_join[, features_EVO_D_large], 
+                                  type = "raw")
+
+eval_pred_EVO_D <- eval_pred_EVO_D %>% 
+  mutate(ensemble = 
+           pred_1 * mod_EVO_D_weights[1] + 
+           pred_2 * mod_EVO_D_weights[2] + 
+           pred_3 * mod_EVO_D_weights[3], 
+         EVO = (ensemble / 60) * TOI)
+
+
+# Combine for full join
+EVO_D_GAA <- eval_pred_EVO_D %>% 
+  group_by(player, position, season, Team) %>% 
+  summarise_at(vars(TOI, GP, EVO), funs(sum)) %>% 
+  mutate(EVO_60 = (EVO / TOI) * 60) %>% 
+  data.frame()
+
+
+## ------------- ##
+##     EVD_D     ##
+## ------------- ##
+
+eval_pred_EVD_D <- pred_EVD_D_join %>% 
+  select(player:GP)
+
+eval_pred_EVD_D$pred_1 <- predict(object = mod_list_EVD_D$lm, 
+                                  pred_EVD_D_join[, features_EVD_D_small],
+                                  type = "raw")
+
+eval_pred_EVD_D$pred_2 <- predict(object = mod_list_EVD_D$cubist, 
+                                  pred_EVD_D_join[, features_EVD_D_large], 
+                                  type = "raw")
+
+eval_pred_EVD_D$pred_3 <- predict(object = mod_list_EVD_D$glmnet, 
+                                  pred_EVD_D_join[, features_EVD_D_large], 
+                                  type = "raw")
+
+eval_pred_EVD_D <- eval_pred_EVD_D %>% 
+  mutate(ensemble = 
+           pred_1 * mod_EVD_D_weights[1] + 
+           pred_2 * mod_EVD_D_weights[2] + 
+           pred_3 * mod_EVD_D_weights[3], 
+         EVD = (ensemble / 60) * TOI)
+
+
+EVD_D_GAA <- eval_pred_EVD_D %>% 
+  group_by(player, position, season, Team) %>%  # added Team
+  summarise_at(vars(TOI, GP, EVD), funs(sum)) %>% 
+  mutate(EVD_60 = (EVD / TOI) * 60) %>% 
+  data.frame()
+
+
+## ---------------- ##
+##  Combine EV - D  ##
+## ---------------- ##
+
+EV_D_overall <- EVO_D_GAA %>% 
+  left_join(., EVD_D_GAA, by = c("player", "position", "season", "Team", "TOI", "GP")) %>% 
+  filter(TOI > TOI_cut_EV) %>% 
+  group_by(season) %>% 
+  mutate(EVO_AA = ((EVO / TOI) - (sum(EVO) / sum(TOI))) * TOI, 
+         EVD_AA = ((EVD / TOI) - (sum(EVD) / sum(TOI))) * TOI, 
+         EVO_AA_60 = (EVO_AA / TOI) * 60, 
+         EVD_AA_60 = (EVD_AA / TOI) * 60)
+
+
+# EV FINAL JOIN: Defensemen
+EV_D_team_final <- EV_D_overall %>% 
+  left_join(., team_strength_RAPM_EV %>% select(season, Team, TOI, skaters, GF, xGA), 
+            by = c("season", "Team"), 
+            suffix = c("_player", "_team")
+            ) %>% 
+  group_by(player, season) %>% 
+  mutate(TOI_perc_tot =  TOI_player / TOI_team, 
+         #adj_off =       (1.6 * GF - (TOI_perc_tot * EVO_AA_60)) / skaters, 
+         adj_off =       (1.7 * GF - (TOI_perc_tot * EVO_AA_60)) / skaters, # new team adjustment
+         #adj_def =       (1.4 * xGA - (TOI_perc_tot * EVD_AA_60)) / skaters, 
+         adj_def =       (1.45 * xGA - (TOI_perc_tot * EVD_AA_60)) / skaters, # new team adjustment
+         EVO_AA_60_adj = EVO_AA_60 + adj_off, 
+         EVD_AA_60_adj = EVD_AA_60 + adj_def, 
+         EVO_AA_adj =    (EVO_AA_60_adj / 60) * TOI_player, 
+         EVD_AA_adj =    -1 * ((EVD_AA_60_adj / 60) * TOI_player), 
+         EVD_AA =        -1 * EVD_AA,
+         off_diff =      EVO_AA_adj - EVO_AA, 
+         def_diff =      EVD_AA_adj - EVD_AA
+         ) %>% 
+  rename(TOI = TOI_player) %>% 
+  select(player:GP, 
+         EVO_AA, EVD_AA,
+         GF, xGA, 
+         off_diff, def_diff, 
+         EVO_AA_adj, EVD_AA_adj) %>% 
+  data.frame()
+
+
+# FINAL F/D JOIN
+ALL_EV <- EV_F_team_final %>% 
+  rbind(., EV_D_team_final) %>% 
+  rename(TOI_EV = TOI)
+
+
+
+
+
+###    Powerplay Offense    ###
+
+
+
+## ------------- ##
+##     PPO_F     ##
+## ------------- ##
+
+eval_pred_PPO_F <- pred_PPO_F_join %>% 
+  select(player:TOI_GP) 
+
+# Predict
+eval_pred_PPO_F$pred_1 <- predict(object = mod_list_PPO_F$cubist, 
+                                  pred_PPO_F_join[, features_PPO_F_large], 
+                                  type = "raw")
+
+eval_pred_PPO_F$pred_2 <- predict(object = mod_list_PPO_F$bagEarth, 
+                                  pred_PPO_F_join[, features_PPO_F_large], 
+                                  type = "raw")
+
+eval_pred_PPO_F$pred_3 <- predict(object = mod_list_PPO_F$svmLinear, 
+                                  pred_PPO_F_join[, features_PPO_F_large], 
+                                  type = "raw")
+
+eval_pred_PPO_F <- eval_pred_PPO_F %>% 
+  mutate(ensemble = 
+           pred_1 * mod_PPO_F_weights[1] + 
+           pred_2 * mod_PPO_F_weights[2] + 
+           pred_3 * mod_PPO_F_weights[3], 
+         PPO = (ensemble / 60) * TOI)
+
+
+# Combine for full join
+PPO_F_GAA <- eval_pred_PPO_F %>% 
+  filter(TOI > TOI_cut_PP) %>% 
+  group_by(player, position, season, Team) %>%  # added Team
+  summarise_at(vars(TOI, GP, PPO), funs(sum)) %>% 
+  mutate(PPO_60 = (PPO / TOI) * 60) %>% 
+  data.frame()
+
+
+PPO_F_overall <- PPO_F_GAA %>% 
+  group_by(season) %>% 
+  mutate(PPO_AA = ((PPO / TOI) - (sum(PPO) / sum(TOI))) * TOI, 
+         PPO_AA_60 = (PPO_AA / TOI) * 60) %>% 
+  data.frame()
+
+
+# PP RAPM Team Strength
+PPO_F_team_final <- PPO_F_overall %>% 
+  left_join(., team_strength_PP_full_AA %>% select(season, Team, t_TOI_PP, skaters_PP, PPO_GF_AA_team), by = c("Team", "season")) %>% 
+  group_by(player, season) %>% 
+  mutate(TOI_perc_tot =  TOI / t_TOI_PP, 
+         adj_off =       (1.4 * PPO_GF_AA_team - (TOI_perc_tot * PPO_AA_60)) / skaters_PP, 
+         PPO_AA_60_adj = PPO_AA_60 + adj_off, 
+         PPO_AA_adj =    (PPO_AA_60_adj / 60) * TOI, 
+         off_diff =      PPO_AA_adj - PPO_AA
+         ) %>% 
+  select(player:GP, PPO_AA, PPO_GF_AA_team, TOI_perc_tot, off_diff, PPO_AA_adj) %>% 
+  data.frame()
+
+
+
+## ------------- ##
+##     PPO_D     ##
+## ------------- ##
+
+eval_pred_PPO_D <- pred_PPO_D_join %>% 
+  select(player:TOI_GP) 
+
+# Predict
+eval_pred_PPO_D$pred_1 <- predict(object = mod_list_PPO_D$lm, 
+                                  pred_PPO_D_join[, features_PPO_D_small], 
+                                  type = "raw")
+
+eval_pred_PPO_D$pred_2 <- predict(object = mod_list_PPO_D$svmLinear, 
+                                  pred_PPO_D_join[, features_PPO_D_large], 
+                                  type = "raw")
+
+eval_pred_PPO_D$pred_3 <- predict(object = mod_list_PPO_D$glmnet, 
+                                  pred_PPO_D_join[, features_PPO_D_large], 
+                                  type = "raw")
+
+eval_pred_PPO_D <- eval_pred_PPO_D %>% 
+  mutate(ensemble = 
+           pred_1 * mod_PPO_D_weights[1] + 
+           pred_2 * mod_PPO_D_weights[2] + 
+           pred_3 * mod_PPO_D_weights[3], 
+         PPO = (ensemble / 60) * TOI)
+
+
+# Combine for full join
+PPO_D_GAA <- eval_pred_PPO_D %>% 
+  filter(TOI > TOI_cut_PP) %>% 
+  group_by(player, position, season, Team) %>%  # added Team
+  summarise_at(vars(TOI, GP, PPO), funs(sum)) %>% 
+  mutate(PPO_60 = (PPO / TOI) * 60) %>% 
+  data.frame()
+
+
+PPO_D_overall <- PPO_D_GAA %>% 
+  group_by(season) %>% 
+  mutate(PPO_AA = ((PPO / TOI) - (sum(PPO) / sum(TOI))) * TOI, 
+         PPO_AA_60 = (PPO_AA / TOI) * 60) %>% 
+  data.frame()
+
+
+
+# PP RAPM Team Strength
+PPO_D_team_final <- PPO_D_overall %>% 
+  left_join(., team_strength_PP_full_AA %>% select(season, Team, t_TOI_PP, skaters_PP, PPO_GF_AA_team), by = c("Team", "season")) %>% 
+  group_by(player, season) %>% 
+  mutate(TOI_perc_tot =  TOI / t_TOI_PP, 
+         adj_off =       (1.4 * PPO_GF_AA_team - (TOI_perc_tot * PPO_AA_60)) / skaters_PP, 
+         PPO_AA_60_adj = PPO_AA_60 + adj_off, 
+         PPO_AA_adj =    (PPO_AA_60_adj / 60) * TOI, 
+         off_diff =      PPO_AA_adj - PPO_AA
+         ) %>% 
+  select(player:GP, PPO_AA, PPO_GF_AA_team, TOI_perc_tot, off_diff, PPO_AA_adj) %>% 
+  data.frame()
+
+
+# FINAL F/D JOIN
+ALL_PP <- PPO_F_team_final %>%
+  rbind(., PPO_D_team_final) %>% 
+  rename(TOI_PP = TOI)
+
+
+
+
+###    Shorthanded Defense    ###
+
+
+
+### --- FORWARDS --- ###
+
+eval_pred_SHD_F <- pred_SHD_F_join %>% 
+  select(player:TOI_GP) 
+
+# Predict
+eval_pred_SHD_F$pred_1 <- predict(object = mod_list_SHD_F$cubist, 
+                                  pred_SHD_F_join[, features_SHD_F_large], 
+                                  type = "raw")
+
+eval_pred_SHD_F$pred_2 <- predict(object = mod_list_SHD_F$bagEarth, 
+                                  pred_SHD_F_join[, features_SHD_F_large], 
+                                  type = "raw")
+
+eval_pred_SHD_F$pred_3 <- predict(object = mod_list_SHD_F$svmLinear, 
+                                  pred_SHD_F_join[, features_SHD_F_large], 
+                                  type = "raw")
+
+eval_pred_SHD_F <- eval_pred_SHD_F %>% 
+  mutate(ensemble = 
+           pred_1 * mod_SHD_F_weights[1] + 
+           pred_2 * mod_SHD_F_weights[2] + 
+           pred_3 * mod_SHD_F_weights[3], 
+         SHD = (ensemble / 60) * TOI)
+
+
+# Combine for full join
+SHD_F_GAA <- eval_pred_SHD_F %>% 
+  filter(TOI > TOI_cut_SH) %>% 
+  group_by(player, position, season, Team) %>% 
+  summarise_at(vars(TOI, GP, SHD), funs(sum)) %>% 
+  mutate(SHD_60 = (SHD / TOI) * 60) %>% 
+  data.frame()
+
+SHD_F_overall <- SHD_F_GAA %>% 
+  group_by(season) %>% 
+  mutate(SHD_AA = ((SHD / TOI) - (sum(SHD) / sum(TOI))) * TOI, 
+         SHD_AA_60 = (SHD_AA / TOI) * 60) %>% 
+  data.frame()
+
+
+# PP RAPM Team Strength
+SHD_F_team_final <- SHD_F_overall %>% 
+  left_join(., team_strength_SH_full_AA %>% select(season, Team, t_TOI_SH, skaters_SH, SHD_xG_AA_team), by = c("Team", "season")) %>% 
+  group_by(player, season) %>% 
+  mutate(TOI_perc_tot =  TOI / t_TOI_SH, 
+         adj_def =       (1.4 * SHD_xG_AA_team - (TOI_perc_tot * SHD_AA_60)) / skaters_SH, 
+         SHD_AA_60_adj = SHD_AA_60 + adj_def, 
+         SHD_AA_adj =    -1 * ((SHD_AA_60_adj / 60) * TOI), 
+         SHD_AA =        -1 * SHD_AA,
+         def_diff =      SHD_AA_adj - SHD_AA
+         ) %>% 
+  select(player:GP, SHD_AA, SHD_xG_AA_team, TOI_perc_tot, def_diff, SHD_AA_adj) %>% 
+  data.frame()
+
+
+### --- DEFENSEMEN --- ###
+
+eval_pred_SHD_D <- pred_SHD_D_join %>% 
+  select(player:TOI_GP) 
+
+# Predict
+eval_pred_SHD_D$pred_1 <- predict(object = mod_list_SHD_D$cubist, 
+                                  pred_SHD_D_join[, features_SHD_D_large], 
+                                  type = "raw")
+
+eval_pred_SHD_D$pred_2 <- predict(object = mod_list_SHD_D$bagEarth, 
+                                  pred_SHD_D_join[, features_SHD_D_large], 
+                                  type = "raw")
+
+eval_pred_SHD_D$pred_3 <- predict(object = mod_list_SHD_D$glmnet, 
+                                  pred_SHD_D_join[, features_SHD_D_large], 
+                                  type = "raw")
+
+eval_pred_SHD_D <- eval_pred_SHD_D %>% 
+  mutate(ensemble = 
+           pred_1 * mod_SHD_D_weights[1] + 
+           pred_2 * mod_SHD_D_weights[2] + 
+           pred_3 * mod_SHD_D_weights[3], 
+         SHD = (ensemble / 60) * TOI)
+
+
+# Combine for full join
+SHD_D_GAA <- eval_pred_SHD_D %>% 
+  filter(TOI > TOI_cut_SH) %>% 
+  group_by(player, position, season, Team) %>%
+  summarise_at(vars(TOI, GP, SHD), funs(sum)) %>% 
+  mutate(SHD_60 = (SHD / TOI) * 60) %>% 
+  data.frame()
+
+SHD_D_overall <- SHD_D_GAA %>% 
+  group_by(season) %>% 
+  mutate(SHD_AA = ((SHD / TOI) - (sum(SHD) / sum(TOI))) * TOI, 
+         SHD_AA_60 = (SHD_AA / TOI) * 60) %>% 
+  data.frame()
+
+
+# PP RAPM Team Strength
+SHD_D_team_final <- SHD_D_overall %>% 
+  left_join(., team_strength_SH_full_AA %>% select(season, Team, t_TOI_SH, skaters_SH, SHD_xG_AA_team), by = c("Team", "season")) %>% 
+  group_by(player, season) %>% 
+  mutate(TOI_perc_tot =  TOI / t_TOI_SH, 
+         adj_def =       (1.4 * SHD_xG_AA_team - (TOI_perc_tot * SHD_AA_60)) / skaters_SH, 
+         SHD_AA_60_adj = SHD_AA_60 + adj_def, 
+         SHD_AA_adj =    -1 * ((SHD_AA_60_adj / 60) * TOI), 
+         SHD_AA =        -1 * SHD_AA,
+         def_diff =      SHD_AA_adj - SHD_AA
+         ) %>% 
+  select(player:GP, SHD_AA, SHD_xG_AA_team, TOI_perc_tot, def_diff, SHD_AA_adj) %>% 
+  data.frame()
+
+
+# FINAL F/D JOIN
+ALL_SH <- SHD_F_team_final %>%
+  rbind(., SHD_D_team_final) %>% 
+  rename(TOI_SH = TOI)
+
+
+## ------------------------------------ ##
+##   Combine All / Create Final Table   ##
+## ------------------------------------ ##
+
+# Replacement Level Objects
+EV_rep_F <-   round(0.1913415, 4)
+EV_rep_D <-   round(0.0969201, 5)
+
+PP_rep_F <-   round(0.4098104, 4)
+PP_rep_D <-   round(0.3804468, 4)
+
+SH_rep_F <-   round(-0.0355829, 5)
+SH_rep_D <-   round(0.06923532, 5)
+
+Pens_rep_F <- round(0.03211396, 5)
+Pens_rep_D <- round(0.01702584, 5)
+
+
+# Final GAA + GAR Join
+ALL_GAR <- on_ice_all_sit_season %>% 
+  left_join(., ALL_EV %>% select(player, season, Team, EVO_AA_adj, EVD_AA_adj), by = c("player", "season", "Team")) %>% 
+  left_join(., ALL_PP %>% select(player, season, Team, PPO_AA_adj), by = c("player", "season", "Team")) %>% 
+  left_join(., ALL_SH %>% select(player, season, Team, SHD_AA_adj), by = c("player", "season", "Team")) %>% 
+  left_join(., adj_pen_season %>% select(player, season, Team, take_AA, draw_AA, pens), by = c("player", "season", "Team")) %>% 
+  
+  mutate_at(vars(EVO_AA_adj, EVD_AA_adj, PPO_AA_adj, SHD_AA_adj, take_AA, draw_AA, pens), funs(ifelse(is.na(.), 0, .))) %>% 
+  
+  left_join(., all_metrics_season_EV %>% select(player, season, Team, TOI) %>% rename(TOI_EV = TOI), by = c("player", "season", "Team")) %>% 
+  left_join(., all_metrics_season_PP %>% select(player, season, Team, TOI) %>% rename(TOI_PP = TOI), by = c("player", "season", "Team")) %>% 
+  left_join(., all_metrics_season_SH %>% select(player, season, Team, TOI) %>% rename(TOI_SH = TOI), by = c("player", "season", "Team")) %>% 
+  
+  mutate(GAA = EVO_AA_adj + EVD_AA_adj + PPO_AA_adj + SHD_AA_adj + pens) %>% 
+  
+  left_join(., player_position, by = "player") %>% 
+  filter(!is.na(position)) %>% 
+  mutate_if(is.numeric, funs(round(., 1))) %>% 
+  select(player, position, season, Team, 
+         GP, 
+         TOI_all, TOI_EV, TOI_PP, TOI_SH, EVO_AA_adj, EVD_AA_adj, PPO_AA_adj, SHD_AA_adj, take_AA, draw_AA, pens, GAA) %>% 
+  rename_at(vars(EVO_AA_adj:SHD_AA_adj), funs(gsub("_adj", "", .))) %>% 
+  rename(pens_AA = pens) %>% 
+  mutate(TOI_SH = ifelse(is.na(TOI_SH), 0, TOI_SH)) %>% 
+  
+  # Goals Above Replacement
+  mutate(EV_GAA = EVO_AA + EVD_AA, 
+         
+         # New team adjustment - objects made above, from GAR_scratch script
+         EV_GAR =   ifelse(position == 1, EV_GAA +  (TOI_EV * (EV_rep_F / 60)), EV_GAA + (TOI_EV * (EV_rep_D / 60))), 
+         PP_GAR =   ifelse(position == 1, PPO_AA +  (TOI_PP * (PP_rep_F / 60)), PPO_AA + (TOI_PP * (PP_rep_D / 60))), 
+         SH_GAR =   ifelse(position == 1, SHD_AA +  (TOI_SH * (SH_rep_F / 60)), SHD_AA + (TOI_SH * (SH_rep_D / 60))), 
+         Pens_GAR = ifelse(position == 1, pens_AA + (TOI_all * (Pens_rep_F / 60)), pens_AA + (TOI_all * (Pens_rep_D / 60))), 
+         
+         # Re-zero players below TOI cutoffs
+         EV_GAR =   ifelse(TOI_EV < TOI_cut_EV, 0, EV_GAR), 
+         PP_GAR =   ifelse(TOI_PP < TOI_cut_PP, 0, PP_GAR), 
+         SH_GAR =   ifelse(TOI_SH < TOI_cut_SH, 0, SH_GAR), 
+         
+         GAR = EV_GAR + PP_GAR + SH_GAR + Pens_GAR, 
+         WAR = GAR / goals_to_wins_season$GPW[match(season, goals_to_wins_season$season_ID)]
+         ) %>% 
+  select(player:TOI_SH, EVO_AA:GAA, EV_GAR:GAR, WAR) %>% 
+  mutate_if(is.numeric, funs(round(., 1))) %>% 
+  data.frame()
+
+# Split
+#GAA_split <- ALL_GAR %>% select(player:GAA)
+#GAR_split <- ALL_GAR %>% select(player:TOI_SH, EV_GAR:WAR)
+
+
+
+# Remove Excess
+rm(eval_pred_EVO_F, eval_pred_EVO_D, eval_pred_EVD_F, eval_pred_EVD_D, 
+   eval_pred_PPO_F, eval_pred_PPO_D, eval_pred_SHD_F, eval_pred_SHD_D, 
+   EVO_F_GAA, EVO_D_GAA, EVD_F_GAA, EVD_D_GAA, 
+   PPO_F_GAA, PPO_D_GAA, SHD_F_GAA, SHD_D_GAA, 
+   pred_EVO_F_join, pred_EVO_D_join, pred_EVD_F_join, pred_EVD_D_join, 
+   pred_PPO_F_join, pred_PPO_D_join, pred_SHD_F_join, pred_SHD_D_join, 
+   EV_F_overall, EV_D_overall, EV_F_team_final, EV_D_team_final, 
+   PPO_F_overall, PPO_D_overall, PPO_F_team_final, PPO_D_team_final, 
+   SHD_F_overall, SHD_D_overall, SHD_F_team_final, SHD_D_team_final
+   )
+gc()
+
+
+###########################################
+
+
+## ---------------------------- ##
+##   Goalie & Shooter GAR/WAR   ##
+## ---------------------------- ##
+
+##################################
+
+# Run function
+shooting_RAPM_All_Sit_list <- fun.shooting_RAPM(pbp_data = pbp_joined, strength_ = "All")
+
+goalie_GAR_in_season <- shooting_RAPM_All_Sit_list$goalie_df
+shooter_GAR_in_season <- shooting_RAPM_All_Sit_list$shooter_df
+
+
+## ----------- ##
+##   Goalies   ##
+## ----------- ##
+
+# Current replacement level (3rd goalie and below per team, per team per season, 10-fold cv)
+goalie_rep <- -0.007312411
+
+# Convert to GAR / WAR
+goalie_GAR_in_season_final <- goalie_GAR_in_season %>% 
+  left_join(., goals_to_wins_season %>% rename(season = season_ID) %>% select(season, GPW), by = "season") %>% 
+  mutate(GAR = GAA + FA * -goalie_rep, 
+         WAR = GAR / GPW
+         ) %>% 
+  mutate_at(vars(GAA, GAR, WAR), funs(round(., 1))) %>% 
+  select(player, position, season, Team, FA, coefficient, prob, GAA, GAR, WAR) %>% 
+  data.frame()
+
+
+## ------------ ##
+##   Shooters   ##
+## ------------ ##
+
+# Shooter Teams (unused for final)
+teams_shooter <- ALL_GAR %>% 
+  group_by(player, Team, season) %>% 
+  summarise() %>% 
+  group_by(player, season) %>% 
+  mutate(Team = paste0(Team, collapse = "/")) %>% 
+  summarise(Team = first(Team)) %>% 
+  data.frame()
+
+# Shooter Replacement Level Per Position
+shooter_rep_F <- -0.007263538
+shooter_rep_D <- -0.01033
+
+# Shooter GAR Final data.frame
+shooter_GAR_in_season_final <- shooter_GAR_in_season %>% 
+  left_join(., teams_shooter, by = c("player", "season")) %>% 
+  mutate(GAR = GAA + iFF * -ifelse(position == 2, shooter_rep_D, shooter_rep_F)) %>% 
+  mutate_at(vars(GAA, GAR), funs(round(., 1))) %>% 
+  select(player, position, season, Team, iFF, coefficient, prob, GAA, GAR) %>% 
+  data.frame()
+
+
+# remove excess data
+rm(goalie_GAR_in_season, goalie_rep, shooter_GAR_in_season, shooter_rep_F, shooter_rep_D)
+
+
+##################################
+
+
+## -------------------- ##
+##   Skater RAPM - EV   ##
+## -------------------- ##
+
+##########################
+
+# Run RAPM Function
+RAPM_EV_list <- fun.RAPM_EV_all(pbp_data = pbp_joined, games_data = games_EV_joined)
+RAPM_EV_in_season_rates <- RAPM_EV_list$RAPM_EV_rates
+RAPM_EV_in_season_impact <- RAPM_EV_list$RAPM_EV_impact
+
+
+##########################
+
+
+## ----------------------- ##
+##   Skater RAPM - PP/SH   ##
+## ----------------------- ##
+
+#############################
+
+# Run Function
+RAPM_PP_list <- fun.RAPM_PP_SH_all(pbp_data = pbp_joined, games_data_PP = games_PP_joined, games_data_SH = games_SH_joined)
+RAPM_PP_in_season_rates <- RAPM_PP_list$RAPM_PP_rates
+RAPM_PP_in_season_impact <- RAPM_PP_list$RAPM_PP_impact
+
+
+#############################
+
+
+## ------------------------------ ##
+##   Game Charts - Avg Per Game   ##
+## ------------------------------ ##
+
+####################################
+
+# Average Corsi / xG Per Game - All Sit 
+average_shots <- rbind(
+  pbp_joined %>% 
+  filter(game_period < 5, 
+         event_type %in% st.corsi_events
+         ) %>% 
+  group_by(game_id, season, Team = home_team) %>% 
+  summarise(CF_all =  sum((event_type %in% st.corsi_events & event_team == home_team)), 
+            xGF_all = sum(na.omit((event_team == home_team) * pred_XGB_7))
+            ) %>% 
+  data.frame(),
+  
+  pbp_joined %>% 
+    filter(game_period < 5, 
+           event_type %in% st.corsi_events
+           ) %>% 
+    group_by(game_id, season, Team = away_team) %>% 
+    summarise(CF_all =  sum((event_type %in% st.corsi_events & event_team == away_team)), 
+              xGF_all = sum(na.omit((event_team == away_team) * pred_XGB_7))
+              ) %>% 
+    data.frame()
+  ) %>% 
+  group_by(season) %>% 
+  summarise(mean_CF_all =  mean(CF_all), 
+            mean_xGF_all = mean(xGF_all), 
+            sd_CF_all =    sd(CF_all), 
+            sd_xGF_all =   sd(xGF_all)
+            ) %>% 
+  data.frame()
+
+
+####################################
+
+
+
+
+
+## ----------------------- SAVE SUMMED TABLES ----------------------- ##
+
+
+## --------------------------- ##
+##   Save Sum Data / Cleanup   ##
+## --------------------------- ##
+
+#################################
+
+# Combine all summed data into list for saving / transfer
+
+in_season_sums_list <- list(# Counts Data 
+                            counts_all_sit_season = counts_all_sit_season, 
+                            counts_EV_season = counts_EV_season, 
+                            counts_PP_season = counts_PP_season, 
+                            counts_SH_season = counts_SH_season, 
+                            
+                            # Rel_TM Data
+                            rel_TM_player_EV_season = rel_TM_player_EV_season, 
+                            rel_TM_player_PP_season = rel_TM_player_PP_season, 
+                            rel_TM_player_SH_season = rel_TM_player_SH_season, 
+                            
+                            # WOWY Data
+                            WOWY_EV_season = WOWY_EV_season, 
+                            WOWY_PP_season = WOWY_PP_season, 
+                            WOWY_SH_season = WOWY_SH_season, 
+                            
+                            # Team Standard Stats
+                            team_sum_all_sit_season = team_games_sum_all_sit_season, 
+                            team_sum_EV_season = team_sum_EV_season, 
+                            team_sum_PP_season = team_sum_PP_season, 
+                            team_sum_SH_season = team_sum_SH_season, 
+                            
+                            # Team RAPMs
+                            team_strength_RAPM_EV = team_strength_RAPM_EV, 
+                            team_strength_RAPM_PP = team_strength_RAPM_PP, 
+                            team_strength_RAPM_SH = team_strength_RAPM_SH, 
+                            
+                            # Penalty Goals Data
+                            adj_pen_season = adj_pen_season, 
+                            
+                            # Goalie Standard Stats
+                            goalie_season = goalie_season, 
+                            
+                            # Goals to Wins In Season
+                            goals_to_wins_season = goals_to_wins_season, 
+                            
+                            # GAR/WAR In Season - Skaters
+                            ALL_GAR = ALL_GAR, 
+                            
+                            # GAR/WAR In Season - Goalies
+                            goalie_GAR_in_season_final = goalie_GAR_in_season_final, 
+                            
+                            # Shooter GAR In Season
+                            shooter_GAR_in_season_final = shooter_GAR_in_season_final, 
+                            
+                            # Skater RAPMS - EV
+                            RAPM_EV_in_season_rates = RAPM_EV_in_season_rates, 
+                            RAPM_EV_in_season_impact = RAPM_EV_in_season_impact, 
+                            
+                            # Skater RAPMS - PP/SH
+                            RAPM_PP_in_season_rates = RAPM_PP_in_season_rates, 
+                            RAPM_PP_in_season_impact = RAPM_PP_in_season_impact, 
+                            
+                            # Average Shots In-Season
+                            average_shots_in_season = average_shots, 
+                            
+                            # Player Position
+                            player_position = player_position, 
+                            
+                            # Last Updated Time
+                            last_update = as.character(Sys.time()), 
+                            
+                            # Check db/new games data.frames
+                            last_scrape_check = check_new_games, 
+                            last_db_update_check = check_db_games
+                            )
+
+
+
+# SAVE Running List Data
+saveRDS(in_season_sums_list, "data/in_season_sums_list.rds")
+
+
+
+#################################
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+##                    ONE-TIME FUNCTIONS                  ##
+## ------------------------------------------------------ ##
+
+
+## ------------------------ ##
+##   Full Schedule Scrape   ## *** completed and saved as .csv
+## ------------------------ ##
+
+##############################
+
+
+## SOURCE ALLSCRAPE.R SCRIPT FIRST
+
+
+# Scrape Schedule of previous games
+fun.schedule <- function(start, end) { 
+  
+  sched <- ds.scrape_schedule(start,
+                              end, 
+                              try_tolerance = 5, 
+                              agents = ds.user_agents)
+  
+  sched <- filter(sched, session != "PR")
+  
+  sched$home_team_id <- Team_ID$Team[match(sched$home_team_id, Team_ID$ID)]
+  sched$away_team_id <- Team_ID$Team[match(sched$away_team_id, Team_ID$ID)]
+  
+  sched$test <- format(as.POSIXct(sched$game_datetime, 
+                                  tz = "UTC", 
+                                  format = "%Y-%m-%d %H:%M:%S"), 
+                       tz = "Canada/Eastern")
+  
+  sched$test <- as.Date(sched$test)
+  sched$test <- as.Date(ifelse(is.na(sched$test), 
+                               as.Date(sched$game_datetime) - 1,
+                               sched$test), 
+                        origin = "1970-01-01")
+  
+  sched$game_date <- sched$test
+  
+  sched <- sched %>% 
+    arrange(game_id) %>% 
+    rename(home_team = home_team_id, 
+           away_team = away_team_id)
+  
+}
+schedule_1819 <- fun.schedule("2018-10-03", "2019-04-07")
+
+hold <- schedule_1819 %>% select(-c(game_status, test))
+
+# SAVE
+#write.csv(hold, "schedule_1819.csv", row.names = F)
+
+rm(hold)
+
+##############################
+
+
+## ------------------------------------------------------ ##
+
+
+
+
+
+##                  DEPRECATED FUNCTIONS                  ##
+## ------------------------------------------------------ ##
+
+
+## ----------------------------- ##
+##   Game Score Games Function   ##
+## ----------------------------- ##
+
+###################################
+
+fun.game_score_all_sit <- function(data) { 
+  
+  print(paste0("season(s): ", unique(data$season)), quote = F)
+  
+  # Modify pbp data
+  data <- data %>% 
+    filter(game_period < 5) %>% 
+    select(-c(face_index:shift_length)) %>% 
+    mutate(scradj = home_score - away_score, 
+           home_lead = ifelse(scradj >= 3, 3, 
+                              ifelse(scradj <= -3, -3, scradj)),
+           home_lead_state = ifelse(home_lead < 0, 1, 
+                                    ifelse(home_lead == 0, 2, 
+                                           ifelse(home_lead > 0, 3, home_lead))), 
+           str_state = ifelse(game_strength_state == "5v5", 1, 
+                              ifelse(game_strength_state == "4v4", 2, 
+                                     ifelse(game_strength_state == "3v3", 3, NA))), 
+           home_lead = home_lead + 4, 
+           event_length = ifelse(is.na(event_length), 0, event_length)
+    ) %>% 
+    rename(pred_goal = pred_XGB_7)
+  
+  
+  
+  # Corsi Diff / Goal Diff
+  fun.oniceCorsiH <- function(data, player_slot) {
+    
+    hold <- data %>% 
+      summarise(TOI = sum(event_length) / 60, 
+                Team = first(home_team), 
+                Venue = first(home_team), 
+                is_home = 1, 
+                
+                GF =  sum((event_type == "GOAL" & event_team == home_team) * score_adj_EV$home_goal_adj[home_lead_state]), 
+                GA =  sum((event_type == "GOAL" & event_team == away_team) * score_adj_EV$away_goal_adj[home_lead_state]), 
+                
+                CF =  sum((event_type %in% st.corsi_events & event_team == home_team) * score_adj_EV$home_corsi_adj[home_lead]), 
+                CA =  sum((event_type %in% st.corsi_events & event_team == away_team) * score_adj_EV$away_corsi_adj[home_lead])
+      )
+    
+    return(hold)
+  }
+  fun.oniceCorsiA <- function(data, player_slot) {
+    
+    hold <- data %>% 
+      summarise(TOI = sum(event_length) / 60, 
+                Team = first(away_team), 
+                Venue = first(home_team), 
+                is_home = 0, 
+                
+                GF =  sum((event_type == "GOAL" & event_team == away_team) * score_adj_EV$away_goal_adj[home_lead_state]), 
+                GA =  sum((event_type == "GOAL" & event_team == home_team) * score_adj_EV$home_goal_adj[home_lead_state]), 
+                
+                CF =  sum((event_type %in% st.corsi_events & event_team == away_team) * score_adj_EV$away_corsi_adj[home_lead]), 
+                CA =  sum((event_type %in% st.corsi_events & event_team == home_team) * score_adj_EV$home_corsi_adj[home_lead])
+      )
+    
+    return(hold)
+  }
+  fun.componiceCorsi <- function(data) {
+    
+    data <- data %>% 
+      filter(game_strength_state == "5v5")
+    
+    print("on_ice_home", quote = F)
+    h1 <- data %>% group_by(game_id, season, home_on_1, home_team) %>% fun.oniceCorsiH(., "home_on_1") %>% rename(player = home_on_1) %>% data.frame()
+    h2 <- data %>% group_by(game_id, season, home_on_2, home_team) %>% fun.oniceCorsiH(., "home_on_2") %>% rename(player = home_on_2) %>% data.frame()
+    h3 <- data %>% group_by(game_id, season, home_on_3, home_team) %>% fun.oniceCorsiH(., "home_on_3") %>% rename(player = home_on_3) %>% data.frame()
+    h4 <- data %>% group_by(game_id, season, home_on_4, home_team) %>% fun.oniceCorsiH(., "home_on_4") %>% rename(player = home_on_4) %>% data.frame()
+    h5 <- data %>% group_by(game_id, season, home_on_5, home_team) %>% fun.oniceCorsiH(., "home_on_5") %>% rename(player = home_on_5) %>% data.frame()
+    h6 <- data %>% group_by(game_id, season, home_on_6, home_team) %>% fun.oniceCorsiH(., "home_on_6") %>% rename(player = home_on_6) %>% data.frame()
+    
+    print("on_ice_away", quote = F)
+    a1 <- data %>% group_by(game_id, season, away_on_1, away_team) %>% fun.oniceCorsiA(., "away_on_1") %>% rename(player = away_on_1) %>% data.frame()
+    a2 <- data %>% group_by(game_id, season, away_on_2, away_team) %>% fun.oniceCorsiA(., "away_on_2") %>% rename(player = away_on_2) %>% data.frame()
+    a3 <- data %>% group_by(game_id, season, away_on_3, away_team) %>% fun.oniceCorsiA(., "away_on_3") %>% rename(player = away_on_3) %>% data.frame()
+    a4 <- data %>% group_by(game_id, season, away_on_4, away_team) %>% fun.oniceCorsiA(., "away_on_4") %>% rename(player = away_on_4) %>% data.frame()
+    a5 <- data %>% group_by(game_id, season, away_on_5, away_team) %>% fun.oniceCorsiA(., "away_on_5") %>% rename(player = away_on_5) %>% data.frame()
+    a6 <- data %>% group_by(game_id, season, away_on_6, away_team) %>% fun.oniceCorsiA(., "away_on_6") %>% rename(player = away_on_6) %>% data.frame()
+    
+    
+    # Join all data.frames
+    merged <- Reduce(function(...) merge(..., all = TRUE), list(h1, h2, h3, h4, h5, h6, a1, a2, a3, a4, a5, a6))
+    
+    merge_return <- merged %>% 
+      group_by(player, game_id, season) %>%  
+      summarise(Team =    first(Team), 
+                Venue =   first(Venue), 
+                is_home = first(is_home), 
+                GF =      sum(GF), 
+                GA =      sum(GA), 
+                CF =      sum(CF), 
+                CA =      sum(CA)
+      ) %>% 
+      filter(!is.na(player)) %>% 
+      data.frame()
+    
+    return(merge_return)
+  }
+  
+  # Boxscore
+  fun.counts <- function(data, venue) {
+    
+    if(venue == "home_team") {
+      
+      # Counts
+      counts_1 <- data %>% 
+        filter(event_type %in% c("GOAL", "BLOCK", "MISS", "SHOT", "HIT", "TAKE", "GIVE"), 
+               event_team == home_team
+        ) %>% 
+        group_by(event_player_1, game_id, season) %>% 
+        summarise(Team = first(home_team),
+                  G = sum(event_type == "GOAL"),
+                  iSF = sum(event_type %in% st.shot_events)
+        ) %>% 
+        rename(player = event_player_1) %>% 
+        data.frame()
+      
+      counts_2 <- data %>% 
+        filter(event_type %in% c("GOAL"), 
+               event_team == home_team
+        ) %>% 
+        group_by(event_player_2, game_id, season) %>% 
+        summarise(Team = first(home_team), 
+                  A1 = sum(event_type == "GOAL")
+        ) %>% 
+        rename(player = event_player_2) %>% 
+        data.frame()
+      
+      counts_3 <- data %>% 
+        filter(event_type == "GOAL", 
+               event_team == home_team
+        ) %>% 
+        group_by(event_player_3, game_id, season) %>%
+        summarise(Team = first(home_team), 
+                  A2 = sum(event_type == "GOAL")
+        ) %>% 
+        rename(player = event_player_3) %>% 
+        data.frame()
+      
+      # Join
+      merged <- Reduce(function(...) merge(..., all = TRUE), list(counts_1, counts_2, counts_3))
+      
+      joined <- merged %>% 
+        mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+        select(player, game_id, season, Team, 
+               G, A1, A2, iSF
+        ) %>% 
+        arrange(player, game_id) %>% 
+        data.frame()
+      
+      return(joined)
+    }
+    else {
+      
+      # Compile
+      counts_1 <- data %>% 
+        filter(event_type %in% c("GOAL", "BLOCK", "MISS", "SHOT", "HIT", "TAKE", "GIVE"), 
+               event_team == away_team
+        ) %>% 
+        group_by(event_player_1, game_id, season) %>% 
+        summarise(Team = first(away_team),
+                  G = sum(event_type == "GOAL"),
+                  iSF = sum(event_type %in% st.shot_events)
+        ) %>% 
+        rename(player = event_player_1) %>% 
+        data.frame()
+      
+      counts_2 <- data %>% 
+        filter(event_type %in% c("GOAL"), 
+               event_team == away_team
+        ) %>% 
+        group_by(event_player_2, game_id, season) %>% 
+        summarise(Team = first(away_team), 
+                  A1 = sum(event_type == "GOAL")
+        ) %>% 
+        rename(player = event_player_2)
+      
+      counts_3 <- data %>% 
+        filter(event_type == "GOAL", 
+               event_team == away_team
+        ) %>% 
+        group_by(event_player_3, game_id, season) %>%
+        summarise(Team = first(away_team), 
+                  A2 = sum(event_type == "GOAL")
+        ) %>% 
+        rename(player = event_player_3) %>% 
+        data.frame()
+      
+      # Join
+      merged <- Reduce(function(...) merge(..., all = TRUE), list(counts_1, counts_2, counts_3))
+      
+      joined <- merged %>% 
+        mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+        select(player, game_id, season, Team, 
+               G, A1, A2, iSF
+        ) %>% 
+        arrange(player, game_id) %>% 
+        data.frame()
+      
+      return(joined)
+    }
+  }
+  fun.faceoff <- function(data, venue) {
+    
+    if(venue == "home_team") {
+      
+      faceoffs <- data %>% 
+        filter(event_type == "FAC") %>% 
+        group_by(event_player_2, game_id, season) %>% 
+        mutate(FOW = 1 * (home_team == event_team), 
+               FOL = 1 * (away_team == event_team)
+        ) %>% 
+        summarise(Team = first(home_team),
+                  FOW = sum(FOW), 
+                  FOL = sum(FOL)
+        ) %>% 
+        mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+        rename(player = event_player_2) %>% 
+        ungroup() %>% 
+        arrange(player, game_id) %>% 
+        data.frame()
+      
+      return(faceoffs)
+    }
+    else {
+      
+      faceoffs <- data %>% 
+        filter(event_type == "FAC") %>% 
+        group_by(event_player_1, game_id, season) %>% 
+        mutate(FOW = 1 * (away_team == event_team), 
+               FOL = 1 * (home_team == event_team)
+        ) %>% 
+        summarise(Team = first(away_team),
+                  FOW = sum(FOW), 
+                  FOL = sum(FOL)
+        ) %>% 
+        mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+        rename(player = event_player_1) %>% 
+        ungroup() %>% 
+        arrange(player, game_id) %>% 
+        data.frame()
+      
+      return(faceoffs)
+    }
+  }
+  fun.penalty <- function(data, venue) {
+    
+    if(venue == "home_team") {
+      
+      pen_1 <- data %>% 
+        filter(event_team == home_team, 
+               event_type %in% c("PENL", "BLOCK")
+        ) %>% 
+        group_by(event_player_1, game_id, season) %>% 
+        summarise(Team = first(home_team),
+                  iPENT2 = sum(na.omit(1 * (event_type == "PENL") +
+                                         1 * (event_type == "PENL" & grepl("double minor", tolower(event_detail)) == TRUE) -
+                                         1 * (event_type == "PENL" & grepl("ps \\-|match|fighting|major", tolower(event_detail)) == TRUE) - 
+                                         1 * (event_type == "PENL" & grepl("too many men", tolower(event_description)) == TRUE) - 
+                                         1 * (event_type == "PENL" & grepl("misconduct", tolower(event_description)) == TRUE)))
+        ) %>% 
+        rename(player = event_player_1) %>% 
+        data.frame()
+      
+      
+      pen_2 <- data %>% 
+        filter(event_team == away_team, 
+               event_type %in% c("PENL", "BLOCK")
+        ) %>% 
+        group_by(event_player_2, game_id, season) %>% 
+        summarise(Team = first(home_team), 
+                  iPEND2 = sum(na.omit(1 * (event_type == "PENL") +
+                                         1 * (event_type == "PENL" & grepl("double minor", tolower(event_detail)) == TRUE) -
+                                         1 * (event_type == "PENL" & grepl("ps \\-|match|fighting|major", tolower(event_detail)) == TRUE) - 
+                                         1 * (event_type == "PENL" & grepl("too many men", tolower(event_description)) == TRUE) - 
+                                         1 * (event_type == "PENL" & grepl("misconduct", tolower(event_description)) == TRUE))),
+                  iBLK = sum(event_type == "BLOCK")
+        ) %>% 
+        rename(player = event_player_2) %>% 
+        data.frame()
+      
+      
+      merged <- Reduce(function(...) merge(..., all = TRUE), list(pen_1, pen_2))
+      
+      joined <- merged %>% 
+        mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+        select(player, game_id, season, Team, 
+               iPENT2, iPEND2, iBLK
+        ) %>% 
+        arrange(player, game_id) %>% 
+        data.frame()
+      
+      return(joined)
+    }
+    else {
+      
+      pen_1 <- data %>% 
+        filter(event_team == away_team, 
+               event_type %in% c("PENL", "BLOCK")
+        ) %>% 
+        group_by(event_player_1, game_id, season) %>% 
+        summarise(Team = first(away_team),
+                  iPENT2 = sum(na.omit(1 * (event_type == "PENL") +
+                                         1 * (event_type == "PENL" & grepl("double minor", tolower(event_detail)) == TRUE) -
+                                         1 * (event_type == "PENL" & grepl("ps \\-|match|fighting|major", tolower(event_detail)) == TRUE) - 
+                                         1 * (event_type == "PENL" & grepl("too many men", tolower(event_description)) == TRUE) - 
+                                         1 * (event_type == "PENL" & grepl("misconduct", tolower(event_description)) == TRUE)))
+        ) %>% 
+        rename(player = event_player_1) %>% 
+        data.frame()
+      
+      pen_2 <- data %>% 
+        filter(event_team == home_team, 
+               event_type %in% c("PENL", "BLOCK")
+        ) %>% 
+        group_by(event_player_2, game_id, season) %>% 
+        summarise(Team = first(away_team),
+                  iPEND2 = sum(na.omit(1 * (event_type == "PENL") +
+                                         1 * (event_type == "PENL" & grepl("double minor", tolower(event_detail)) == TRUE) -
+                                         1 * (event_type == "PENL" & grepl("ps \\-|match|fighting|major", tolower(event_detail)) == TRUE) - 
+                                         1 * (event_type == "PENL" & grepl("too many men", tolower(event_description)) == TRUE) - 
+                                         1 * (event_type == "PENL" & grepl("misconduct", tolower(event_description)) == TRUE))),
+                  iBLK = sum(event_type == "BLOCK")
+        ) %>% 
+        rename(player = event_player_2) %>% 
+        data.frame()
+      
+      
+      merged <- Reduce(function(...) merge(..., all = TRUE), list(pen_1, pen_2))
+      
+      joined <- merged %>% 
+        mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+        select(player, game_id, season, Team, 
+               iPENT2, iPEND2, iBLK
+        ) %>% 
+        arrange(player, game_id) %>% 
+        data.frame()
+      
+      return(joined)
+    }
+  }
+  
+  
+  # Run Functions
+  print("corsi/goal diff", quote = F)
+  corsi_G_diff <- fun.componiceCorsi(data)
+  
+  print("counts", quote = F)
+  counts_h <- fun.counts(data, "home_team")
+  counts_a <- fun.counts(data, "away_team")
+  
+  counts_all <- counts_h %>% 
+    rbind(., counts_a) %>% 
+    arrange(player, game_id)
+  
+  print("faceoffs", quote = F)
+  faceoff_h <- fun.faceoff(data, "home_team")
+  faceoff_a <- fun.faceoff(data, "away_team")
+  
+  faceoff_all <- faceoff_h %>% 
+    rbind(., faceoff_a) %>% 
+    arrange(player, game_id)
+  
+  print("penalties", quote = F)
+  penalty_h <- fun.penalty(data, "home_team")
+  penalty_a <- fun.penalty(data, "away_team")
+  
+  penalty_all <- penalty_h %>% 
+    rbind(., penalty_a) %>% 
+    arrange(player, game_id)
+  
+  # Join
+  print("bind", quote = F)
+  test_join <- corsi_G_diff %>% 
+    full_join(., counts_all, by = c("player", "game_id", "season", "Team")) %>% 
+    full_join(., faceoff_all, by = c("player", "game_id", "season", "Team")) %>% 
+    full_join(., penalty_all, by = c("player", "game_id", "season", "Team")) %>% 
+    mutate_if(is.numeric, funs(ifelse(is.na(.), 0, .)))
+  
+  # Remove goalies
+  fun.goalie_remove <- function(data_) {
+    
+    # Identifies goalies within a given pbp data.frame & returns a data.frame to join for removal
+    goalie_return <- data.frame(player = sort(unique(na.omit(as.character(rbind(data_$home_goalie, data_$away_goalie))))), 
+                                is_goalie = 1)
+    
+    goalie_return$player <- as.character(goalie_return$player)
+    
+    return(goalie_return)
+  }
+  goalieremove <- fun.goalie_remove(data_ = data)
+  
+  all <- test_join %>% 
+    left_join(., goalieremove, "player") %>% 
+    filter(is.na(is_goalie)) %>% 
+    select(-c(is_goalie)) %>%
+    arrange(player, game_id) %>% 
+    filter(!is.na(player)) %>% 
+    left_join(., player_position, by = "player") %>% 
+    data.frame()
+  
+  ## ----------- ##
+  ##   Goalies   ##
+  ## ----------- ##
+  
+  print("goalie", quote = F)
+  
+  # Goalie Game Score
+  goalies_home <- data %>% 
+    group_by(home_goalie, game_id, season, home_team) %>% 
+    summarise(GA = sum((event_type == "GOAL" & event_team == away_team)), 
+              SA = sum((event_type %in% st.shot_events & event_team == away_team))
+    ) %>% 
+    rename(player = home_goalie, 
+           Team = home_team
+    ) %>% 
+    data.frame()
+  
+  goalies_away <- data %>% 
+    group_by(away_goalie, game_id, season, away_team) %>% 
+    summarise(GA = sum((event_type == "GOAL" & event_team == home_team)), 
+              SA = sum((event_type %in% st.shot_events & event_team == home_team))
+    ) %>% 
+    rename(player = away_goalie, 
+           Team = away_team
+    ) %>% 
+    data.frame()
+  
+  game_score_goalies_all <- goalies_home %>% 
+    rbind(., goalies_away) %>% 
+    filter(!is.na(player)) %>% 
+    group_by(player, game_id, season, Team) %>% 
+    summarise_at(vars(SA, GA), funs(sum)) %>% 
+    mutate(position = 3, 
+           SV = SA - GA, 
+           GS = (-0.75 * GA) + (0.1 * SV)
+    ) %>% 
+    select(player, position, game_id, season, Team, SA:GS) %>% 
+    ungroup() %>% 
+    rename_at(vars(SA, GA, SV), funs(paste0(., "_goalie"))) %>% 
+    data.frame()
+  
+  
+  ## --------------- ##
+  ##   Combine All   ##
+  ## --------------- ##
+  
+  game_score_all_sit_sum <- all %>% 
+    group_by(player, position, game_id, season, Team) %>% 
+    summarise_at(vars(GF:iBLK), funs(sum)) %>% 
+    ungroup() %>% 
+    mutate(GS = round((0.75 * G) + (0.7 * A1) + (0.55 * A2) + (0.075 * iSF) + (0.05 * iBLK) + (0.15 * iPEND2) - (0.15 * iPENT2) + 
+                        (0.01 * FOW) - (0.01 * FOL) + (0.05 * CF) - (0.05 * CA) + (0.15 * GF) - (0.15* GA), 2)
+    ) %>% 
+    full_join(., game_score_goalies_all, by = c("player", "position", "game_id", "season", "Team", "GS")) %>% 
+    mutate_if(is.numeric, funs(ifelse(is.na(.), 0, .))) %>% 
+    arrange(player, season) %>% 
+    select(player, position, game_id, season, Team, GF:iBLK, SA_goalie:SV_goalie, GS) %>% 
+    data.frame()
+  
+  
+  return(game_score_all_sit_sum)
+  
+}
+game_score_games_new <- fun.game_score_all_sit(data = pbp_df)
+
+
+###################################
+
+
+
+## ------------------------------------------------------ ##
+
+
+
+
+
+
+
+
+
