@@ -21,7 +21,7 @@ source("ALLSCRAPE.R")
 source("Shiny_All_Functions.R")
 
 
-###  Load basics
+###  Load Object Data
 #####################################
 
 ## -------- ##
@@ -1209,7 +1209,7 @@ adj_pen_season <- adj_pen_games_joined %>%
          draw_AA = ((adj_draw / TOI) - (sum(na.omit(adj_draw)) / sum(na.omit(TOI)))) * TOI, 
          pens =    take_AA + draw_AA
          ) %>% 
-  mutate_at(vars(take_AA:pens), funs(round(., 1))) %>% 
+  mutate_at(vars(TOI, take_AA:pens), funs(round(., 1))) %>% 
   select(player:Team, TOI, take_count, draw_count, adj_take, adj_draw, take_AA, draw_AA, pens) %>% 
   ungroup() %>% 
   mutate(position = ifelse(position == 1, "F", 

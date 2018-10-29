@@ -2,7 +2,7 @@
 #####          SHINY All Functions            ||             09/22/18           #####
 #####################################################################################
 
-# Basic
+# Basic Functions
 standardize <- function(metric) {
   
   x <- (metric - mean(na.omit(metric))) / sd(na.omit(metric))
