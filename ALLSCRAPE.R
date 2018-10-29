@@ -3,6 +3,10 @@
 #################################################################################
 
 
+## ***  this Script is a slightly modified version of Manny Perry's Dry Scrape NHL scraper
+## ***  the original source code can be found here: https://github.com/mannyelk/corsica/blob/master/modules/dryscrape.R
+
+
 ## Dependencies - moved to source
 #library(RCurl); library(rjson); #library(dplyr); 
 #library(lubridate); library(doMC); library(rvest)
