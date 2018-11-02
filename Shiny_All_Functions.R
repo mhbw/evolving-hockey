@@ -4921,7 +4921,7 @@ fun.pen_assign <- function(data) {
     select(cluster, no_impact) %>% 
     mutate(check = 1 * (cluster == 1 & no_impact == 0))
   
-  if(sum(na.omit(x$check)) > 0) { 
+  if (sum(na.omit(x$check)) > 0) { 
     
     # Initial gather
     test1 <- data %>% 
@@ -5292,7 +5292,7 @@ fun.pen_value_main <- function(pen_data, pbp_data) {
 # Calculate goal value - Extras
 fun.pen_value_xtra <- function(data) {
   
-  if(sum(na.omit(data$pen_shot)) + sum(na.omit(data$major)) > 0) {  # check if there are "extra" penalties
+  if (sum(na.omit(data$pen_shot)) + sum(na.omit(data$major)) > 0) {  # check if there are "extra" penalties
     
     # Calculate Penalty Shot + Major Goal Values
     pen_calc_xtras <- data %>% 
@@ -8783,11 +8783,11 @@ fun.shooting_RAPM <- function(pbp_data, strength_) {
     st.strength_states <- c("3v3", "5v5", "4v4", "5v4", "4v5", "5v3", "3v5", "4v3", "3v4", "5vE", "Ev5", "4vE", "Ev4") %>% as.factor()
     
     # Filter to strength state
-    if(strength == "All") { 
+    if (strength == "All") { 
       hold <- filter(data, game_strength_state %in% st.strength_states)
     
       }
-    if(strength == "EV") { 
+    if (strength == "EV") { 
       hold <- filter(data, game_strength_state %in% st.even_strength)
     
       }
@@ -8799,7 +8799,7 @@ fun.shooting_RAPM <- function(pbp_data, strength_) {
       filter(!is.na(TOI) & home_goalie != 50) %>% 
       rename(goalie = home_goalie, 
              Team =   home_team
-      ) %>% 
+             ) %>% 
       data.frame()
     
     pbp_goalie_A <- hold %>% 
@@ -8808,7 +8808,7 @@ fun.shooting_RAPM <- function(pbp_data, strength_) {
       filter(!is.na(TOI) & away_goalie != 50) %>% 
       rename(goalie = away_goalie, 
              Team =   away_team
-      ) %>% 
+             ) %>% 
       data.frame()
     
     pbp_goalie <- pbp_goalie_A %>% 
@@ -8817,12 +8817,12 @@ fun.shooting_RAPM <- function(pbp_data, strength_) {
       summarise(TOI = sum(TOI) / 60) %>% 
       mutate(qual = ifelse(TOI >= cutoff, 1, 0), 
              player = paste0(goalie, ".", Team)
-      ) %>% 
+             ) %>% 
       ungroup() %>% 
       select(player, qual) %>% 
       data.frame()
     
-  }
+    }
   goalie_qual <- fun.goalie_qual(data =     pbp_data, 
                                  cutoff =   1, 
                                  strength = strength_)
@@ -8834,11 +8834,11 @@ fun.shooting_RAPM <- function(pbp_data, strength_) {
     st.strength_states <- c("3v3", "5v5", "4v4", "5v4", "4v5", "5v3", "3v5", "4v3", "3v4", "5vE", "Ev5", "4vE", "Ev4") %>% as.factor()
     
     # Filter to strength state
-    if(strength == "All") { 
+    if (strength == "All") { 
       hold <- filter(data, game_strength_state %in% st.strength_states)
     
       }
-    if(strength == "EV") { 
+    if (strength == "EV") { 
       hold <- filter(data, game_strength_state %in% st.even_strength)
     
       }
@@ -8873,25 +8873,25 @@ fun.shooting_RAPM <- function(pbp_data, strength_) {
     st.even_strength <- c("5v5", "4v4", "3v3") %>% as.factor()
     st.strength_states <- c("3v3", "5v5", "4v4", "5v4", "4v5", "5v3", "3v5", "4v3", "3v4", "5vE", "Ev5", "4vE", "Ev4") %>% as.factor()
     
-    if(strength == "All") { 
+    if (strength == "All") { 
       
       return_pbp <- data %>% 
         rename(pred_goal = pred_XGB_7, 
                shooter = event_player_1
-        ) %>% 
+               ) %>% 
         filter(event_type %in% st.fenwick_events, 
                game_period < 5, 
                (game_strength_state %in% c("5v5", "4v4", "3v3", "5v4", "4v5", "5v3", "3v5", "4v3", "3v4")) | 
                  ((game_strength_state == "5vE" & event_team == away_team) | (game_strength_state == "Ev5" & event_team == home_team)) | 
                  ((game_strength_state == "4vE" & event_team == away_team) | (game_strength_state == "Ev4" & event_team == home_team)), 
                !is.na(pred_goal)
-        ) %>% 
+               ) %>% 
         left_join(., player_position %>% rename(shooter = player), by = "shooter") %>% 
         mutate(is_goal = 1 * (event_type == "GOAL"), 
                
                goalie = ifelse(event_team == home_team, paste0(away_goalie, ".", away_team), paste0(home_goalie, ".", home_team)), 
                
-               home_lead = home_score - away_score, 
+               home_lead =           home_score - away_score, 
                shooter_score_trail = 1 * ((event_team == home_team & home_lead < 0) | (event_team == away_team & home_lead > 0)), 
                shooter_score_even =  1 * (home_lead == 0), 
                shooter_score_lead =  1 * ((event_team == home_team & home_lead > 0) | (event_team == away_team & home_lead < 0)), 
@@ -8906,9 +8906,9 @@ fun.shooting_RAPM <- function(pbp_data, strength_) {
                state_4vE = 1 * ((game_strength_state == "4vE" & event_team == away_team) | (game_strength_state == "Ev4" & event_team == home_team)),
                
                shooter_is_home = 1 * (event_team == home_team), 
-               shooter_is_F = 1 * (position == 1), 
-               shooter_is_D = 1 * (position == 2) 
-        ) %>% 
+               shooter_is_F =    1 * (position == 1), 
+               shooter_is_D =    1 * (position == 2) 
+               ) %>% 
         left_join(., btb, by = c("game_id")) %>% 
         select(is_goal, pred_goal,
                shooter, 
@@ -8919,11 +8919,11 @@ fun.shooting_RAPM <- function(pbp_data, strength_) {
                shooter_is_home, 
                shooter_is_F, shooter_is_D, 
                home_btb, away_btb
-        ) %>% 
+               ) %>% 
         mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
         data.frame()
       
-    } 
+      } 
     
     return(return_pbp)
   
@@ -8946,7 +8946,8 @@ fun.shooting_RAPM <- function(pbp_data, strength_) {
       goalie_return$player <- as.character(goalie_return$player)
       
       return(goalie_return)
-    }
+    
+      }
     goalies <- fun.goalie_find(sub_data2)
     
     goalies <- goalies %>% 
@@ -9052,8 +9053,7 @@ fun.shooting_RAPM <- function(pbp_data, strength_) {
                           alpha = 0, 
                           nfolds = 10, 
                           #standardize = FALSE, # not using standardization
-                          parallel = TRUE
-                          )
+                          parallel = TRUE)
   gc()
   
   print(paste("lambdas tested:", length(CV_results$lambda)), quote = F)
