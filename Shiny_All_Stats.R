@@ -251,6 +251,8 @@ fun.schedule <- function(start, end) {
 schedule_current <- fun.schedule(Sys.Date() - 1,
                                  Sys.Date() - 1)
 
+print(schedule_current)
+
 
 # Scrape pbp data
 fun.scrape_pbp <- function(year) { 
@@ -1068,9 +1070,9 @@ TOI_together_PP_joined <- db %>% tbl("TOI_together_data_PP") %>% data.frame()
 TOI_together_SH_joined <- db %>% tbl("TOI_together_data_SH") %>% data.frame()
 
 team_games_all_sit_joined <- db %>% tbl("team_data_all_sit") %>% data.frame()
-team_games_EV_joined <- db %>% tbl("team_data_EV") %>% data.frame()
-team_games_PP_joined <- db %>% tbl("team_data_PP") %>% data.frame()
-team_games_SH_joined <- db %>% tbl("team_data_SH") %>% data.frame()
+team_games_EV_joined <-      db %>% tbl("team_data_EV") %>% data.frame()
+team_games_PP_joined <-      db %>% tbl("team_data_PP") %>% data.frame()
+team_games_SH_joined <-      db %>% tbl("team_data_SH") %>% data.frame()
 
 goalie_games_all_sit_joined <- db %>% tbl("goalie_games_all_sit") %>% data.frame()
 adj_pen_games_joined <-        db %>% tbl("adj_pen_games_all_sit") %>% data.frame()
@@ -1401,14 +1403,14 @@ team_strength_SH_full_AA <- team_strength_RAPM_SH %>%
 
 ## -- Weights -- ##
 
-mod_EVO_F_weights <- c("lm" = 0.252551, "bagEarth" = 0.3448017, "svmLinear" = 0.4026653)
-mod_EVO_D_weights <- c("lm" = 0.37921, "cubist" = 0.3210417, "svmLinear" = 0.299772)
-mod_EVD_F_weights <- c("bagEarth" = 0.413722, "svmLinear" = 0.297881, "glmnet" = 0.288418)
-mod_EVD_D_weights <- c("lm" = 0.3688093, "cubist" = 0.2741847, "glmnet" = 0.3570327)
-mod_PPO_F_weights <- c("cubist" = 0.3791753, "bagEarth" = 0.3650347, "svmLinear" = 0.2558133)
-mod_PPO_D_weights <- c("lm" = 0.3972313, "svmLinear" = 0.352244, "glmnet" = 0.2505447)
-mod_SHD_F_weights <- c("cubist" = 0.3101013, "bagEarth" = 0.3426613, "svmLinear" = 0.3472623)
-mod_SHD_D_weights <- c("cubist" = 0.282119, "bagEarth" = 0.443778, "glmnet" = 0.274121)
+mod_EVO_F_weights <- c("lm" =       0.252551,   "bagEarth" =  0.3448017,  "svmLinear" = 0.4026653)
+mod_EVO_D_weights <- c("lm" =       0.37921,    "cubist" =    0.3210417,  "svmLinear" = 0.299772)
+mod_EVD_F_weights <- c("bagEarth" = 0.413722,   "svmLinear" = 0.297881,   "glmnet" =    0.288418)
+mod_EVD_D_weights <- c("lm" =       0.3688093,  "cubist" =    0.2741847,  "glmnet" =    0.3570327)
+mod_PPO_F_weights <- c("cubist" =   0.3791753,  "bagEarth" =  0.3650347,  "svmLinear" = 0.2558133)
+mod_PPO_D_weights <- c("lm" =       0.3972313,  "svmLinear" = 0.352244,   "glmnet" =    0.2505447)
+mod_SHD_F_weights <- c("cubist" =   0.3101013,  "bagEarth" =  0.3426613,  "svmLinear" = 0.3472623)
+mod_SHD_D_weights <- c("cubist" =   0.282119,   "bagEarth" =  0.443778,   "glmnet" =    0.274121)
 
 
 ## -- Features -- ##
