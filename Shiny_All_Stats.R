@@ -349,9 +349,9 @@ player_position <- player_position_historic %>%
   select(-c(test)) %>% 
   
   ##        ***  Manual Addition  ***            ##
-  #rbind(., data.frame(player = "ALEX.FORTIN", 
-  #                    position = 1)
-  #      ) %>% 
+  rbind(., data.frame(player = "MATT.LUFF", 
+                      position = 1)
+        ) %>% 
   
   arrange(player) %>% 
   data.frame()
@@ -661,6 +661,7 @@ fun.position_test <- function(pbp_data) {
   
   # Print result
   if(nrow(position_test) > 0) { 
+    print(paste0("There were position mismatches!"), quote = F)
     print(paste0("NA Players: ", position_test$player), quote = F)
     
     }
@@ -673,6 +674,7 @@ fun.position_test <- function(pbp_data) {
   
   }
 position_test <- fun.position_test(pbp_data = pbp_new)
+
 
 
 
@@ -715,6 +717,7 @@ paste0("Season: ", unique(pbp_df$season), "  //  Games: ", length(unique(pbp_df$
 
 
 #######################################
+
 
 
 
