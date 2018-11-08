@@ -349,9 +349,9 @@ player_position <- player_position_historic %>%
   select(-c(test)) %>% 
   
   ##        ***  Manual Addition  ***            ##
-  rbind(., data.frame(player = "MATT.LUFF", 
-                      position = 1)
-        ) %>% 
+  #rbind(., data.frame(player = "MATT.LUFF", 
+  #                    position = 1)
+  #      ) %>% 
   
   arrange(player) %>% 
   data.frame()
@@ -1060,8 +1060,8 @@ gc()
 db <- DBI::dbConnect(SQLite(), dbname = "data/NHL_db_1819.sqlite") # NEW DATABASE NAME
 
 pbp_joined <-     db %>% tbl("pbp_full") %>% data.frame()
-shifts_joined <-  db %>% tbl("shifts_full") %>% data.frame()
-rosters_joined <- db %>% tbl("rosters_full") %>% data.frame()
+#shifts_joined <-  db %>% tbl("shifts_full") %>% data.frame()    # not needed here
+#rosters_joined <- db %>% tbl("rosters_full") %>% data.frame()   # not needed here
 
 games_all_sit_joined <- db %>% tbl("games_data_all_sit") %>% data.frame()
 games_EV_joined <-      db %>% tbl("games_data_EV") %>% data.frame()
