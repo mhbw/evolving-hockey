@@ -1469,10 +1469,13 @@ TOI_cut_SH <- 25
 ##   Prepare SPM/GAR Data   ##
 ## ------------------------ ##
 
-### Even-Strength
+# Specify data
 metrics_EV <- all_metrics_season_EV
+metrics_PP <- all_metrics_season_PP
+metrics_SH <- all_metrics_season_SH
 
-### --- Offense --- ###
+
+### Even-Strength Offense
 EVO_box_rates <- metrics_EV %>% 
   mutate(FO_perc = ifelse(FOW > 0 & FOL > 0, 100 * FOW / (FOW + FOL), 0), 
          r_FO_perc = (FOL + 50) / (FOW + 50)
@@ -1488,12 +1491,8 @@ EVO_box_rates <- metrics_EV %>%
          FO_perc, r_FO_perc,
          rel_TM_GF60, rel_TM_SF60, rel_TM_FF60, rel_TM_CF60, rel_TM_xGF60)
 
-# Join
-pred_EVO_F_join <- EVO_box_rates %>% filter(position == 1)
-pred_EVO_D_join <- EVO_box_rates %>% filter(position == 2)
 
-
-### --- Defense --- ###
+### Even-Strength Defense
 EVD_box_rates <- metrics_EV %>% 
   mutate(FO_perc = ifelse(FOW > 0 & FOL > 0, 100 * FOW / (FOW + FOL), 0), 
          r_FO_perc = (FOL + 50) / (FOW + 50)
@@ -1509,14 +1508,8 @@ EVD_box_rates <- metrics_EV %>%
          rel_TM_GA60_state, rel_TM_SA60_state, rel_TM_FA60_state, rel_TM_CA60_state, rel_TM_xGA60_state
          )
 
-# Join
-pred_EVD_F_join <- EVD_box_rates %>% filter(position == 1)
-pred_EVD_D_join <- EVD_box_rates %>% filter(position == 2)
-
 
 ### Powerplay 
-metrics_PP <- all_metrics_season_PP
-
 PPO_box_rates <- metrics_PP %>% 
   mutate(FO_perc = ifelse(FOW > 0 & FOL > 0, 100 * FOW / (FOW + FOL), 0), 
          r_FO_perc = (FOL + 50) / (FOW + 50), 
@@ -1537,14 +1530,8 @@ PPO_box_rates <- metrics_PP %>%
          rel_TM_GF60_state, rel_TM_SF60_state, rel_TM_FF60_state, rel_TM_CF60_state, rel_TM_xGF60_state
          ) 
 
-# Join
-pred_PPO_F_join <- PPO_box_rates %>% filter(position == 1)
-pred_PPO_D_join <- PPO_box_rates %>% filter(position == 2)
-
 
 ### Shorthanded
-metrics_SH <- all_metrics_season_SH
-
 SHD_box_rates <- metrics_SH %>% 
   mutate(FO_perc = ifelse(FOW > 0 & FOL > 0, 100 * FOW / (FOW + FOL), 0), 
          r_FO_perc = (FOL + 50) / (FOW + 50),
@@ -1566,9 +1553,25 @@ SHD_box_rates <- metrics_SH %>%
          rel_TM_GA60_state, rel_TM_SA60_state, rel_TM_FA60_state, rel_TM_CA60_state, rel_TM_xGA60_state
          )
 
-# Join
+
+
+# EVO: Split F/D
+pred_EVO_F_join <- EVO_box_rates %>% filter(position == 1)
+pred_EVO_D_join <- EVO_box_rates %>% filter(position == 2)
+
+# EVD: Split F/D
+pred_EVD_F_join <- EVD_box_rates %>% filter(position == 1)
+pred_EVD_D_join <- EVD_box_rates %>% filter(position == 2)
+
+# PPO: Split F/D
+pred_PPO_F_join <- PPO_box_rates %>% filter(position == 1)
+pred_PPO_D_join <- PPO_box_rates %>% filter(position == 2)
+
+# SHD: Split F/D
 pred_SHD_F_join <- SHD_box_rates %>% filter(position == 1)
 pred_SHD_D_join <- SHD_box_rates %>% filter(position == 2)
+
+
 
 
 # Remove Excess
@@ -1585,500 +1588,14 @@ gc()
 
 ###########################################
 
+# Even-Strength Function
+ALL_EV <- fun.ALL_EV_GAA()
 
-###    Even-Strength Offense & Defense    ###
+# Powerplay Offense Function
+ALL_PP <- fun.ALL_PP_GAA()
 
-
-## ------------- ##
-##     EVO_F     ##
-## ------------- ##
-
-eval_pred_EVO_F <- pred_EVO_F_join %>% 
-  select(player:GP)
-
-
-eval_pred_EVO_F$pred_1 <- predict(object = mod_list_EVO_F$lm, 
-                                  pred_EVO_F_join[, features_EVO_F_small],
-                                  type = "raw")
-
-eval_pred_EVO_F$pred_2 <- predict(object = mod_list_EVO_F$bagEarth, 
-                                  pred_EVO_F_join[, features_EVO_F_large], 
-                                  type = "raw")
-
-eval_pred_EVO_F$pred_3 <- predict(object = mod_list_EVO_F$svmLinear, 
-                                  pred_EVO_F_join[, features_EVO_F_large], 
-                                  type = "raw")
-
-eval_pred_EVO_F <- eval_pred_EVO_F %>% 
-  mutate(ensemble = 
-           pred_1 * mod_EVO_F_weights[1] + 
-           pred_2 * mod_EVO_F_weights[2] + 
-           pred_3 * mod_EVO_F_weights[3], 
-         EVO = (ensemble / 60) * TOI)
-
-
-# Combine for full join
-EVO_F_GAA <- eval_pred_EVO_F %>% 
-  group_by(player, position, season, Team) %>%  # added Team
-  summarise_at(vars(TOI, GP, EVO), funs(sum)) %>% 
-  mutate(EVO_60 = (EVO / TOI) * 60) %>% 
-  data.frame()
-
-
-
-## ------------- ##
-##     EVD_F     ##
-## ------------- ##
-
-eval_pred_EVD_F <- pred_EVD_F_join %>% 
-  select(player:GP)
-
-eval_pred_EVD_F$pred_1 <- predict(object = mod_list_EVD_F$bagEarth, 
-                                  pred_EVD_F_join[, features_EVD_F_large],
-                                  type = "raw")
-
-eval_pred_EVD_F$pred_2 <- predict(object = mod_list_EVD_F$svmLinear, 
-                                  pred_EVD_F_join[, features_EVD_F_large], 
-                                  type = "raw")
-
-eval_pred_EVD_F$pred_3 <- predict(object = mod_list_EVD_F$glmnet, 
-                                  pred_EVD_F_join[, features_EVD_F_large], 
-                                  type = "raw")
-
-eval_pred_EVD_F <- eval_pred_EVD_F %>% 
-  mutate(ensemble = 
-           pred_1 * mod_EVD_F_weights[1] + 
-           pred_2 * mod_EVD_F_weights[2] + 
-           pred_3 * mod_EVD_F_weights[3], 
-         EVD = (ensemble / 60) * TOI)
-
-
-# Combine for full join
-EVD_F_GAA <- eval_pred_EVD_F %>% 
-  group_by(player, position, season, Team) %>%  # added Team
-  summarise_at(vars(TOI, GP, EVD), funs(sum)) %>% 
-  mutate(EVD_60 = (EVD / TOI) * 60) %>% 
-  data.frame()
-
-
-## ---------------- ##
-##  Combine EV - F  ##
-## ---------------- ##
-
-EV_F_overall <- EVO_F_GAA %>% 
-  left_join(., EVD_F_GAA, by = c("player", "position", "season", "Team", "TOI", "GP")) %>% 
-  filter(TOI > TOI_cut_EV) %>% 
-  group_by(season) %>% 
-  mutate(EVO_AA =    ((EVO / TOI) - (sum(EVO) / sum(TOI))) * TOI, 
-         EVD_AA =    ((EVD / TOI) - (sum(EVD) / sum(TOI))) * TOI, 
-         EVO_AA_60 = (EVO_AA / TOI) * 60, 
-         EVD_AA_60 = (EVD_AA / TOI) * 60)
-
-
-# EV FINAL JOIN: Forwards
-EV_F_team_final <- EV_F_overall %>% 
-  left_join(., team_strength_RAPM_EV %>% select(season, Team, TOI, skaters, GF, xGA), 
-            by = c("season", "Team"), 
-            suffix = c("_player", "_team")
-            ) %>% 
-  group_by(player, season) %>% 
-  mutate(TOI_perc_tot =  TOI_player / TOI_team, 
-         #adj_off =       (1.6 * GF - (TOI_perc_tot * EVO_AA_60)) / skaters, 
-         adj_off =       (1.7 * GF - (TOI_perc_tot * EVO_AA_60)) / skaters, # new team adjustment 
-         #adj_def =       (1.4 * xGA - (TOI_perc_tot * EVD_AA_60)) / skaters, 
-         adj_def =       (1.45 * xGA - (TOI_perc_tot * EVD_AA_60)) / skaters, # new team adjustment 
-         EVO_AA_60_adj = EVO_AA_60 + adj_off, 
-         EVD_AA_60_adj = EVD_AA_60 + adj_def, 
-         EVO_AA_adj =    (EVO_AA_60_adj / 60) * TOI_player, 
-         EVD_AA_adj =    -1 * ((EVD_AA_60_adj / 60) * TOI_player), 
-         EVD_AA =        -1 * EVD_AA,
-         off_diff =      EVO_AA_adj - EVO_AA, 
-         def_diff =      EVD_AA_adj - EVD_AA
-         ) %>% 
-  rename(TOI = TOI_player) %>% 
-  select(player:GP, 
-         EVO_AA, EVD_AA,
-         GF, xGA, 
-         off_diff, def_diff, 
-         EVO_AA_adj, EVD_AA_adj) %>% 
-  data.frame()
-
-
-## ----------------------------------------------------------------- ##
-
-
-## ------------- ##
-##     EVO_D     ##
-## ------------- ##
-
-eval_pred_EVO_D <- pred_EVO_D_join %>% 
-  select(player:GP)
-
-
-eval_pred_EVO_D$pred_1 <- predict(object = mod_list_EVO_D$lm, 
-                                  pred_EVO_D_join[, features_EVO_D_small],
-                                  type = "raw")
-
-eval_pred_EVO_D$pred_2 <- predict(object = mod_list_EVO_D$cubist, 
-                                  pred_EVO_D_join[, features_EVO_D_large], 
-                                  type = "raw")
-
-eval_pred_EVO_D$pred_3 <- predict(object = mod_list_EVO_D$svmLinear, 
-                                  pred_EVO_D_join[, features_EVO_D_large], 
-                                  type = "raw")
-
-eval_pred_EVO_D <- eval_pred_EVO_D %>% 
-  mutate(ensemble = 
-           pred_1 * mod_EVO_D_weights[1] + 
-           pred_2 * mod_EVO_D_weights[2] + 
-           pred_3 * mod_EVO_D_weights[3], 
-         EVO = (ensemble / 60) * TOI)
-
-
-# Combine for full join
-EVO_D_GAA <- eval_pred_EVO_D %>% 
-  group_by(player, position, season, Team) %>% 
-  summarise_at(vars(TOI, GP, EVO), funs(sum)) %>% 
-  mutate(EVO_60 = (EVO / TOI) * 60) %>% 
-  data.frame()
-
-
-## ------------- ##
-##     EVD_D     ##
-## ------------- ##
-
-eval_pred_EVD_D <- pred_EVD_D_join %>% 
-  select(player:GP)
-
-eval_pred_EVD_D$pred_1 <- predict(object = mod_list_EVD_D$lm, 
-                                  pred_EVD_D_join[, features_EVD_D_small],
-                                  type = "raw")
-
-eval_pred_EVD_D$pred_2 <- predict(object = mod_list_EVD_D$cubist, 
-                                  pred_EVD_D_join[, features_EVD_D_large], 
-                                  type = "raw")
-
-eval_pred_EVD_D$pred_3 <- predict(object = mod_list_EVD_D$glmnet, 
-                                  pred_EVD_D_join[, features_EVD_D_large], 
-                                  type = "raw")
-
-eval_pred_EVD_D <- eval_pred_EVD_D %>% 
-  mutate(ensemble = 
-           pred_1 * mod_EVD_D_weights[1] + 
-           pred_2 * mod_EVD_D_weights[2] + 
-           pred_3 * mod_EVD_D_weights[3], 
-         EVD = (ensemble / 60) * TOI)
-
-
-EVD_D_GAA <- eval_pred_EVD_D %>% 
-  group_by(player, position, season, Team) %>%  # added Team
-  summarise_at(vars(TOI, GP, EVD), funs(sum)) %>% 
-  mutate(EVD_60 = (EVD / TOI) * 60) %>% 
-  data.frame()
-
-
-## ---------------- ##
-##  Combine EV - D  ##
-## ---------------- ##
-
-EV_D_overall <- EVO_D_GAA %>% 
-  left_join(., EVD_D_GAA, by = c("player", "position", "season", "Team", "TOI", "GP")) %>% 
-  filter(TOI > TOI_cut_EV) %>% 
-  group_by(season) %>% 
-  mutate(EVO_AA = ((EVO / TOI) - (sum(EVO) / sum(TOI))) * TOI, 
-         EVD_AA = ((EVD / TOI) - (sum(EVD) / sum(TOI))) * TOI, 
-         EVO_AA_60 = (EVO_AA / TOI) * 60, 
-         EVD_AA_60 = (EVD_AA / TOI) * 60)
-
-
-# EV FINAL JOIN: Defensemen
-EV_D_team_final <- EV_D_overall %>% 
-  left_join(., team_strength_RAPM_EV %>% select(season, Team, TOI, skaters, GF, xGA), 
-            by = c("season", "Team"), 
-            suffix = c("_player", "_team")
-            ) %>% 
-  group_by(player, season) %>% 
-  mutate(TOI_perc_tot =  TOI_player / TOI_team, 
-         #adj_off =       (1.6 * GF - (TOI_perc_tot * EVO_AA_60)) / skaters, 
-         adj_off =       (1.7 * GF - (TOI_perc_tot * EVO_AA_60)) / skaters, # new team adjustment
-         #adj_def =       (1.4 * xGA - (TOI_perc_tot * EVD_AA_60)) / skaters, 
-         adj_def =       (1.45 * xGA - (TOI_perc_tot * EVD_AA_60)) / skaters, # new team adjustment
-         EVO_AA_60_adj = EVO_AA_60 + adj_off, 
-         EVD_AA_60_adj = EVD_AA_60 + adj_def, 
-         EVO_AA_adj =    (EVO_AA_60_adj / 60) * TOI_player, 
-         EVD_AA_adj =    -1 * ((EVD_AA_60_adj / 60) * TOI_player), 
-         EVD_AA =        -1 * EVD_AA,
-         off_diff =      EVO_AA_adj - EVO_AA, 
-         def_diff =      EVD_AA_adj - EVD_AA
-         ) %>% 
-  rename(TOI = TOI_player) %>% 
-  select(player:GP, 
-         EVO_AA, EVD_AA,
-         GF, xGA, 
-         off_diff, def_diff, 
-         EVO_AA_adj, EVD_AA_adj) %>% 
-  data.frame()
-
-
-# FINAL F/D JOIN
-ALL_EV <- EV_F_team_final %>% 
-  rbind(., EV_D_team_final) %>% 
-  rename(TOI_EV = TOI)
-
-
-
-
-
-###    Powerplay Offense    ###
-
-
-
-## ------------- ##
-##     PPO_F     ##
-## ------------- ##
-
-eval_pred_PPO_F <- pred_PPO_F_join %>% 
-  select(player:TOI_GP) 
-
-# Predict
-eval_pred_PPO_F$pred_1 <- predict(object = mod_list_PPO_F$cubist, 
-                                  pred_PPO_F_join[, features_PPO_F_large], 
-                                  type = "raw")
-
-eval_pred_PPO_F$pred_2 <- predict(object = mod_list_PPO_F$bagEarth, 
-                                  pred_PPO_F_join[, features_PPO_F_large], 
-                                  type = "raw")
-
-eval_pred_PPO_F$pred_3 <- predict(object = mod_list_PPO_F$svmLinear, 
-                                  pred_PPO_F_join[, features_PPO_F_large], 
-                                  type = "raw")
-
-eval_pred_PPO_F <- eval_pred_PPO_F %>% 
-  mutate(ensemble = 
-           pred_1 * mod_PPO_F_weights[1] + 
-           pred_2 * mod_PPO_F_weights[2] + 
-           pred_3 * mod_PPO_F_weights[3], 
-         PPO = (ensemble / 60) * TOI)
-
-
-# Combine for full join
-PPO_F_GAA <- eval_pred_PPO_F %>% 
-  filter(TOI > TOI_cut_PP) %>% 
-  group_by(player, position, season, Team) %>%  # added Team
-  summarise_at(vars(TOI, GP, PPO), funs(sum)) %>% 
-  mutate(PPO_60 = (PPO / TOI) * 60) %>% 
-  data.frame()
-
-
-PPO_F_overall <- PPO_F_GAA %>% 
-  group_by(season) %>% 
-  mutate(PPO_AA = ((PPO / TOI) - (sum(PPO) / sum(TOI))) * TOI, 
-         PPO_AA_60 = (PPO_AA / TOI) * 60) %>% 
-  data.frame()
-
-
-# PP RAPM Team Strength
-PPO_F_team_final <- PPO_F_overall %>% 
-  left_join(., team_strength_PP_full_AA %>% select(season, Team, t_TOI_PP, skaters_PP, PPO_GF_AA_team), by = c("Team", "season")) %>% 
-  group_by(player, season) %>% 
-  mutate(TOI_perc_tot =  TOI / t_TOI_PP, 
-         adj_off =       (1.4 * PPO_GF_AA_team - (TOI_perc_tot * PPO_AA_60)) / skaters_PP, 
-         PPO_AA_60_adj = PPO_AA_60 + adj_off, 
-         PPO_AA_adj =    (PPO_AA_60_adj / 60) * TOI, 
-         off_diff =      PPO_AA_adj - PPO_AA
-         ) %>% 
-  select(player:GP, PPO_AA, PPO_GF_AA_team, TOI_perc_tot, off_diff, PPO_AA_adj) %>% 
-  data.frame()
-
-
-
-## ------------- ##
-##     PPO_D     ##
-## ------------- ##
-
-eval_pred_PPO_D <- pred_PPO_D_join %>% 
-  select(player:TOI_GP) 
-
-# Predict
-eval_pred_PPO_D$pred_1 <- predict(object = mod_list_PPO_D$lm, 
-                                  pred_PPO_D_join[, features_PPO_D_small], 
-                                  type = "raw")
-
-eval_pred_PPO_D$pred_2 <- predict(object = mod_list_PPO_D$svmLinear, 
-                                  pred_PPO_D_join[, features_PPO_D_large], 
-                                  type = "raw")
-
-eval_pred_PPO_D$pred_3 <- predict(object = mod_list_PPO_D$glmnet, 
-                                  pred_PPO_D_join[, features_PPO_D_large], 
-                                  type = "raw")
-
-eval_pred_PPO_D <- eval_pred_PPO_D %>% 
-  mutate(ensemble = 
-           pred_1 * mod_PPO_D_weights[1] + 
-           pred_2 * mod_PPO_D_weights[2] + 
-           pred_3 * mod_PPO_D_weights[3], 
-         PPO = (ensemble / 60) * TOI)
-
-
-# Combine for full join
-PPO_D_GAA <- eval_pred_PPO_D %>% 
-  filter(TOI > TOI_cut_PP) %>% 
-  group_by(player, position, season, Team) %>%  # added Team
-  summarise_at(vars(TOI, GP, PPO), funs(sum)) %>% 
-  mutate(PPO_60 = (PPO / TOI) * 60) %>% 
-  data.frame()
-
-
-PPO_D_overall <- PPO_D_GAA %>% 
-  group_by(season) %>% 
-  mutate(PPO_AA = ((PPO / TOI) - (sum(PPO) / sum(TOI))) * TOI, 
-         PPO_AA_60 = (PPO_AA / TOI) * 60) %>% 
-  data.frame()
-
-
-
-# PP RAPM Team Strength
-PPO_D_team_final <- PPO_D_overall %>% 
-  left_join(., team_strength_PP_full_AA %>% select(season, Team, t_TOI_PP, skaters_PP, PPO_GF_AA_team), by = c("Team", "season")) %>% 
-  group_by(player, season) %>% 
-  mutate(TOI_perc_tot =  TOI / t_TOI_PP, 
-         adj_off =       (1.4 * PPO_GF_AA_team - (TOI_perc_tot * PPO_AA_60)) / skaters_PP, 
-         PPO_AA_60_adj = PPO_AA_60 + adj_off, 
-         PPO_AA_adj =    (PPO_AA_60_adj / 60) * TOI, 
-         off_diff =      PPO_AA_adj - PPO_AA
-         ) %>% 
-  select(player:GP, PPO_AA, PPO_GF_AA_team, TOI_perc_tot, off_diff, PPO_AA_adj) %>% 
-  data.frame()
-
-
-# FINAL F/D JOIN
-ALL_PP <- PPO_F_team_final %>%
-  rbind(., PPO_D_team_final) %>% 
-  rename(TOI_PP = TOI)
-
-
-
-
-###    Shorthanded Defense    ###
-
-
-
-### --- FORWARDS --- ###
-
-eval_pred_SHD_F <- pred_SHD_F_join %>% 
-  select(player:TOI_GP) 
-
-# Predict
-eval_pred_SHD_F$pred_1 <- predict(object = mod_list_SHD_F$cubist, 
-                                  pred_SHD_F_join[, features_SHD_F_large], 
-                                  type = "raw")
-
-eval_pred_SHD_F$pred_2 <- predict(object = mod_list_SHD_F$bagEarth, 
-                                  pred_SHD_F_join[, features_SHD_F_large], 
-                                  type = "raw")
-
-eval_pred_SHD_F$pred_3 <- predict(object = mod_list_SHD_F$svmLinear, 
-                                  pred_SHD_F_join[, features_SHD_F_large], 
-                                  type = "raw")
-
-eval_pred_SHD_F <- eval_pred_SHD_F %>% 
-  mutate(ensemble = 
-           pred_1 * mod_SHD_F_weights[1] + 
-           pred_2 * mod_SHD_F_weights[2] + 
-           pred_3 * mod_SHD_F_weights[3], 
-         SHD = (ensemble / 60) * TOI)
-
-
-# Combine for full join
-SHD_F_GAA <- eval_pred_SHD_F %>% 
-  filter(TOI > TOI_cut_SH) %>% 
-  group_by(player, position, season, Team) %>% 
-  summarise_at(vars(TOI, GP, SHD), funs(sum)) %>% 
-  mutate(SHD_60 = (SHD / TOI) * 60) %>% 
-  data.frame()
-
-SHD_F_overall <- SHD_F_GAA %>% 
-  group_by(season) %>% 
-  mutate(SHD_AA = ((SHD / TOI) - (sum(SHD) / sum(TOI))) * TOI, 
-         SHD_AA_60 = (SHD_AA / TOI) * 60) %>% 
-  data.frame()
-
-
-# PP RAPM Team Strength
-SHD_F_team_final <- SHD_F_overall %>% 
-  left_join(., team_strength_SH_full_AA %>% select(season, Team, t_TOI_SH, skaters_SH, SHD_xG_AA_team), by = c("Team", "season")) %>% 
-  group_by(player, season) %>% 
-  mutate(TOI_perc_tot =  TOI / t_TOI_SH, 
-         adj_def =       (1.4 * SHD_xG_AA_team - (TOI_perc_tot * SHD_AA_60)) / skaters_SH, 
-         SHD_AA_60_adj = SHD_AA_60 + adj_def, 
-         SHD_AA_adj =    -1 * ((SHD_AA_60_adj / 60) * TOI), 
-         SHD_AA =        -1 * SHD_AA,
-         def_diff =      SHD_AA_adj - SHD_AA
-         ) %>% 
-  select(player:GP, SHD_AA, SHD_xG_AA_team, TOI_perc_tot, def_diff, SHD_AA_adj) %>% 
-  data.frame()
-
-
-### --- DEFENSEMEN --- ###
-
-eval_pred_SHD_D <- pred_SHD_D_join %>% 
-  select(player:TOI_GP) 
-
-# Predict
-eval_pred_SHD_D$pred_1 <- predict(object = mod_list_SHD_D$cubist, 
-                                  pred_SHD_D_join[, features_SHD_D_large], 
-                                  type = "raw")
-
-eval_pred_SHD_D$pred_2 <- predict(object = mod_list_SHD_D$bagEarth, 
-                                  pred_SHD_D_join[, features_SHD_D_large], 
-                                  type = "raw")
-
-eval_pred_SHD_D$pred_3 <- predict(object = mod_list_SHD_D$glmnet, 
-                                  pred_SHD_D_join[, features_SHD_D_large], 
-                                  type = "raw")
-
-eval_pred_SHD_D <- eval_pred_SHD_D %>% 
-  mutate(ensemble = 
-           pred_1 * mod_SHD_D_weights[1] + 
-           pred_2 * mod_SHD_D_weights[2] + 
-           pred_3 * mod_SHD_D_weights[3], 
-         SHD = (ensemble / 60) * TOI)
-
-
-# Combine for full join
-SHD_D_GAA <- eval_pred_SHD_D %>% 
-  filter(TOI > TOI_cut_SH) %>% 
-  group_by(player, position, season, Team) %>%
-  summarise_at(vars(TOI, GP, SHD), funs(sum)) %>% 
-  mutate(SHD_60 = (SHD / TOI) * 60) %>% 
-  data.frame()
-
-SHD_D_overall <- SHD_D_GAA %>% 
-  group_by(season) %>% 
-  mutate(SHD_AA = ((SHD / TOI) - (sum(SHD) / sum(TOI))) * TOI, 
-         SHD_AA_60 = (SHD_AA / TOI) * 60) %>% 
-  data.frame()
-
-
-# PP RAPM Team Strength
-SHD_D_team_final <- SHD_D_overall %>% 
-  left_join(., team_strength_SH_full_AA %>% select(season, Team, t_TOI_SH, skaters_SH, SHD_xG_AA_team), by = c("Team", "season")) %>% 
-  group_by(player, season) %>% 
-  mutate(TOI_perc_tot =  TOI / t_TOI_SH, 
-         adj_def =       (1.4 * SHD_xG_AA_team - (TOI_perc_tot * SHD_AA_60)) / skaters_SH, 
-         SHD_AA_60_adj = SHD_AA_60 + adj_def, 
-         SHD_AA_adj =    -1 * ((SHD_AA_60_adj / 60) * TOI), 
-         SHD_AA =        -1 * SHD_AA,
-         def_diff =      SHD_AA_adj - SHD_AA
-         ) %>% 
-  select(player:GP, SHD_AA, SHD_xG_AA_team, TOI_perc_tot, def_diff, SHD_AA_adj) %>% 
-  data.frame()
-
-
-# FINAL F/D JOIN
-ALL_SH <- SHD_F_team_final %>%
-  rbind(., SHD_D_team_final) %>% 
-  rename(TOI_SH = TOI)
+# Shorthanded Defense Function
+ALL_SH <- fun.ALL_SH_GAA()
 
 
 ## ------------------------------------ ##
@@ -2116,7 +1633,6 @@ ALL_GAR <- on_ice_all_sit_season %>%
   
   left_join(., player_position, by = "player") %>% 
   filter(!is.na(position)) %>% 
-  mutate_if(is.numeric, funs(round(., 1))) %>% 
   select(player, position, season, Team, 
          GP, 
          TOI_all, TOI_EV, TOI_PP, TOI_SH, EVO_AA_adj, EVD_AA_adj, PPO_AA_adj, SHD_AA_adj, take_AA, draw_AA, pens, GAA) %>% 
@@ -2152,16 +1668,7 @@ ALL_GAR <- on_ice_all_sit_season %>%
 
 
 # Remove Excess
-rm(eval_pred_EVO_F, eval_pred_EVO_D, eval_pred_EVD_F, eval_pred_EVD_D, 
-   eval_pred_PPO_F, eval_pred_PPO_D, eval_pred_SHD_F, eval_pred_SHD_D, 
-   EVO_F_GAA, EVO_D_GAA, EVD_F_GAA, EVD_D_GAA, 
-   PPO_F_GAA, PPO_D_GAA, SHD_F_GAA, SHD_D_GAA, 
-   pred_EVO_F_join, pred_EVO_D_join, pred_EVD_F_join, pred_EVD_D_join, 
-   pred_PPO_F_join, pred_PPO_D_join, pred_SHD_F_join, pred_SHD_D_join, 
-   EV_F_overall, EV_D_overall, EV_F_team_final, EV_D_team_final, 
-   PPO_F_overall, PPO_D_overall, PPO_F_team_final, PPO_D_team_final, 
-   SHD_F_overall, SHD_D_overall, SHD_F_team_final, SHD_D_team_final
-   )
+rm(ALL_EV, ALL_PP, ALL_SH)
 gc()
 
 
@@ -2390,23 +1897,6 @@ saveRDS(in_season_sums_list, "data/in_season_sums_list.rds")
 
 
 #################################
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
