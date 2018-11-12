@@ -16,11 +16,6 @@ options(scipen = 999)
 set.seed(123)
 
 
-# Source ALLSCRAPE.R & Shiny_All_Functions.R Scripts
-source("ALLSCRAPE.R")
-source("Shiny_All_Functions.R")
-
-
 ###  Load Object Data
 #####################################
 
@@ -178,6 +173,11 @@ st.empty_net <- c("5vE", "Ev5", "4vE", "Ev4", "3vE", "Ev3") %>% as.factor()
 #####################################
 
 
+# Source ALLSCRAPE.R & Shiny_All_Functions.R Scripts
+source("ALLSCRAPE.R")
+source("Shiny_All_Functions.R")
+
+
 
 
 ## ----------------------- START NEW DATA PREP ------------------------ ##
@@ -248,6 +248,7 @@ fun.schedule <- function(start, end) {
            away_team = away_team_id)
   
   }
+
 schedule_current <- fun.schedule(Sys.Date() - 1,
                                  Sys.Date() - 1)
 
@@ -325,6 +326,7 @@ rosters_new <- pbp_list_new$new_rosters %>%
 
 
 #############################
+
 
 
 
@@ -924,28 +926,28 @@ check_new_games <- fun.check_new_games()
 # Save New Data
 db <- DBI::dbConnect(SQLite(), dbname = "data/NHL_db_1819.sqlite") # NEW DATABASE NAME (second time)
 
-#dbWriteTable(db, "games_data_all_sit", games_all_sit_new, overwrite = F, append = T)
-#dbWriteTable(db, "games_data_EV", games_EV_new, overwrite = F, append = T)
-#dbWriteTable(db, "games_data_PP", games_PP_new, overwrite = F, append = T)
-#dbWriteTable(db, "games_data_SH", games_SH_new, overwrite = F, append = T)
+dbWriteTable(db, "games_data_all_sit", games_all_sit_new, overwrite = F, append = T)
+dbWriteTable(db, "games_data_EV", games_EV_new, overwrite = F, append = T)
+dbWriteTable(db, "games_data_PP", games_PP_new, overwrite = F, append = T)
+dbWriteTable(db, "games_data_SH", games_SH_new, overwrite = F, append = T)
 
-#dbWriteTable(db, "TOI_together_data_EV", teammate_TOI_EV_new, overwrite = F, append = T)
-#dbWriteTable(db, "TOI_together_data_PP", teammate_TOI_PP_new, overwrite = F, append = T)
-#dbWriteTable(db, "TOI_together_data_SH", teammate_TOI_SH_new, overwrite = F, append = T)
+dbWriteTable(db, "TOI_together_data_EV", teammate_TOI_EV_new, overwrite = F, append = T)
+dbWriteTable(db, "TOI_together_data_PP", teammate_TOI_PP_new, overwrite = F, append = T)
+dbWriteTable(db, "TOI_together_data_SH", teammate_TOI_SH_new, overwrite = F, append = T)
 
-#dbWriteTable(db, "goalie_games_all_sit", goalie_games_all_sit_new, overwrite = F, append = T)
-#dbWriteTable(db, "adj_pen_games_all_sit", adj_pen_games_new, overwrite = F, append = T)
+dbWriteTable(db, "goalie_games_all_sit", goalie_games_all_sit_new, overwrite = F, append = T)
+dbWriteTable(db, "adj_pen_games_all_sit", adj_pen_games_new, overwrite = F, append = T)
 
-#dbWriteTable(db, "team_data_all_sit", team_games_all_sit_new, overwrite = F, append = T)
-#dbWriteTable(db, "team_data_EV", team_games_EV_new, overwrite = F, append = T)
-#dbWriteTable(db, "team_data_PP", team_games_PP_new, overwrite = F, append = T)
-#dbWriteTable(db, "team_data_SH", team_games_SH_new, overwrite = F, append = T)
+dbWriteTable(db, "team_data_all_sit", team_games_all_sit_new, overwrite = F, append = T)
+dbWriteTable(db, "team_data_EV", team_games_EV_new, overwrite = F, append = T)
+dbWriteTable(db, "team_data_PP", team_games_PP_new, overwrite = F, append = T)
+dbWriteTable(db, "team_data_SH", team_games_SH_new, overwrite = F, append = T)
 
-#dbWriteTable(db, "pbp_full", pbp_df, overwrite = F, append = T)
-#dbWriteTable(db, "shifts_full", shifts_new, overwrite = F, append = T)
-#dbWriteTable(db, "rosters_full", rosters_new, overwrite = F, append = T)
+dbWriteTable(db, "pbp_full", pbp_df, overwrite = F, append = T)
+dbWriteTable(db, "shifts_full", shifts_new, overwrite = F, append = T)
+dbWriteTable(db, "rosters_full", rosters_new, overwrite = F, append = T)
 
-#dbWriteTable(db, "game_charts_labels", team_games_new_pbp, overwrite = F, append = T)
+dbWriteTable(db, "game_charts_labels", team_games_new_pbp, overwrite = F, append = T)
 
 dbDisconnect(db)
 
@@ -968,12 +970,6 @@ dbDisconnect(db)
 #dbRemoveTable(db, "team_data_PP")
 #dbRemoveTable(db, "team_data_SH")
 
-
-
-
-# Deprecated - *** removed from database ***
-#dbWriteTable(db, "game_score_games", game_score_games_new, overwrite = F, append = T)
-#dbWriteTable(db, "on_ice_games_all_sit", on_ice_all_sit_games_new, overwrite = F, append = T)
 
 
 
