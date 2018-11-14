@@ -12,7 +12,7 @@ options(scipen = 999)
 set.seed(123)
 
 
-# Source ALLSCRAPE.R & Shiny_All_Functions.R Scripts
+# Source ALLSCRAPE.R
 source("ALLSCRAPE.R")
 
 
@@ -116,9 +116,11 @@ fun.league_standings <- function(season) {
       Losses =   raw_standings$records$teamRecords[[df]]$leagueRecord$losses, 
       OT =       raw_standings$records$teamRecords[[df]]$leagueRecord$ot,
       ROW =      raw_standings$records$teamRecords[[df]]$row,
+      Points =   raw_standings$records$teamRecords[[df]]$points,
+      Points_perc = round(raw_standings$records$teamRecords[[df]]$points / (raw_standings$records$teamRecords[[df]]$gamesPlayed * 2), 3), 
       GF =       raw_standings$records$teamRecords[[df]]$goalsScored,
       GA =       raw_standings$records$teamRecords[[df]]$goalsAgainst,
-      Points =   raw_standings$records$teamRecords[[df]]$points,
+      G_diff =   raw_standings$records$teamRecords[[df]]$goalsScored - raw_standings$records$teamRecords[[df]]$goalsAgainst, 
       Streak =   raw_standings$records$teamRecords[[df]]$streak$streakCode,
       div_rank =       as.numeric(raw_standings$records$teamRecords[[df]]$divisionRank), 
       con_rank =       as.numeric(raw_standings$records$teamRecords[[df]]$conferenceRank),
