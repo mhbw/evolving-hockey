@@ -90,6 +90,61 @@ rm(hold)
 
 
 
+## -------------------------- ##
+##   NHL Standings Function   ##
+## -------------------------- ##
+
+################################
+
+fun.league_standings <- function(season) { 
+  
+  raw_standings <- jsonlite::fromJSON(
+    paste0(
+      "https://statsapi.web.nhl.com/api/v1/standings?season=", 
+      season
+      )
+    )
+  
+  fun.combine_standings <- function(df) { 
+    
+    x <- data.frame(
+      Team =     raw_standings$records$teamRecords[[df]]$team$name, 
+      team_id =  raw_standings$records$teamRecords[[df]]$team$id, 
+      season =   season, 
+      GP =       raw_standings$records$teamRecords[[df]]$gamesPlayed,
+      Wins =     raw_standings$records$teamRecords[[df]]$leagueRecord$wins, 
+      Losses =   raw_standings$records$teamRecords[[df]]$leagueRecord$losses, 
+      OT =       raw_standings$records$teamRecords[[df]]$leagueRecord$ot,
+      ROW =      raw_standings$records$teamRecords[[df]]$row,
+      GF =       raw_standings$records$teamRecords[[df]]$goalsScored,
+      GA =       raw_standings$records$teamRecords[[df]]$goalsAgainst,
+      Points =   raw_standings$records$teamRecords[[df]]$points,
+      Streak =   raw_standings$records$teamRecords[[df]]$streak$streakCode,
+      div_rank =       as.numeric(raw_standings$records$teamRecords[[df]]$divisionRank), 
+      con_rank =       as.numeric(raw_standings$records$teamRecords[[df]]$conferenceRank),
+      league_rank =    as.numeric(raw_standings$records$teamRecords[[df]]$leagueRank),
+      wild_card_rank = as.numeric(raw_standings$records$teamRecords[[df]]$wildCardRank),
+      stringsAsFactors = FALSE
+      )
+    
+    }
+  
+  standings <- rbind(
+    fun.combine_standings(1), 
+    fun.combine_standings(2), 
+    fun.combine_standings(3), 
+    fun.combine_standings(4)
+    ) %>% 
+    arrange(league_rank)
+  
+  }
+standings <- fun.league_standings(season = "20182019")
+
+
+################################
+
+
+
 ## ---------------------- ##
 ##   Draw Rink Function   ##
 ## ---------------------- ##
