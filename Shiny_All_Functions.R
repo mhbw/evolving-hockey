@@ -8827,9 +8827,12 @@ fun.ALL_EV_GAA <- function() {
   
   EV_F_overall <- EVO_F_GAA %>% 
     left_join(., EVD_F_GAA, by = c("player", "position", "season", "Team", "TOI", "GP")) %>% 
-    filter(TOI > TOI_cut_EV) %>% 
+    #filter(TOI > TOI_cut_EV) %>% 
     group_by(season) %>% 
-    mutate(EVO_AA =    ((EVO / TOI) - (sum(EVO) / sum(TOI))) * TOI, 
+    mutate(EVO = ifelse(TOI < TOI_cut_EV, (EVO / 60) * TOI, EVO),  # Added "regressing" to average
+           EVD = ifelse(TOI < TOI_cut_EV, (EVD / 60) * TOI, EVD),  # Added "regressing" to average 
+           
+           EVO_AA =    ((EVO / TOI) - (sum(EVO) / sum(TOI))) * TOI, 
            EVD_AA =    ((EVD / TOI) - (sum(EVD) / sum(TOI))) * TOI, 
            EVO_AA_60 = (EVO_AA / TOI) * 60, 
            EVD_AA_60 = (EVD_AA / TOI) * 60
@@ -8952,9 +8955,12 @@ fun.ALL_EV_GAA <- function() {
   
   EV_D_overall <- EVO_D_GAA %>% 
     left_join(., EVD_D_GAA, by = c("player", "position", "season", "Team", "TOI", "GP")) %>% 
-    filter(TOI > TOI_cut_EV) %>% 
+    #filter(TOI > TOI_cut_EV) %>% 
     group_by(season) %>% 
-    mutate(EVO_AA = ((EVO / TOI) - (sum(EVO) / sum(TOI))) * TOI, 
+    mutate(EVO = ifelse(TOI < TOI_cut_EV, (EVO / 60) * TOI, EVO),  # Added "regressing" to average
+           EVD = ifelse(TOI < TOI_cut_EV, (EVD / 60) * TOI, EVD),  # Added "regressing" to average
+           
+           EVO_AA = ((EVO / TOI) - (sum(EVO) / sum(TOI))) * TOI, 
            EVD_AA = ((EVD / TOI) - (sum(EVD) / sum(TOI))) * TOI, 
            EVO_AA_60 = (EVO_AA / TOI) * 60, 
            EVD_AA_60 = (EVD_AA / TOI) * 60
@@ -9038,7 +9044,8 @@ fun.ALL_PP_GAA <- function() {
   
   # Combine for full join
   PPO_F_GAA <- eval_pred_PPO_F %>% 
-    filter(TOI > TOI_cut_PP) %>% 
+    #filter(TOI > TOI_cut_PP) %>% 
+    filter(TOI > 0) %>% 
     group_by(player, position, season, Team) %>%  # added Team
     summarise_at(vars(TOI, GP, PPO), funs(sum)) %>% 
     mutate(PPO_60 = (PPO / TOI) * 60) %>% 
@@ -9047,7 +9054,9 @@ fun.ALL_PP_GAA <- function() {
   
   PPO_F_overall <- PPO_F_GAA %>% 
     group_by(season) %>% 
-    mutate(PPO_AA = ((PPO / TOI) - (sum(PPO) / sum(TOI))) * TOI, 
+    mutate(PPO = ifelse(TOI < TOI_cut_PP, (PPO / 25) * TOI, PPO),   # "regress" to average for low TOI players 
+           
+           PPO_AA = ((PPO / TOI) - (sum(PPO) / sum(TOI))) * TOI, 
            PPO_AA_60 = (PPO_AA / TOI) * 60
            ) %>% 
     data.frame()
@@ -9102,7 +9111,8 @@ fun.ALL_PP_GAA <- function() {
   
   # Combine for full join
   PPO_D_GAA <- eval_pred_PPO_D %>% 
-    filter(TOI > TOI_cut_PP) %>% 
+    #filter(TOI > TOI_cut_PP) %>% 
+    filter(TOI > 0) %>% 
     group_by(player, position, season, Team) %>%  # added Team
     summarise_at(vars(TOI, GP, PPO), funs(sum)) %>% 
     mutate(PPO_60 = (PPO / TOI) * 60) %>% 
@@ -9111,7 +9121,9 @@ fun.ALL_PP_GAA <- function() {
   
   PPO_D_overall <- PPO_D_GAA %>% 
     group_by(season) %>% 
-    mutate(PPO_AA = ((PPO / TOI) - (sum(PPO) / sum(TOI))) * TOI, 
+    mutate(PPO = ifelse(TOI < TOI_cut_PP, (PPO / 25) * TOI, PPO),   # "regress" to average for low TOI players  
+           
+           PPO_AA = ((PPO / TOI) - (sum(PPO) / sum(TOI))) * TOI, 
            PPO_AA_60 = (PPO_AA / TOI) * 60
            ) %>% 
     data.frame()
@@ -9178,7 +9190,8 @@ fun.ALL_SH_GAA <- function() {
   
   # Combine for full join
   SHD_F_GAA <- eval_pred_SHD_F %>% 
-    filter(TOI > TOI_cut_SH) %>% 
+    #filter(TOI > TOI_cut_SH) %>% 
+    filter(TOI > 0) %>% 
     group_by(player, position, season, Team) %>% 
     summarise_at(vars(TOI, GP, SHD), funs(sum)) %>% 
     mutate(SHD_60 = (SHD / TOI) * 60) %>% 
@@ -9186,7 +9199,9 @@ fun.ALL_SH_GAA <- function() {
   
   SHD_F_overall <- SHD_F_GAA %>% 
     group_by(season) %>% 
-    mutate(SHD_AA = ((SHD / TOI) - (sum(SHD) / sum(TOI))) * TOI, 
+    mutate(SHD = ifelse(TOI < TOI_cut_SH, (SHD / 25) * TOI, SHD),   # "regress" to average for low TOI players  
+           
+           SHD_AA = ((SHD / TOI) - (sum(SHD) / sum(TOI))) * TOI, 
            SHD_AA_60 = (SHD_AA / TOI) * 60
            ) %>% 
     data.frame()
@@ -9242,7 +9257,8 @@ fun.ALL_SH_GAA <- function() {
   
   # Combine for full join
   SHD_D_GAA <- eval_pred_SHD_D %>% 
-    filter(TOI > TOI_cut_SH) %>% 
+    #filter(TOI > TOI_cut_SH) %>% 
+    filter(TOI > 0) %>% 
     group_by(player, position, season, Team) %>%
     summarise_at(vars(TOI, GP, SHD), funs(sum)) %>% 
     mutate(SHD_60 = (SHD / TOI) * 60) %>% 
@@ -9250,7 +9266,9 @@ fun.ALL_SH_GAA <- function() {
   
   SHD_D_overall <- SHD_D_GAA %>% 
     group_by(season) %>% 
-    mutate(SHD_AA = ((SHD / TOI) - (sum(SHD) / sum(TOI))) * TOI, 
+    mutate(SHD = ifelse(TOI < TOI_cut_SH, (SHD / 25) * TOI, SHD),   # "regress" to average for low TOI players  
+           
+           SHD_AA = ((SHD / TOI) - (sum(SHD) / sum(TOI))) * TOI, 
            SHD_AA_60 = (SHD_AA / TOI) * 60
            ) %>% 
     data.frame()

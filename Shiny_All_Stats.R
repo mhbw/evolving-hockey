@@ -1646,9 +1646,9 @@ ALL_GAR <- on_ice_all_sit_season %>%
          Pens_GAR = ifelse(position == 1, pens_AA + (TOI_all * (Pens_rep_F / 60)), pens_AA + (TOI_all * (Pens_rep_D / 60))), 
          
          # Re-zero players below TOI cutoffs
-         EV_GAR =   ifelse(TOI_EV < TOI_cut_EV, 0, EV_GAR), 
-         PP_GAR =   ifelse(TOI_PP < TOI_cut_PP, 0, PP_GAR), 
-         SH_GAR =   ifelse(TOI_SH < TOI_cut_SH, 0, SH_GAR), 
+         #EV_GAR =   ifelse(TOI_EV < TOI_cut_EV, 0, EV_GAR), 
+         #PP_GAR =   ifelse(TOI_PP < TOI_cut_PP, 0, PP_GAR), 
+         #SH_GAR =   ifelse(TOI_SH < TOI_cut_SH, 0, SH_GAR), 
          
          GAR = EV_GAR + PP_GAR + SH_GAR + Pens_GAR, 
          WAR = GAR / goals_to_wins_season$GPW[match(season, goals_to_wins_season$season_ID)]
