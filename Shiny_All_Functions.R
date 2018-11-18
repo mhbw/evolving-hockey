@@ -3884,35 +3884,35 @@ fun.event_playerH <- function(data, player) {
   if (player == "home_on_1") {
     
     h1 <- data %>% 
-      group_by(game_id, season, home_on_1, home_on_2, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_1, home_on_2, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_1, 
              teammate = home_on_2) %>% 
       data.frame()
     
     h2 <- data %>% 
-      group_by(game_id, season, home_on_1, home_on_3, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_1, home_on_3, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_1, 
              teammate = home_on_3) %>% 
       data.frame()
     
     h3 <- data %>% 
-      group_by(game_id, season, home_on_1, home_on_4, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_1, home_on_4, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_1, 
              teammate = home_on_4) %>% 
       data.frame()
     
     h4 <- data %>% 
-      group_by(game_id, season, home_on_1, home_on_5, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_1, home_on_5, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_1, 
              teammate = home_on_5) %>% 
       data.frame()
     
     h5 <- data %>% 
-      group_by(game_id, season, home_on_1, home_on_6, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_1, home_on_6, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_1, 
              teammate = home_on_6) %>% 
@@ -3921,7 +3921,7 @@ fun.event_playerH <- function(data, player) {
     
     hbind <- h1 %>% 
       rbind(., h2, h3, h4, h5) %>% 
-      group_by(player, teammate, game_id, season, home_team) %>% 
+      group_by(player, teammate, game_id, game_date, season, home_team) %>% 
       summarise_at(vars(TOI), funs(sum)) %>%
       filter(TOI > 0) %>% 
       data.frame()
@@ -3932,35 +3932,35 @@ fun.event_playerH <- function(data, player) {
   else if (player == "home_on_2") {
     
     h1 <- data %>% 
-      group_by(game_id, season, home_on_2, home_on_1, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_2, home_on_1, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_2, 
              teammate = home_on_1) %>% 
       data.frame()
     
     h2 <- data %>% 
-      group_by(game_id, season, home_on_2, home_on_3, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_2, home_on_3, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_2, 
              teammate = home_on_3) %>% 
       data.frame()
     
     h3 <- data %>% 
-      group_by(game_id, season, home_on_2, home_on_4, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_2, home_on_4, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_2, 
              teammate = home_on_4) %>% 
       data.frame()
     
     h4 <- data %>% 
-      group_by(game_id, season, home_on_2, home_on_5, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_2, home_on_5, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_2, 
              teammate = home_on_5) %>% 
       data.frame()
     
     h5 <- data %>% 
-      group_by(game_id, season, home_on_2, home_on_6, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_2, home_on_6, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_2, 
              teammate = home_on_6) %>% 
@@ -3969,7 +3969,7 @@ fun.event_playerH <- function(data, player) {
     
     hbind <- h1 %>% 
       rbind(., h2, h3, h4, h5) %>% 
-      group_by(player, teammate, game_id, season, home_team) %>% 
+      group_by(player, teammate, game_id, game_date, season, home_team) %>% 
       summarise_at(vars(TOI), funs(sum)) %>%
       filter(TOI > 0) %>% 
       data.frame()
@@ -3980,35 +3980,35 @@ fun.event_playerH <- function(data, player) {
   else if (player == "home_on_3") {
     
     h1 <- data %>% 
-      group_by(game_id, season, home_on_3, home_on_1, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_3, home_on_1, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_3, 
              teammate = home_on_1) %>% 
       data.frame()
     
     h2 <- data %>% 
-      group_by(game_id, season, home_on_3, home_on_2, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_3, home_on_2, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_3, 
              teammate = home_on_2) %>% 
       data.frame()
     
     h3 <- data %>% 
-      group_by(game_id, season, home_on_3, home_on_4, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_3, home_on_4, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_3, 
              teammate = home_on_4) %>% 
       data.frame()
     
     h4 <- data %>% 
-      group_by(game_id, season, home_on_3, home_on_5, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_3, home_on_5, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_3, 
              teammate = home_on_5) %>% 
       data.frame()
     
     h5 <- data %>% 
-      group_by(game_id, season, home_on_3, home_on_6, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_3, home_on_6, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_3, 
              teammate = home_on_6) %>% 
@@ -4017,7 +4017,7 @@ fun.event_playerH <- function(data, player) {
     
     hbind <- h1 %>% 
       rbind(., h2, h3, h4, h5) %>% 
-      group_by(player, teammate, game_id, season, home_team) %>% 
+      group_by(player, teammate, game_id, game_date, season, home_team) %>% 
       summarise_at(vars(TOI), funs(sum)) %>%
       filter(TOI > 0) %>% 
       data.frame()
@@ -4028,35 +4028,35 @@ fun.event_playerH <- function(data, player) {
   else if (player == "home_on_4") {
     
     h1 <- data %>% 
-      group_by(game_id, season, home_on_4, home_on_1, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_4, home_on_1, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_4, 
              teammate = home_on_1) %>% 
       data.frame()
     
     h2 <- data %>% 
-      group_by(game_id, season, home_on_4, home_on_2, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_4, home_on_2, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_4, 
              teammate = home_on_2) %>% 
       data.frame()
     
     h3 <- data %>% 
-      group_by(game_id, season, home_on_4, home_on_3, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_4, home_on_3, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_4, 
              teammate = home_on_3) %>% 
       data.frame()
     
     h4 <- data %>% 
-      group_by(game_id, season, home_on_4, home_on_5, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_4, home_on_5, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_4, 
              teammate = home_on_5) %>% 
       data.frame()
     
     h5 <- data %>% 
-      group_by(game_id, season, home_on_4, home_on_6, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_4, home_on_6, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_4, 
              teammate = home_on_6) %>% 
@@ -4065,7 +4065,7 @@ fun.event_playerH <- function(data, player) {
     
     hbind <- h1 %>% 
       rbind(., h2, h3, h4, h5) %>% 
-      group_by(player, teammate, game_id, season, home_team) %>% 
+      group_by(player, teammate, game_id, game_date, season, home_team) %>% 
       summarise_at(vars(TOI), funs(sum)) %>%
       filter(TOI > 0) %>% 
       data.frame()
@@ -4076,35 +4076,35 @@ fun.event_playerH <- function(data, player) {
   else if (player == "home_on_5") {
     
     h1 <- data %>% 
-      group_by(game_id, season, home_on_5, home_on_1, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_5, home_on_1, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_5, 
              teammate = home_on_1) %>% 
       data.frame()
     
     h2 <- data %>% 
-      group_by(game_id, season, home_on_5, home_on_2, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_5, home_on_2, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_5, 
              teammate = home_on_2) %>% 
       data.frame()
     
     h3 <- data %>% 
-      group_by(game_id, season, home_on_5, home_on_3, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_5, home_on_3, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_5, 
              teammate = home_on_3) %>% 
       data.frame()
     
     h4 <- data %>% 
-      group_by(game_id, season, home_on_5, home_on_4, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_5, home_on_4, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_5, 
              teammate = home_on_4) %>% 
       data.frame()
     
     h5 <- data %>% 
-      group_by(game_id, season, home_on_5, home_on_6, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_5, home_on_6, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_5, 
              teammate = home_on_6) %>% 
@@ -4113,7 +4113,7 @@ fun.event_playerH <- function(data, player) {
     
     hbind <- h1 %>% 
       rbind(., h2, h3, h4, h5) %>% 
-      group_by(player, teammate, game_id, season, home_team) %>% 
+      group_by(player, teammate, game_id, game_date, season, home_team) %>% 
       summarise_at(vars(TOI), funs(sum)) %>%
       filter(TOI > 0) %>% 
       data.frame()
@@ -4124,35 +4124,35 @@ fun.event_playerH <- function(data, player) {
   else if (player == "home_on_6") {
     
     h1 <- data %>% 
-      group_by(game_id, season, home_on_6, home_on_1, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_6, home_on_1, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_6, 
              teammate = home_on_1) %>% 
       data.frame()
     
     h2 <- data %>% 
-      group_by(game_id, season, home_on_6, home_on_2, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_6, home_on_2, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_6, 
              teammate = home_on_2) %>% 
       data.frame()
     
     h3 <- data %>% 
-      group_by(game_id, season, home_on_6, home_on_3, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_6, home_on_3, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_6, 
              teammate = home_on_3) %>% 
       data.frame()
     
     h4 <- data %>% 
-      group_by(game_id, season, home_on_6, home_on_4, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_6, home_on_4, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_6, 
              teammate = home_on_4) %>% 
       data.frame()
     
     h5 <- data %>% 
-      group_by(game_id, season, home_on_6, home_on_5, home_team) %>% 
+      group_by(game_id, game_date, season, home_on_6, home_on_5, home_team) %>% 
       fun.QoT_H(.) %>% 
       rename(player = home_on_6, 
              teammate = home_on_5) %>% 
@@ -4161,7 +4161,7 @@ fun.event_playerH <- function(data, player) {
     
     hbind <- h1 %>% 
       rbind(., h2, h3, h4, h5) %>% 
-      group_by(player, teammate, game_id, season, home_team) %>% 
+      group_by(player, teammate, game_id, game_date, season, home_team) %>% 
       summarise_at(vars(TOI), funs(sum)) %>%
       filter(TOI > 0) %>% 
       data.frame()
@@ -4176,35 +4176,35 @@ fun.event_playerA <- function(data, player) {
   if (player == "away_on_1") {
     
     a1 <- data %>% 
-      group_by(game_id, season, away_on_1, away_on_2, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_1, away_on_2, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_1, 
              teammate = away_on_2) %>% 
       data.frame()
     
     a2 <- data %>% 
-      group_by(game_id, season, away_on_1, away_on_3, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_1, away_on_3, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_1, 
              teammate = away_on_3) %>% 
       data.frame()
     
     a3 <- data %>% 
-      group_by(game_id, season, away_on_1, away_on_4, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_1, away_on_4, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_1, 
              teammate = away_on_4) %>% 
       data.frame()
     
     a4 <- data %>% 
-      group_by(game_id, season, away_on_1, away_on_5, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_1, away_on_5, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_1, 
              teammate = away_on_5) %>% 
       data.frame()
     
     a5 <- data %>% 
-      group_by(game_id, season, away_on_1, away_on_6, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_1, away_on_6, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_1, 
              teammate = away_on_6) %>% 
@@ -4213,7 +4213,7 @@ fun.event_playerA <- function(data, player) {
     
     abind <- a1 %>% 
       rbind(., a2, a3, a4, a5) %>% 
-      group_by(player, teammate, game_id, season, away_team) %>% 
+      group_by(player, teammate, game_id, game_date, season, away_team) %>% 
       summarise_at(vars(TOI), funs(sum)) %>% 
       filter(TOI > 0) %>% 
       data.frame()
@@ -4224,35 +4224,35 @@ fun.event_playerA <- function(data, player) {
   else if (player == "away_on_2") {
     
     a1 <- data %>% 
-      group_by(game_id, season, away_on_2, away_on_1, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_2, away_on_1, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_2, 
              teammate = away_on_1) %>% 
       data.frame()
     
     a2 <- data %>% 
-      group_by(game_id, season, away_on_2, away_on_3, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_2, away_on_3, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_2, 
              teammate = away_on_3) %>% 
       data.frame()
     
     a3 <- data %>% 
-      group_by(game_id, season, away_on_2, away_on_4, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_2, away_on_4, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_2, 
              teammate = away_on_4) %>% 
       data.frame()
     
     a4 <- data %>% 
-      group_by(game_id, season, away_on_2, away_on_5, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_2, away_on_5, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_2, 
              teammate = away_on_5) %>% 
       data.frame()
     
     a5 <- data %>% 
-      group_by(game_id, season, away_on_2, away_on_6, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_2, away_on_6, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_2, 
              teammate = away_on_6) %>% 
@@ -4261,7 +4261,7 @@ fun.event_playerA <- function(data, player) {
     
     abind <- a1 %>% 
       rbind(., a2, a3, a4, a5) %>% 
-      group_by(player, teammate, game_id, season, away_team) %>% 
+      group_by(player, teammate, game_id, game_date, season, away_team) %>% 
       summarise_at(vars(TOI), funs(sum)) %>% 
       filter(TOI > 0) %>% 
       data.frame()
@@ -4272,35 +4272,35 @@ fun.event_playerA <- function(data, player) {
   else if (player == "away_on_3") {
     
     a1 <- data %>% 
-      group_by(game_id, season, away_on_3, away_on_1, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_3, away_on_1, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_3, 
              teammate = away_on_1) %>% 
       data.frame()
     
     a2 <- data %>% 
-      group_by(game_id, season, away_on_3, away_on_2, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_3, away_on_2, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_3, 
              teammate = away_on_2) %>% 
       data.frame()
     
     a3 <- data %>% 
-      group_by(game_id, season, away_on_3, away_on_4, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_3, away_on_4, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_3, 
              teammate = away_on_4) %>% 
       data.frame()
     
     a4 <- data %>% 
-      group_by(game_id, season, away_on_3, away_on_5, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_3, away_on_5, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_3, 
              teammate = away_on_5) %>% 
       data.frame()
     
     a5 <- data %>% 
-      group_by(game_id, season, away_on_3, away_on_6, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_3, away_on_6, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_3, 
              teammate = away_on_6) %>% 
@@ -4309,7 +4309,7 @@ fun.event_playerA <- function(data, player) {
     
     abind <- a1 %>% 
       rbind(., a2, a3, a4, a5) %>% 
-      group_by(player, teammate, game_id, season, away_team) %>% 
+      group_by(player, teammate, game_id, game_date, season, away_team) %>% 
       summarise_at(vars(TOI), funs(sum)) %>% 
       filter(TOI > 0) %>% 
       data.frame()
@@ -4320,35 +4320,35 @@ fun.event_playerA <- function(data, player) {
   else if (player == "away_on_4") {
     
     a1 <- data %>% 
-      group_by(game_id, season, away_on_4, away_on_1, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_4, away_on_1, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_4, 
              teammate = away_on_1) %>% 
       data.frame()
     
     a2 <- data %>% 
-      group_by(game_id, season, away_on_4, away_on_2, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_4, away_on_2, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_4, 
              teammate = away_on_2) %>% 
       data.frame()
     
     a3 <- data %>% 
-      group_by(game_id, season, away_on_4, away_on_3, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_4, away_on_3, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_4, 
              teammate = away_on_3) %>% 
       data.frame()
     
     a4 <- data %>% 
-      group_by(game_id, season, away_on_4, away_on_5, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_4, away_on_5, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_4, 
              teammate = away_on_5) %>% 
       data.frame()
     
     a5 <- data %>% 
-      group_by(game_id, season, away_on_4, away_on_6, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_4, away_on_6, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_4, 
              teammate = away_on_6) %>% 
@@ -4357,7 +4357,7 @@ fun.event_playerA <- function(data, player) {
     
     abind <- a1 %>% 
       rbind(., a2, a3, a4, a5) %>% 
-      group_by(player, teammate, game_id, season, away_team) %>% 
+      group_by(player, teammate, game_id, game_date, season, away_team) %>% 
       summarise_at(vars(TOI), funs(sum)) %>% 
       filter(TOI > 0) %>% 
       data.frame()
@@ -4368,35 +4368,35 @@ fun.event_playerA <- function(data, player) {
   else if (player == "away_on_5") {
     
     a1 <- data %>% 
-      group_by(game_id, season, away_on_5, away_on_1, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_5, away_on_1, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_5, 
              teammate = away_on_1) %>% 
       data.frame()
     
     a2 <- data %>% 
-      group_by(game_id, season, away_on_5, away_on_2, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_5, away_on_2, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_5, 
              teammate = away_on_2) %>% 
       data.frame()
     
     a3 <- data %>% 
-      group_by(game_id, season, away_on_5, away_on_3, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_5, away_on_3, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_5, 
              teammate = away_on_3) %>% 
       data.frame()
     
     a4 <- data %>% 
-      group_by(game_id, season, away_on_5, away_on_4, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_5, away_on_4, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_5, 
              teammate = away_on_4) %>% 
       data.frame()
     
     a5 <- data %>% 
-      group_by(game_id, season, away_on_5, away_on_6, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_5, away_on_6, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_5, 
              teammate = away_on_6) %>% 
@@ -4405,7 +4405,7 @@ fun.event_playerA <- function(data, player) {
     
     abind <- a1 %>% 
       rbind(., a2, a3, a4, a5) %>% 
-      group_by(player, teammate, game_id, season, away_team) %>% 
+      group_by(player, teammate, game_id, game_date, season, away_team) %>% 
       summarise_at(vars(TOI), funs(sum)) %>% 
       filter(TOI > 0) %>% 
       data.frame()
@@ -4416,35 +4416,35 @@ fun.event_playerA <- function(data, player) {
   else if (player == "away_on_6") {
     
     a1 <- data %>% 
-      group_by(game_id, season, away_on_6, away_on_1, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_6, away_on_1, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_6, 
              teammate = away_on_1) %>% 
       data.frame()
     
     a2 <- data %>% 
-      group_by(game_id, season, away_on_6, away_on_2, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_6, away_on_2, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_6, 
              teammate = away_on_2) %>% 
       data.frame()
     
     a3 <- data %>% 
-      group_by(game_id, season, away_on_6, away_on_3, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_6, away_on_3, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_6, 
              teammate = away_on_3) %>% 
       data.frame()
     
     a4 <- data %>% 
-      group_by(game_id, season, away_on_6, away_on_4, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_6, away_on_4, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_6, 
              teammate = away_on_4) %>% 
       data.frame()
     
     a5 <- data %>% 
-      group_by(game_id, season, away_on_6, away_on_5, away_team) %>% 
+      group_by(game_id, game_date, season, away_on_6, away_on_5, away_team) %>% 
       fun.QoT_A(.) %>% 
       rename(player = away_on_6, 
              teammate = away_on_5) %>% 
@@ -4453,7 +4453,7 @@ fun.event_playerA <- function(data, player) {
     
     abind <- a1 %>% 
       rbind(., a2, a3, a4, a5) %>% 
-      group_by(player, teammate, game_id, season, away_team) %>% 
+      group_by(player, teammate, game_id, game_date, season, away_team) %>% 
       summarise_at(vars(TOI), funs(sum)) %>% 
       filter(TOI > 0) %>% 
       data.frame()
@@ -4567,7 +4567,7 @@ fun.teammate <- function(pbp_data, strength) {
   
   home_all <- home1 %>% 
     rbind(., home2, home3, home4, home5, home6) %>% 
-    group_by(player, teammate, game_id, season, home_team) %>% 
+    group_by(player, teammate, game_id, game_date, season, home_team) %>% 
     summarise(TOI = sum(TOI)) %>% 
     filter(!is.na(player), 
            !is.na(teammate)
@@ -4577,7 +4577,7 @@ fun.teammate <- function(pbp_data, strength) {
   
   away_all <- away1 %>% 
     rbind(., away2, away3, away4, away5, away6) %>% 
-    group_by(player, teammate, game_id, season, away_team) %>% 
+    group_by(player, teammate, game_id, game_date, season, away_team) %>% 
     summarise(TOI = sum(TOI)) %>% 
     filter(!is.na(player), 
            !is.na(teammate)
@@ -4616,7 +4616,7 @@ fun.teammate <- function(pbp_data, strength) {
   
   return_df <- hold_H %>% 
     rbind(., hold_A) %>% 
-    select(player, teammate, game_id, season, Team, TOI) %>% 
+    select(player, teammate, game_id, game_date, season, Team, TOI) %>% 
     mutate(player =   ifelse(player == "SEBASTIAN.AHO" & Team == "NYI", "5EBASTIAN.AHO", player),      # FIX NYI AHO
            teammate = ifelse(teammate == "SEBASTIAN.AHO" & Team == "NYI", "5EBASTIAN.AHO", teammate)
            ) %>% 
@@ -5392,7 +5392,7 @@ fun.pen_value_sum <- function(main_data, xtra_data) {
     filter(first_assign != 1, 
            team_pen != 1
            ) %>% 
-    group_by(event_player_1, game_id, season) %>% 
+    group_by(event_player_1, game_id, game_date, season) %>% 
     summarise(take = sum(pen_value), 
               adj_take = sum(ifelse(home_team == event_team, pen_value * pen_score_adj[home_lead_state, 4],  
                                     ifelse(away_team == event_team, pen_value * pen_score_adj[home_lead_state, 5], pen_value))), 
@@ -5406,7 +5406,7 @@ fun.pen_value_sum <- function(main_data, xtra_data) {
     filter(first_assign != 1, 
            team_pen != 1
            ) %>% 
-    group_by(event_player_2, game_id, season) %>% 
+    group_by(event_player_2, game_id, game_date, season) %>% 
     summarise(draw = sum(pen_value), 
               adj_draw = sum(ifelse(home_team == event_team, pen_value * pen_score_adj[home_lead_state, 4],  
                                     ifelse(away_team == event_team, pen_value * pen_score_adj[home_lead_state, 5], pen_value))), 
@@ -5417,7 +5417,7 @@ fun.pen_value_sum <- function(main_data, xtra_data) {
     data.frame()
   
   p_main_all <- p_main_take %>% 
-    full_join(., p_main_draw, by = c("player", "game_id", "season")) %>% 
+    full_join(., p_main_draw, by = c("player", "game_id", "game_date", "season")) %>% 
     data.frame()
   
   p_main_all[is.na(p_main_all)] <- 0
@@ -5427,7 +5427,7 @@ fun.pen_value_sum <- function(main_data, xtra_data) {
   if (ncol(xtra_data) > 1) {  # check if there were "extra" penalties
     
     p_xtra_take <- xtra_data %>% 
-      group_by(event_player_1, game_id, season) %>% 
+      group_by(event_player_1, game_id, game_date, season) %>% 
       summarise(take = sum(pen_value_take), 
                 adj_take = sum(ifelse(home_team == event_team, pen_value_take * pen_score_adj[home_lead_state, 4],  
                                       ifelse(away_team == event_team, pen_value_take * pen_score_adj[home_lead_state, 5], pen_value_take))), 
@@ -5438,7 +5438,7 @@ fun.pen_value_sum <- function(main_data, xtra_data) {
       data.frame()
     
     p_xtra_draw <- xtra_data %>% 
-      group_by(event_player_2, game_id, season) %>% 
+      group_by(event_player_2, game_id, game_date, season) %>% 
       summarise(draw = sum(pen_value_draw), 
                 adj_draw = sum(ifelse(home_team == event_team, pen_value_draw * pen_score_adj[home_lead_state, 4],  
                                       ifelse(away_team == event_team, pen_value_draw * pen_score_adj[home_lead_state, 5], pen_value_draw))), 
@@ -5451,7 +5451,7 @@ fun.pen_value_sum <- function(main_data, xtra_data) {
     # Fix Draw or Take is NA on one penalty
     if (nrow(p_xtra_take) > 0 & nrow(p_xtra_draw) > 0) { 
       p_xtra_all <- p_xtra_take %>% 
-        full_join(., p_xtra_draw, by = c("player", "game_id", "season")) %>% 
+        full_join(., p_xtra_draw, by = c("player", "game_id", "game_date", "season")) %>% 
         data.frame()
       
       p_xtra_all[is.na(p_xtra_all)] <- 0
@@ -5462,7 +5462,7 @@ fun.pen_value_sum <- function(main_data, xtra_data) {
      p_xtra_draw[1, 1] <- "TESTING"
      
      p_xtra_all <- p_xtra_take %>% 
-       full_join(., p_xtra_draw, by = c("player", "game_id", "season")) %>% 
+       full_join(., p_xtra_draw, by = c("player", "game_id", "game_date", "season")) %>% 
        filter(player != "TESTING") %>% 
        data.frame()
      
@@ -5474,7 +5474,7 @@ fun.pen_value_sum <- function(main_data, xtra_data) {
       p_xtra_take[1, 1] <- "TESTING"
       
       p_xtra_all <- p_xtra_take %>% 
-        full_join(., p_xtra_draw, by = c("player", "game_id", "season")) %>% 
+        full_join(., p_xtra_draw, by = c("player", "game_id", "game_date", "season")) %>% 
         filter(player != "TESTING") %>% 
         data.frame()
       
@@ -5487,6 +5487,7 @@ fun.pen_value_sum <- function(main_data, xtra_data) {
     } else { 
     p_xtra_all <- data.frame(player = character(), 
                              game_id = character(), 
+                             game_date = character(),
                              season = numeric(), 
                              take = numeric(), 
                              adj_take = numeric(), 
@@ -5506,7 +5507,7 @@ fun.pen_value_sum <- function(main_data, xtra_data) {
              assign_verify == 1, 
              team_pen != 1
              ) %>% 
-      group_by(take_assign, game_id, season) %>% 
+      group_by(take_assign, game_id, game_date, season) %>% 
       summarise(take = sum(pen_value), 
                 ## Unable to determine player's team at this point
                 adj_take = sum(pen_value), 
@@ -5521,7 +5522,7 @@ fun.pen_value_sum <- function(main_data, xtra_data) {
              assign_verify == 1, 
              team_pen != 1
              ) %>% 
-      group_by(draw_assign, game_id, season) %>% 
+      group_by(draw_assign, game_id, game_date, season) %>% 
       summarise(draw = sum(pen_value), 
                 ## Unable to determine player's team at this point
                 adj_draw = sum(pen_value), 
@@ -5532,7 +5533,7 @@ fun.pen_value_sum <- function(main_data, xtra_data) {
       data.frame()
     
     p_assign_all <- p_assign_take %>% 
-      full_join(., p_assign_draw, by = c("player", "game_id", "season")) %>% 
+      full_join(., p_assign_draw, by = c("player", "game_id", "game_date", "season")) %>% 
       data.frame()
     
     p_assign_all[is.na(p_assign_all)] <- 0
@@ -5542,6 +5543,7 @@ fun.pen_value_sum <- function(main_data, xtra_data) {
     # Return blank data.frame in correct format if no "assigned" penalties
     p_assign_all <- data.frame(player = character(), 
                                game_id = character(), 
+                               game_date = character(), 
                                season = numeric(), 
                                take = numeric(), 
                                adj_take = numeric(), 
@@ -5556,7 +5558,7 @@ fun.pen_value_sum <- function(main_data, xtra_data) {
   # Combine All Penalty Tables
   p_combined <- p_main_all %>% 
     rbind(., p_xtra_all, p_assign_all) %>% 
-    group_by(player, game_id, season) %>% 
+    group_by(player, game_id, game_date, season) %>% 
     summarise_all(funs(sum)) %>% 
     mutate_at(vars(take:draw_count), funs(round(.,3))) %>% 
     mutate(take = -(take), 
@@ -5564,12 +5566,33 @@ fun.pen_value_sum <- function(main_data, xtra_data) {
            adj_pen_diff = adj_take + adj_draw, 
            season = as.character(season)
            ) %>% 
-    select(player, game_id, season, take_count, draw_count, take, draw, adj_take, adj_draw, adj_pen_diff) %>% 
+    select(player, game_id, game_date, season, take_count, draw_count, take, draw, adj_take, adj_draw, adj_pen_diff) %>% 
     arrange(player, game_id) %>% 
     data.frame()
   
   return(p_combined)
 
+  }
+
+# Add On Skater/Goalie Position & Team
+fun.pen_value_sum_add <- function(pen_data, skater_data, goalie_data, position_data) { 
+  
+  return_df <- pen_data %>% 
+    left_join(., skater_data %>%                           ## Skaters 
+                select(player, game_id, Team), 
+              by = c("player", "game_id")
+              ) %>% 
+    left_join(., position_data, by = "player") %>% 
+    left_join(., goalie_data %>%                           ## Goalies
+                select(player, game_id, Team) %>%  
+                rename(Team_goalie = Team), 
+              by = c("player", "game_id")
+              ) %>% 
+    mutate(position = ifelse(is.na(position) & !is.na(Team_goalie), 3, position), 
+           Team =     ifelse(is.na(Team) & !is.na(Team_goalie), Team_goalie, Team)
+           ) %>% 
+    select(player, position, game_id, game_date, season, Team, take_count:adj_pen_diff)
+  
   }
 
 # Sum Team Penalties: Game by Game
@@ -6119,6 +6142,40 @@ fun.team_games_SH <- function(data) {
 
 
 ####################################
+
+
+
+## ----------------------------- ##
+##   Team Game Labels Function   ##
+## ----------------------------- ##
+
+###################################
+
+fun.team_game_labels <- function(pbp_data) { 
+  
+  return_df <- pbp_data %>% 
+    group_by(home_team, away_team, season, game_id, game_date) %>% 
+    summarise() %>% 
+    rename(Team = home_team, 
+           Opponent = away_team
+           ) %>% 
+    data.frame() %>%
+    rbind(., pbp_data %>% 
+            group_by(away_team, home_team, season, game_id, game_date) %>% 
+            summarise() %>% 
+            rename(Team = away_team, 
+                   Opponent = home_team
+                   ) %>% 
+            data.frame()
+          ) %>% 
+    mutate(game_label = paste0(Team, " vs. ", Opponent, ", ", game_date)) %>% 
+    arrange(game_id) %>% 
+    data.frame()
+  
+  }
+
+
+###################################
 
 
 

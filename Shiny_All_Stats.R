@@ -729,6 +729,9 @@ paste0("Season: ", unique(pbp_df$season), "  //  Games: ", length(unique(pbp_df$
 ## -------------------- RUN GAME BY GAME FUNCTIONS --------------------- ##
 
 
+#pbp_df <- pbp_joined
+#rm(pbp_joined)
+
 
 ## ----------------------- ##
 ##   Even-Strength Games   ##
@@ -783,28 +786,9 @@ pen_source <- fun.pen_setup(data = pbp_df)
 pen_enhanced <- fun.pen_assign(data = pen_source)
 pen_calc_main <- fun.pen_value_main(pen_data = pen_enhanced, pbp_data = pbp_df)
 pen_calc_xtras <- fun.pen_value_xtra(data = pen_enhanced)
-adj_pen_games_new <- fun.pen_value_sum(main_data = pen_calc_main, xtra_data = pen_calc_xtras)
 pen_team_take <- fun.pen_team_take(data = pen_calc_main)
-
-rm(pen_source, pen_enhanced, pen_calc_main, pen_calc_xtras)
-
-
-# Update adj_pen_diff data.frame with Teams and TOI (need all sit TOI and goalie data created above)
-adj_pen_games_new <- adj_pen_games_new %>% 
-  left_join(., games_all_sit_new %>%                      ## Skaters 
-              select(player:Team), 
-            by = c("player", "game_id", "season")
-            ) %>% 
-  left_join(., player_position, by = "player") %>% 
-  left_join(., goalie_games_all_sit_new %>%               ## Goalies
-              select(player, game_id, season, Team) %>%  
-              rename(Team_goalie = Team), 
-            by = c("player", "game_id", "season")
-            ) %>% 
-  mutate(position = ifelse(is.na(position) & !is.na(Team_goalie), 3, position), 
-         Team =     ifelse(is.na(Team) & !is.na(Team_goalie), Team_goalie, Team)
-         ) %>% 
-  select(player, position, game_id, season, Team, take_count:adj_pen_diff)
+adj_pen_games <- fun.pen_value_sum(main_data = pen_calc_main, xtra_data = pen_calc_xtras)
+adj_pen_games_new <- fun.pen_value_sum_add(pen_data = adj_pen_games, skater_data = games_all_sit_new, goalie_data = goalie_games_all_sit_new, position_data = player_position)
 
 
 ## ------------------------------ ##
@@ -817,29 +801,13 @@ team_games_PP_new <-      fun.team_games_PP(data = pbp_df)
 team_games_SH_new <-      fun.team_games_SH(data = pbp_df)
 
 
+## --------------------------- ##
+##   Team Game Charts Labels   ## *** For New PBP Data
+## --------------------------- ##
 
-## ----------------------------- ##
-##   Create Game Charts Labels   ## *** For New PBP Data
-## ----------------------------- ##
+team_games_new_pbp <- fun.team_game_labels(pbp_data = pbp_df)
 
-team_games_new_pbp <- pbp_df %>% 
-  group_by(home_team, away_team, season, game_id, game_date) %>% 
-  summarise() %>% 
-  rename(Team = home_team, 
-         Opponent = away_team
-         ) %>% 
-  data.frame() %>%
-  rbind(., pbp_df %>% 
-          group_by(away_team, home_team, season, game_id, game_date) %>% 
-          summarise() %>% 
-          rename(Team = away_team, 
-                 Opponent = home_team
-          ) %>% 
-          data.frame()
-        ) %>% 
-  mutate(game_label = paste0(Team, " vs. ", Opponent, ", ", game_date)) %>% 
-  arrange(Team, game_id) %>% 
-  data.frame()
+
 
 
 
@@ -926,10 +894,20 @@ check_new_games <- fun.check_new_games()
 # Save New Data
 db <- DBI::dbConnect(SQLite(), dbname = "data/NHL_db_1819.sqlite") # NEW DATABASE NAME (second time)
 
+dbWriteTable(db, "pbp_full", pbp_df, overwrite = F, append = T)
+dbWriteTable(db, "shifts_full", shifts_new, overwrite = F, append = T)
+dbWriteTable(db, "rosters_full", rosters_new, overwrite = F, append = T)
+dbWriteTable(db, "game_charts_labels", team_games_new_pbp, overwrite = F, append = T)
+
 dbWriteTable(db, "games_data_all_sit", games_all_sit_new, overwrite = F, append = T)
 dbWriteTable(db, "games_data_EV", games_EV_new, overwrite = F, append = T)
 dbWriteTable(db, "games_data_PP", games_PP_new, overwrite = F, append = T)
 dbWriteTable(db, "games_data_SH", games_SH_new, overwrite = F, append = T)
+
+dbWriteTable(db, "team_data_all_sit", team_games_all_sit_new, overwrite = F, append = T)
+dbWriteTable(db, "team_data_EV", team_games_EV_new, overwrite = F, append = T)
+dbWriteTable(db, "team_data_PP", team_games_PP_new, overwrite = F, append = T)
+dbWriteTable(db, "team_data_SH", team_games_SH_new, overwrite = F, append = T)
 
 dbWriteTable(db, "TOI_together_data_EV", teammate_TOI_EV_new, overwrite = F, append = T)
 dbWriteTable(db, "TOI_together_data_PP", teammate_TOI_PP_new, overwrite = F, append = T)
@@ -938,38 +916,34 @@ dbWriteTable(db, "TOI_together_data_SH", teammate_TOI_SH_new, overwrite = F, app
 dbWriteTable(db, "goalie_games_all_sit", goalie_games_all_sit_new, overwrite = F, append = T)
 dbWriteTable(db, "adj_pen_games_all_sit", adj_pen_games_new, overwrite = F, append = T)
 
-dbWriteTable(db, "team_data_all_sit", team_games_all_sit_new, overwrite = F, append = T)
-dbWriteTable(db, "team_data_EV", team_games_EV_new, overwrite = F, append = T)
-dbWriteTable(db, "team_data_PP", team_games_PP_new, overwrite = F, append = T)
-dbWriteTable(db, "team_data_SH", team_games_SH_new, overwrite = F, append = T)
-
-dbWriteTable(db, "pbp_full", pbp_df, overwrite = F, append = T)
-dbWriteTable(db, "shifts_full", shifts_new, overwrite = F, append = T)
-dbWriteTable(db, "rosters_full", rosters_new, overwrite = F, append = T)
-
-dbWriteTable(db, "game_charts_labels", team_games_new_pbp, overwrite = F, append = T)
-
 dbDisconnect(db)
 
 
 
 
 ## Remove a Table - *** if needed ***
-#dbRemoveTable(db, "game_score_games")
-#dbRemoveTable(db, "on_ice_games_all_sit")
+#db <- DBI::dbConnect(SQLite(), dbname = "data/NHL_db_1819.sqlite") # NEW DATABASE NAME (second time)
 
 #dbRemoveTable(db, "games_data_all_sit")
 #dbRemoveTable(db, "games_data_EV")
 #dbRemoveTable(db, "games_data_PP")
 #dbRemoveTable(db, "games_data_SH")
 
-#dbRemoveTable(db, "goalie_games_all_sit")
-
 #dbRemoveTable(db, "team_data_all_sit")
 #dbRemoveTable(db, "team_data_EV")
 #dbRemoveTable(db, "team_data_PP")
 #dbRemoveTable(db, "team_data_SH")
 
+#dbRemoveTable(db, "TOI_together_data_EV")
+#dbRemoveTable(db, "TOI_together_data_PP")
+#dbRemoveTable(db, "TOI_together_data_SH")
+
+#dbRemoveTable(db, "goalie_games_all_sit")
+#dbRemoveTable(db, "adj_pen_games_all_sit")
+
+#dbRemoveTable(db, "game_charts_labels")
+
+#dbDisconnect(db)
 
 
 
@@ -1039,6 +1013,7 @@ rm(pbp_new, shifts_new, rosters_new,
    teammate_TOI_EV_new, teammate_TOI_PP_new, teammate_TOI_SH_new, 
    team_games_EV_new, team_games_PP_new, team_games_SH_new, team_games_all_sit_new, 
    goalie_games_all_sit_new, adj_pen_games_new, 
+   pen_source, pen_enhanced, pen_calc_main, pen_calc_xtras, adj_pen_games, 
    xG_model_XGB_7_EV, xG_model_XGB_7_UE, xG_model_XGB_10_SH, xG_model_XGB_10_EN)
 gc()
 
@@ -1058,41 +1033,34 @@ db <- DBI::dbConnect(SQLite(), dbname = "data/NHL_db_1819.sqlite") # NEW DATABAS
 pbp_joined <-     db %>% tbl("pbp_full") %>% data.frame()
 #shifts_joined <-  db %>% tbl("shifts_full") %>% data.frame()    # not needed here
 #rosters_joined <- db %>% tbl("rosters_full") %>% data.frame()   # not needed here
+#game_labels_joined <- db %>% tbl("game_charts_labels") %>% data.frame()
 
 games_all_sit_joined <- db %>% tbl("games_data_all_sit") %>% data.frame()
 games_EV_joined <-      db %>% tbl("games_data_EV") %>% data.frame()
 games_PP_joined <-      db %>% tbl("games_data_PP") %>% data.frame()
 games_SH_joined <-      db %>% tbl("games_data_SH") %>% data.frame()
 
-TOI_together_EV_joined <- db %>% tbl("TOI_together_data_EV") %>% data.frame()
-TOI_together_PP_joined <- db %>% tbl("TOI_together_data_PP") %>% data.frame()
-TOI_together_SH_joined <- db %>% tbl("TOI_together_data_SH") %>% data.frame()
-
 team_games_all_sit_joined <- db %>% tbl("team_data_all_sit") %>% data.frame()
 team_games_EV_joined <-      db %>% tbl("team_data_EV") %>% data.frame()
 team_games_PP_joined <-      db %>% tbl("team_data_PP") %>% data.frame()
 team_games_SH_joined <-      db %>% tbl("team_data_SH") %>% data.frame()
 
+TOI_together_EV_joined <- db %>% tbl("TOI_together_data_EV") %>% data.frame()
+TOI_together_PP_joined <- db %>% tbl("TOI_together_data_PP") %>% data.frame()
+TOI_together_SH_joined <- db %>% tbl("TOI_together_data_SH") %>% data.frame()
+
 goalie_games_all_sit_joined <- db %>% tbl("goalie_games_all_sit") %>% data.frame()
 adj_pen_games_joined <-        db %>% tbl("adj_pen_games_all_sit") %>% data.frame()
 
-game_labels_joined <- db %>% tbl("game_charts_labels") %>% data.frame()
-
 dbDisconnect(db)
-
-
-# DEPRECATED
-#on_ice_all_sit_games_joined <- db %>% tbl("on_ice_games_all_sit") %>% data.frame() # replaced with games_all_sit_joined
-#game_score_games_joined <-     db %>% tbl("game_score_games") %>% data.frame()     # not used anymore
-
-
-
 
 
 
 
 
 ## ------------------- COMPUTE SUMMED TABLES ------------------- ##
+
+
 
 
 
