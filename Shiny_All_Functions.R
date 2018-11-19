@@ -3429,7 +3429,9 @@ fun.all_sit_standard <- function(data_) {
                 is_home = first(is_home), 
                 TOI  = sum(TOI)
                 ) %>% 
-      filter(!is.na(player)) %>% 
+      filter(!is.na(player), 
+             !is.na(game_date) # filtering to catch pbp data issues for all situations
+             ) %>% 
       select(player, game_id, game_date, season, Team, Opponent, is_home, TOI) %>% 
       data.frame()
     
@@ -3487,7 +3489,7 @@ fun.all_sit_standard <- function(data_) {
                 OZS =  sum(OZS), 
                 NZS =  sum(NZS), 
                 DZS =  sum(DZS)
-      ) %>% 
+                ) %>% 
       arrange(player) %>% 
       data.frame()
     
@@ -3836,12 +3838,14 @@ fun.all_sit_standard <- function(data_) {
     }
   goalieremove <- fun.goalie_remove(data_ = pbp_data)
   
-  all1 <- test_join %>% 
+  all <- test_join %>% 
     left_join(., goalieremove, "player") %>% 
     filter(is.na(is_goalie)) %>% 
     select(-c(is_goalie)) %>% 
     arrange(player, game_id) %>% 
-    filter(!is.na(player)) %>% 
+    filter(!is.na(player), 
+           !is.na(game_date) # filtering to catch pbp data issues for all situations
+           ) %>% 
     select(player, game_id, game_date, season, Team, Opponent, is_home,  
            TOI, G:ixG, iBLK, iHF, iHA, GIVE, TAKE, iPENT2:iPEND5, FOW, FOL, OZS, NZS, DZS, 
            t_TOI
@@ -5896,6 +5900,7 @@ fun.team_games_EV <- function(data) {
     select(Team, Opponent, game_id, game_date, season, is_home, 
            TOI, TOI_5v5:TOI_3v3, GF:C_diff, PEND2:PENT5
            ) %>% 
+    arrange(Team, game_id) %>% 
     data.frame()
   
   return(games)
@@ -6015,6 +6020,7 @@ fun.team_games_PP <- function(data) {
     select(Team, Opponent, game_id, game_date, season, is_home, 
            TOI, TOI_5v4:TOI_4v3, GF:CA, PEND2:PENT5
            ) %>% 
+    arrange(Team, game_id) %>% 
     data.frame()
   
   return(games)
@@ -6134,6 +6140,7 @@ fun.team_games_SH <- function(data) {
     select(Team, Opponent, game_id, game_date, season, is_home, 
            TOI, TOI_4v5:TOI_3v4, GF:CA, PEND2:PENT5
            ) %>% 
+    arrange(Team, game_id) %>% 
     data.frame()
   
   return(games)
@@ -6142,7 +6149,6 @@ fun.team_games_SH <- function(data) {
 
 
 ####################################
-
 
 
 ## ----------------------------- ##
