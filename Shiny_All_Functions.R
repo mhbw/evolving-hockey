@@ -997,9 +997,535 @@ fun.NHL_info_scrape <- function(season_) {
 #########################
 
 
+
 ## ------------------------------------------------------ ##
 
 
+
+## ----------------- ##
+##   All Sit Games   ##
+## ----------------- ##
+
+#######################
+
+# Calulate Game-By_Game Stats - All Situations
+fun.all_sit_standard <- function(data_) { 
+  
+  # Modify pbp data
+  pbp_data <- data_ %>% 
+    filter(game_period < 5, 
+           event_length < 900
+           ) %>% 
+    select(-c(face_index:shift_length)) %>% 
+    mutate(event_length = ifelse(is.na(event_length), 0, event_length)) %>% 
+    rename(pred_goal = pred_XGB_7)
+  
+  # Time On Ice
+  fun.onice_H_all <- function(data, venue) {
+    
+    on_ice <- data %>% 
+      summarise(Team = first(home_team), 
+                Opponent = first(away_team), 
+                is_home = 1, 
+                TOI = sum(event_length) / 60
+                )
+    
+    return(on_ice)
+    
+    }
+  fun.onice_A_all <- function(data, venue) {
+    
+    on_ice <- data %>% 
+      summarise(Team = first(away_team), 
+                Opponent = first(home_team), 
+                is_home = 0, 
+                TOI = sum(event_length) / 60
+                )
+    
+    return(on_ice)
+    
+    }
+  fun.onice_combine_all <- function(data) {
+    
+    # prepare data
+    function_data <- data %>% 
+      filter(game_strength_state %in% st.strength_states) %>% 
+      mutate(event_length = ifelse(is.na(event_length), 0, event_length))
+    
+    # Run Functions
+    h1 <- function_data %>% group_by(game_id, game_date, season, home_on_1, home_team) %>% fun.onice_H_all(., "home_on_1") %>% rename(player = home_on_1) %>% data.frame()
+    h2 <- function_data %>% group_by(game_id, game_date, season, home_on_2, home_team) %>% fun.onice_H_all(., "home_on_2") %>% rename(player = home_on_2) %>% data.frame()
+    h3 <- function_data %>% group_by(game_id, game_date, season, home_on_3, home_team) %>% fun.onice_H_all(., "home_on_3") %>% rename(player = home_on_3) %>% data.frame()
+    h4 <- function_data %>% group_by(game_id, game_date, season, home_on_4, home_team) %>% fun.onice_H_all(., "home_on_4") %>% rename(player = home_on_4) %>% data.frame()
+    h5 <- function_data %>% group_by(game_id, game_date, season, home_on_5, home_team) %>% fun.onice_H_all(., "home_on_5") %>% rename(player = home_on_5) %>% data.frame()
+    h6 <- function_data %>% group_by(game_id, game_date, season, home_on_6, home_team) %>% fun.onice_H_all(., "home_on_6") %>% rename(player = home_on_6) %>% data.frame()
+    
+    a1 <- function_data %>% group_by(game_id, game_date, season, away_on_1, away_team) %>% fun.onice_A_all(., "away_on_1") %>% rename(player = away_on_1) %>% data.frame()
+    a2 <- function_data %>% group_by(game_id, game_date, season, away_on_2, away_team) %>% fun.onice_A_all(., "away_on_2") %>% rename(player = away_on_2) %>% data.frame()
+    a3 <- function_data %>% group_by(game_id, game_date, season, away_on_3, away_team) %>% fun.onice_A_all(., "away_on_3") %>% rename(player = away_on_3) %>% data.frame()
+    a4 <- function_data %>% group_by(game_id, game_date, season, away_on_4, away_team) %>% fun.onice_A_all(., "away_on_4") %>% rename(player = away_on_4) %>% data.frame()
+    a5 <- function_data %>% group_by(game_id, game_date, season, away_on_5, away_team) %>% fun.onice_A_all(., "away_on_5") %>% rename(player = away_on_5) %>% data.frame()
+    a6 <- function_data %>% group_by(game_id, game_date, season, away_on_6, away_team) %>% fun.onice_A_all(., "away_on_6") %>% rename(player = away_on_6) %>% data.frame()
+    
+    # Combine
+    join_df <- Reduce(function(...) merge(..., all = TRUE), list(h1, h2, h3, h4, h5, h6, a1, a2, a3, a4, a5, a6))
+    
+    
+    # Remove Goalies
+    fun.goalie_find <- function(data_) {
+      
+      # Identifies goalies within a given pbp data.frame & returns a data.frame to join for removal
+      
+      goalie_return <- data.frame(player = sort(unique(na.omit(as.character(rbind(data_$home_goalie, data_$away_goalie))))), 
+                                  is_goalie = 1)
+      
+      goalie_return$player <- as.character(goalie_return$player)
+      
+      return(goalie_return)
+      
+      }
+    goalie_remove <- fun.goalie_find(data_ = function_data)
+    
+    join_remove <- join_df[!(join_df$player %in% goalie_remove$player), ]
+    
+    # Format
+    join_return <- join_remove %>% 
+      group_by(player, game_id, game_date, season) %>% 
+      summarise(Team = first(Team), 
+                Opponent = first(Opponent), 
+                is_home = first(is_home), 
+                TOI  = sum(TOI)
+                ) %>% 
+      filter(!is.na(player), 
+             !is.na(game_date) # filtering to catch pbp data issues for all situations
+             ) %>% 
+      select(player, game_id, game_date, season, Team, Opponent, is_home, TOI) %>% 
+      data.frame()
+    
+    return(join_return)
+    
+    }
+  
+  # Zone Starts
+  fun.ZS_H_all <- function(data, venue) {
+    
+    hold <- data %>% 
+      filter(event_type == "FAC") %>%  
+      summarise(Team = first(home_team),
+                OZS = sum(event_type == "FAC" & home_zone == "Off"), 
+                NZS = sum(event_type == "FAC" & home_zone == "Neu"), 
+                DZS = sum(event_type == "FAC" & home_zone == "Def")
+                )
+    
+    return(hold)
+    
+    }
+  fun.ZS_A_all <- function(data, venue) {
+    
+    hold <- data %>% 
+      filter(event_type == "FAC") %>%  
+      summarise(Team = first(away_team),
+                OZS = sum(event_type == "FAC" & home_zone == "Def"), 
+                NZS = sum(event_type == "FAC" & home_zone == "Neu"), 
+                DZS = sum(event_type == "FAC" & home_zone == "Off")
+                )
+    
+    return(hold)
+    
+    }
+  fun.ZS_compute_all <- function(data) {
+    
+    h1 <- data %>% group_by(game_id, season, home_on_1) %>% fun.ZS_H_all(., "home_on_1") %>% rename(player = home_on_1) %>% data.frame()
+    h2 <- data %>% group_by(game_id, season, home_on_2) %>% fun.ZS_H_all(., "home_on_2") %>% rename(player = home_on_2) %>% data.frame()
+    h3 <- data %>% group_by(game_id, season, home_on_3) %>% fun.ZS_H_all(., "home_on_3") %>% rename(player = home_on_3) %>% data.frame()
+    h4 <- data %>% group_by(game_id, season, home_on_4) %>% fun.ZS_H_all(., "home_on_4") %>% rename(player = home_on_4) %>% data.frame()
+    h5 <- data %>% group_by(game_id, season, home_on_5) %>% fun.ZS_H_all(., "home_on_5") %>% rename(player = home_on_5) %>% data.frame()
+    h6 <- data %>% group_by(game_id, season, home_on_6) %>% fun.ZS_H_all(., "home_on_6") %>% rename(player = home_on_6) %>% data.frame()
+    
+    a1 <- data %>% group_by(game_id, season, away_on_1) %>% fun.ZS_A_all(., "away_on_1") %>% rename(player = away_on_1) %>% data.frame()
+    a2 <- data %>% group_by(game_id, season, away_on_2) %>% fun.ZS_A_all(., "away_on_2") %>% rename(player = away_on_2) %>% data.frame()
+    a3 <- data %>% group_by(game_id, season, away_on_3) %>% fun.ZS_A_all(., "away_on_3") %>% rename(player = away_on_3) %>% data.frame()
+    a4 <- data %>% group_by(game_id, season, away_on_4) %>% fun.ZS_A_all(., "away_on_4") %>% rename(player = away_on_4) %>% data.frame()
+    a5 <- data %>% group_by(game_id, season, away_on_5) %>% fun.ZS_A_all(., "away_on_5") %>% rename(player = away_on_5) %>% data.frame()
+    a6 <- data %>% group_by(game_id, season, away_on_6) %>% fun.ZS_A_all(., "away_on_6") %>% rename(player = away_on_6) %>% data.frame()
+    
+    # Join
+    merged <- Reduce(function(...) merge(..., all = TRUE), list(h1, h2, h3, h4, h5, h6, a1, a2, a3, a4, a5, a6))
+    
+    summed <- merged %>% 
+      group_by(player, game_id, season) %>%  
+      summarise(Team = first(Team),
+                OZS =  sum(OZS), 
+                NZS =  sum(NZS), 
+                DZS =  sum(DZS)
+                ) %>% 
+      arrange(player) %>% 
+      data.frame()
+    
+    return(summed)
+    
+    }
+  
+  # Boxscore
+  fun.counts_all <- function(data, venue) {
+    
+    if (venue == "home_team") {
+      
+      # Counts
+      counts_1 <- data %>% 
+        filter(event_type %in% c("GOAL", "BLOCK", "MISS", "SHOT", "HIT", "TAKE", "GIVE"), 
+               event_team == home_team
+               ) %>% 
+        group_by(event_player_1, game_id, season) %>% 
+        summarise(Team = first(home_team),
+                  G = sum(event_type == "GOAL"),
+                  iSF = sum(event_type %in% st.shot_events), 
+                  iFF = sum(event_type %in% st.fenwick_events), 
+                  iCF = sum(event_type %in% st.corsi_events), 
+                  ixG = sum(na.omit(pred_goal)), 
+                  
+                  GIVE = sum(event_type == "GIVE"), 
+                  TAKE = sum(event_type == "TAKE")
+                  ) %>% 
+        rename(player = event_player_1) %>% 
+        data.frame()
+      
+      counts_2 <- data %>% 
+        filter(event_type %in% "GOAL", 
+               event_team == home_team
+               ) %>% 
+        group_by(event_player_2, game_id, season) %>% 
+        summarise(Team = first(home_team), 
+                  A1 = sum(event_type == "GOAL")
+                  ) %>% 
+        rename(player = event_player_2) %>% 
+        data.frame()
+      
+      counts_3 <- data %>% 
+        filter(event_type == "GOAL", 
+               event_team == home_team
+               ) %>% 
+        group_by(event_player_3, game_id, season) %>%
+        summarise(Team = first(home_team), 
+                  A2 = sum(event_type == "GOAL")
+                  ) %>% 
+        rename(player = event_player_3) %>% 
+        data.frame()
+      
+      # Join
+      merged <- Reduce(function(...) merge(..., all = TRUE), list(counts_1, counts_2, counts_3))
+      
+      joined <- merged %>% 
+        mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+        mutate(Points = G + A1 + A2) %>% 
+        select(player, game_id, season, Team, 
+               G, A1, A2, Points, iSF, iFF, iCF, ixG, 
+               GIVE, TAKE
+               ) %>% 
+        arrange(player, game_id) %>% 
+        data.frame()
+      
+      return(joined)
+      
+      }
+    else {
+      
+      # Compile
+      counts_1 <- data %>% 
+        filter(event_type %in% c("GOAL", "BLOCK", "MISS", "SHOT", "HIT", "TAKE", "GIVE"), 
+               event_team == away_team
+               ) %>% 
+        group_by(event_player_1, game_id, season) %>% 
+        summarise(Team = first(away_team),
+                  G = sum(event_type == "GOAL"),
+                  iSF = sum(event_type %in% st.shot_events), 
+                  iFF = sum(event_type %in% st.fenwick_events), 
+                  iCF = sum(event_type %in% st.corsi_events), 
+                  ixG = sum(na.omit(pred_goal)), 
+                  
+                  GIVE = sum(event_type == "GIVE"), 
+                  TAKE = sum(event_type == "TAKE")
+                  ) %>% 
+        rename(player = event_player_1) %>% 
+        data.frame()
+      
+      counts_2 <- data %>% 
+        filter(event_type %in% c("GOAL"), 
+               event_team == away_team
+               ) %>% 
+        group_by(event_player_2, game_id, season) %>% 
+        summarise(Team = first(away_team), 
+                  A1 = sum(event_type == "GOAL")
+                  ) %>% 
+        rename(player = event_player_2)
+      
+      counts_3 <- data %>% 
+        filter(event_type == "GOAL", 
+               event_team == away_team
+               ) %>% 
+        group_by(event_player_3, game_id, season) %>%
+        summarise(Team = first(away_team), 
+                  A2 = sum(event_type == "GOAL")
+                  ) %>% 
+        rename(player = event_player_3) %>% 
+        data.frame()
+      
+      # Join
+      merged <- Reduce(function(...) merge(..., all = TRUE), list(counts_1, counts_2, counts_3))
+      
+      joined <- merged %>% 
+        mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+        mutate(Points = G + A1 + A2) %>% 
+        select(player, game_id, season, Team, 
+               G, A1, A2, Points, iSF, iFF, iCF, ixG, 
+               GIVE, TAKE
+               ) %>% 
+        arrange(player, game_id) %>% 
+        data.frame()
+      
+      return(joined)
+      
+      }
+    
+    }
+  fun.faceoff_all <- function(data, venue) {
+    
+    if (venue == "home_team") {
+      
+      faceoffs <- data %>% 
+        filter(event_type == "FAC") %>% 
+        group_by(event_player_2, game_id, season) %>% 
+        mutate(FOW = 1 * (home_team == event_team), 
+               FOL = 1 * (away_team == event_team)
+               ) %>% 
+        summarise(Team = first(home_team),
+                  FOW = sum(FOW), 
+                  FOL = sum(FOL)
+                  ) %>% 
+        mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+        rename(player = event_player_2) %>% 
+        ungroup() %>% 
+        arrange(player, game_id) %>% 
+        data.frame()
+      
+      return(faceoffs)
+      
+      }
+    else {
+      
+      faceoffs <- data %>% 
+        filter(event_type == "FAC") %>% 
+        group_by(event_player_1, game_id, season) %>% 
+        mutate(FOW = 1 * (away_team == event_team), 
+               FOL = 1 * (home_team == event_team)
+               ) %>% 
+        summarise(Team = first(away_team),
+                  FOW = sum(FOW), 
+                  FOL = sum(FOL)
+                  ) %>% 
+        mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+        rename(player = event_player_1) %>% 
+        ungroup() %>% 
+        arrange(player, game_id) %>% 
+        data.frame()
+      
+      return(faceoffs)
+      
+      }
+    
+    }
+  fun.penalty_all <- function(data, venue) {
+    
+    if (venue == "home_team") {
+      
+      pen_1 <- data %>% 
+        filter(event_team == home_team, 
+               event_type %in% c("PENL", "HIT", "BLOCK")
+               ) %>% 
+        group_by(event_player_1, game_id, season) %>% 
+        summarise(Team = first(home_team),
+                  iPENT2 = sum(na.omit(1 * (event_type == "PENL") +
+                                         1 * (event_type == "PENL" & grepl("double minor", tolower(event_detail)) == TRUE) -
+                                         1 * (event_type == "PENL" & grepl("ps \\-|match|fighting|major", tolower(event_detail)) == TRUE) - 
+                                         1 * (event_type == "PENL" & grepl("too many men", tolower(event_description)) == TRUE) - 
+                                         1 * (event_type == "PENL" & grepl("misconduct", tolower(event_description)) == TRUE))), 
+                  iPENT5 = sum(na.omit(event_type == "PENL" & grepl("fighting|major", tolower(event_detail)) == TRUE)), 
+                  iHF = sum(na.omit(event_type == "HIT"))
+                  ) %>% 
+        rename(player = event_player_1) %>% 
+        data.frame()
+      
+      
+      pen_2 <- data %>% 
+        filter(event_team == away_team, 
+               event_type %in% c("PENL", "HIT", "BLOCK")
+               ) %>% 
+        group_by(event_player_2, game_id, season) %>% 
+        summarise(Team = first(home_team), 
+                  iPEND2 = sum(na.omit(1 * (event_type == "PENL") +
+                                         1 * (event_type == "PENL" & grepl("double minor", tolower(event_detail)) == TRUE) -
+                                         1 * (event_type == "PENL" & grepl("ps \\-|match|fighting|major", tolower(event_detail)) == TRUE) - 
+                                         1 * (event_type == "PENL" & grepl("too many men", tolower(event_description)) == TRUE) - 
+                                         1 * (event_type == "PENL" & grepl("misconduct", tolower(event_description)) == TRUE))),
+                  iPEND5 = sum(na.omit(event_type == "PENL" & grepl("fighting|major", tolower(event_detail)) == TRUE)), 
+                  iHA = sum(na.omit(event_type == "HIT")), 
+                  iBLK = sum(event_type == "BLOCK")
+                  ) %>% 
+        rename(player = event_player_2) %>% 
+        data.frame()
+      
+      
+      merged <- Reduce(function(...) merge(..., all = TRUE), list(pen_1, pen_2))
+      
+      joined <- merged %>% 
+        mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+        mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
+        select(player, game_id, season, Team, 
+               iBLK, iHF, iHA, 
+               iPENT2, iPEND2, iPENT5, iPEND5
+               ) %>% 
+        arrange(player, game_id) %>% 
+        data.frame()
+      
+      return(joined)
+      
+      }
+    else {
+      
+      pen_1 <- data %>% 
+        filter(event_team == away_team, 
+               event_type %in% c("PENL", "HIT", "BLOCK")
+               ) %>% 
+        group_by(event_player_1, game_id, season) %>% 
+        summarise(Team = first(away_team),
+                  iPENT2 = sum(na.omit(1 * (event_type == "PENL") +
+                                         1 * (event_type == "PENL" & grepl("double minor", tolower(event_detail)) == TRUE) -
+                                         1 * (event_type == "PENL" & grepl("ps \\-|match|fighting|major", tolower(event_detail)) == TRUE) - 
+                                         1 * (event_type == "PENL" & grepl("too many men", tolower(event_description)) == TRUE) - 
+                                         1 * (event_type == "PENL" & grepl("misconduct", tolower(event_description)) == TRUE))), 
+                  iPENT5 = sum(na.omit(event_type == "PENL" & grepl("fighting|major", tolower(event_detail)) == TRUE)), 
+                  iHF = sum(na.omit(event_type == "HIT"))
+                  ) %>% 
+        rename(player = event_player_1) %>% 
+        data.frame()
+      
+      pen_2 <- data %>% 
+        filter(event_team == home_team, 
+               event_type %in% c("PENL", "HIT", "BLOCK")
+               ) %>% 
+        group_by(event_player_2, game_id, season) %>% 
+        summarise(Team = first(away_team),
+                  iPEND2 = sum(na.omit(1 * (event_type == "PENL") +
+                                         1 * (event_type == "PENL" & grepl("double minor", tolower(event_detail)) == TRUE) -
+                                         1 * (event_type == "PENL" & grepl("ps \\-|match|fighting|major", tolower(event_detail)) == TRUE) - 
+                                         1 * (event_type == "PENL" & grepl("too many men", tolower(event_description)) == TRUE) - 
+                                         1 * (event_type == "PENL" & grepl("misconduct", tolower(event_description)) == TRUE))),
+                  iPEND5 = sum(na.omit(event_type == "PENL" & grepl("fighting|major", tolower(event_detail)) == TRUE)), 
+                  iHA = sum(na.omit(event_type == "HIT")), 
+                  iBLK = sum(event_type == "BLOCK")
+                  ) %>% 
+        rename(player = event_player_2) %>% 
+        data.frame()
+      
+      
+      merged <- Reduce(function(...) merge(..., all = TRUE), list(pen_1, pen_2))
+      
+      joined <- merged %>% 
+        mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+        select(player, game_id, season, Team, 
+               iBLK, iHF, iHA, 
+               iPENT2, iPEND2, iPENT5, iPEND5
+               ) %>% 
+        arrange(player, game_id) %>% 
+        data.frame()
+      
+      return(joined)
+      
+      }
+    
+    }
+  
+  # Run Functions
+  on_ice_all <- fun.onice_combine_all(data = pbp_data)
+  
+  zone_starts_all <- fun.ZS_compute_all(data = pbp_data)
+  
+  counts_all <- fun.counts_all(data = pbp_data, "home_team") %>% 
+    rbind(., fun.counts_all(data = pbp_data, "away_team")) %>% 
+    arrange(player, game_id)
+  
+  faceoff_all <- fun.faceoff_all(data = pbp_data, "home_team") %>% 
+    rbind(., fun.faceoff_all(data = pbp_data, "away_team")) %>% 
+    arrange(player, game_id)
+  
+  penalty_all <- fun.penalty_all(data = pbp_data, "home_team") %>% 
+    rbind(., fun.penalty_all(data = pbp_data, "away_team")) %>% 
+    arrange(player, game_id)
+  
+  # Team TOI for TOI_perc calculation
+  team_TOI_all <- rbind(
+    pbp_data %>% 
+      group_by(game_id, season, home_team) %>% 
+      summarise(TOI = sum(event_length) / 60) %>% 
+      rename(Team = home_team) %>% 
+      data.frame(), 
+    
+    pbp_data %>% 
+      group_by(game_id, season, away_team) %>% 
+      summarise(TOI = sum(event_length) / 60) %>% 
+      rename(Team = away_team) %>% 
+      data.frame()
+    ) %>% 
+    group_by(game_id, season, Team) %>% 
+    summarise(t_TOI = sum(TOI)) %>% 
+    arrange(game_id, Team) %>% 
+    data.frame()
+  
+  
+  ## --------------- ##
+  ##   Combine All   ##
+  ## --------------- ##
+  
+  test_join <- on_ice_all %>% 
+    full_join(., zone_starts_all, by = c("player", "game_id", "season", "Team")) %>% 
+    full_join(., counts_all, by = c("player", "game_id", "season", "Team")) %>% 
+    full_join(., faceoff_all, by = c("player", "game_id", "season", "Team")) %>% 
+    full_join(., penalty_all, by = c("player", "game_id", "season", "Team")) %>% 
+    left_join(., team_TOI_all, by = c("game_id", "season", "Team")) %>% 
+    mutate_if(is.numeric, funs(ifelse(is.na(.), 0, .)))
+  
+  # Remove goalies
+  fun.goalie_remove <- function(data_) {
+    
+    # Identifies goalies within a given pbp data.frame & returns a data.frame to join for removal
+    goalie_return <- data.frame(player = sort(unique(na.omit(as.character(rbind(data_$home_goalie, data_$away_goalie))))), 
+                                is_goalie = 1)
+    
+    goalie_return$player <- as.character(goalie_return$player)
+    
+    return(goalie_return)
+    
+    }
+  goalieremove <- fun.goalie_remove(data_ = pbp_data)
+  
+  all <- test_join %>% 
+    left_join(., goalieremove, "player") %>% 
+    filter(is.na(is_goalie)) %>% 
+    select(-c(is_goalie)) %>% 
+    arrange(player, game_id) %>% 
+    filter(!is.na(player), 
+           !is.na(game_date) # filtering to catch pbp data issues for all situations
+           ) %>% 
+    select(player, game_id, game_date, season, Team, Opponent, is_home,  
+           TOI, G:ixG, iBLK, iHF, iHA, GIVE, TAKE, iPENT2:iPEND5, FOW, FOL, OZS, NZS, DZS, 
+           t_TOI
+           ) %>% 
+    data.frame()
+  
+  }
+
+
+#######################
 
 
 ## ----------------------- ##
@@ -1427,6 +1953,7 @@ fun.counts <- function(data, venue) {
     
     joined <- merged %>% 
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+      mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
       mutate(Points = G + A1 + A2, 
              Points_adj = G_adj + A1_adj + A2_adj
              ) %>% 
@@ -1503,6 +2030,7 @@ fun.counts <- function(data, venue) {
     
     joined <- merged %>% 
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+      mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
       mutate(Points = G + A1 + A2, 
              Points_adj = G_adj + A1_adj + A2_adj
              ) %>% 
@@ -1622,6 +2150,7 @@ fun.penalty <- function(data, venue) {
     
     joined <- merged %>% 
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+      mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
       select(player, game_id, season, Team, 
              iPENT2, iPEND2, iPENT5, iPEND5, iBLK, 
              iHF_o, iHF_n, iHF_d, iHA_o, iHA_n, iHA_d, 
@@ -1686,6 +2215,7 @@ fun.penalty <- function(data, venue) {
     
     joined <- merged %>% 
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+      mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
       select(player, game_id, season, Team, 
              iPENT2, iPEND2, iPENT5, iPEND5, iBLK, 
              iHF_o, iHF_n, iHF_d, iHA_o, iHA_n, iHA_d, 
@@ -2198,6 +2728,7 @@ fun.counts_PP <- function(data, venue) {
     
     joined <- merged %>% 
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+      mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
       mutate(Points = G + A1 + A2, 
              Points_adj = G_adj + A1_adj + A2_adj
              ) %>% 
@@ -2275,6 +2806,7 @@ fun.counts_PP <- function(data, venue) {
     
     joined <- merged %>% 
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+      mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
       mutate(Points = G + A1 + A2, 
              Points_adj = G_adj + A1_adj + A2_adj
              ) %>% 
@@ -2400,6 +2932,7 @@ fun.penalty_PP <- function(data, venue) {
     
     joined <- merged %>% 
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+      mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
       select(player, game_id, season, Team, 
              iPENT2, iPEND2, iPENT5, iPEND5,
              iHF_o, iHF_n, iHF_d, 
@@ -2465,6 +2998,7 @@ fun.penalty_PP <- function(data, venue) {
     
     joined <- merged %>% 
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+      mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
       select(player, game_id, season, Team, 
              iPENT2, iPEND2, iPENT5, iPEND5,
              iHF_o, iHF_n, iHF_d, 
@@ -2533,7 +3067,6 @@ fun.combine_counts_PP <- function(data) {
     left_join(., counts_all,  by = c("player", "game_id", "season", "Team")) %>% 
     left_join(., faceoff_all, by = c("player", "game_id", "season", "Team")) %>% 
     left_join(., penalty_all, by = c("player", "game_id", "season", "Team")) %>% 
-    mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
     select(player, game_id, game_date, season, Team, Opponent, is_home, 
            TOI, 
            G, A1, A2, Points, 
@@ -2552,6 +3085,7 @@ fun.combine_counts_PP <- function(data) {
            A2 = ifelse(is.na(A2), 0, A2)
            ) %>% 
     arrange(player, game_id) %>% 
+    mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
     data.frame()
   
   return(metrics_combined)
@@ -3168,6 +3702,7 @@ fun.penalty_SH <- function(data, venue) {
     
     joined <- merged %>% 
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+      mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
       select(player, game_id, season, Team, 
              iPENT2, iPEND2, iPENT5, iPEND5, 
              iBLK, iBLK_adj, 
@@ -3237,6 +3772,7 @@ fun.penalty_SH <- function(data, venue) {
     
     joined <- merged %>% 
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+      mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
       select(player, game_id, season, Team, 
              iPENT2, iPEND2, iPENT5, iPEND5, 
              iBLK, iBLK_adj, 
@@ -3306,7 +3842,6 @@ fun.combine_counts_SH <- function(data) {
     left_join(., counts_all,  by = c("player", "game_id", "season", "Team")) %>% 
     left_join(., faceoff_all, by = c("player", "game_id", "season", "Team")) %>% 
     left_join(., penalty_all, by = c("player", "game_id", "season", "Team")) %>% 
-    mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
     select(player, game_id, game_date, season, Team, Opponent, is_home, TOI, 
            G, A1, A2, Points, 
            iSF, iFF, iCF, ixG,
@@ -3324,6 +3859,8 @@ fun.combine_counts_SH <- function(data) {
            A2 = ifelse(is.na(A2), 0, A2)
            ) %>% 
     arrange(player, game_id) %>% 
+    mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+    mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
     data.frame()
   
   
@@ -3335,527 +3872,2152 @@ fun.combine_counts_SH <- function(data) {
 ###########################
 
 
-## ----------------- ##
-##   All Sit Games   ##
-## ----------------- ##
+## ------------------- ##
+##   5v5, etc. Games   ##
+## ------------------- ##
 
-#######################
+#########################
 
-# Calulate Game-By_Game Stats - All Situations
-fun.all_sit_standard <- function(data_) { 
+# Skaters: On Ice Corsi For / Against, TOI, Team - per game
+fun.oniceCorsiH_EV_strength <- function(data, player_slot, scr_adj_list) {
   
-  # Modify pbp data
-  pbp_data <- data_ %>% 
-    filter(game_period < 5, 
-           event_length < 900
-           ) %>% 
-    select(-c(face_index:shift_length)) %>% 
-    mutate(event_length = ifelse(is.na(event_length), 0, event_length)) %>% 
-    rename(pred_goal = pred_XGB_7)
+  hold <- data %>% 
+    summarise(TOI = sum(event_length) / 60, 
+              
+              Team = first(home_team), 
+              Opponent = first(away_team), 
+              is_home = 1, 
+              
+              # Unadjusted
+              GF =  sum(event_type == "GOAL" & event_team == home_team), 
+              GA =  sum(event_type == "GOAL" & event_team == away_team), 
+              SF =  sum(event_type %in% st.shot_events & event_team == home_team), 
+              SA =  sum(event_type %in% st.shot_events & event_team == away_team), 
+              FF =  sum(event_type %in% st.fenwick_events & event_team == home_team), 
+              FA =  sum(event_type %in% st.fenwick_events & event_team == away_team),
+              CF =  sum(event_type %in% st.corsi_events & event_team == home_team), 
+              CA =  sum(event_type %in% st.corsi_events & event_team == away_team),
+              xGF = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal)),
+              xGA = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal)), 
+              
+              # Normal Score Adjustment
+              GF_adj =  sum((event_type == "GOAL" & event_team == home_team) * scr_adj_list$home_goal_adj[home_lead_state]), 
+              GA_adj =  sum((event_type == "GOAL" & event_team == away_team) * scr_adj_list$away_goal_adj[home_lead_state]), 
+              SF_adj =  sum((event_type %in% st.shot_events & event_team == home_team) * scr_adj_list$home_shots_adj[home_lead]), 
+              SA_adj =  sum((event_type %in% st.shot_events & event_team == away_team) * scr_adj_list$away_shots_adj[home_lead]), 
+              FF_adj =  sum((event_type %in% st.fenwick_events & event_team == home_team) * scr_adj_list$home_fenwick_adj[home_lead]), 
+              FA_adj =  sum((event_type %in% st.fenwick_events & event_team == away_team) * scr_adj_list$away_fenwick_adj[home_lead]),
+              CF_adj =  sum((event_type %in% st.corsi_events & event_team == home_team) * scr_adj_list$home_corsi_adj[home_lead]), 
+              CA_adj =  sum((event_type %in% st.corsi_events & event_team == away_team) * scr_adj_list$away_corsi_adj[home_lead]),
+              xGF_adj = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal * scr_adj_list$home_xG_adj[home_lead_state])),
+              xGA_adj = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal * scr_adj_list$away_xG_adj[home_lead_state]))
+              )
   
-  # Time On Ice
-  fun.onice_H_all <- function(data, venue) {
-    
-    on_ice <- data %>% 
-      summarise(Team = first(home_team), 
-                Opponent = first(away_team), 
-                is_home = 1, 
-                TOI = sum(event_length) / 60
-                )
-    
-    return(on_ice)
-    
+  return(hold)
+  
   }
-  fun.onice_A_all <- function(data, venue) {
-    
-    on_ice <- data %>% 
-      summarise(Team = first(away_team), 
-                Opponent = first(home_team), 
-                is_home = 0, 
-                TOI = sum(event_length) / 60
-                )
-    
-    return(on_ice)
-    
+fun.oniceCorsiA_EV_strength <- function(data, player_slot, scr_adj_list) {
+  
+  hold <- data %>% 
+    summarise(TOI = sum(event_length) / 60, 
+              
+              Team = first(away_team), 
+              Opponent = first(home_team), 
+              is_home = 0, 
+              
+              # Unadjusted
+              GF =  sum(event_type == "GOAL" & event_team == away_team), 
+              GA =  sum(event_type == "GOAL" & event_team == home_team), 
+              SF =  sum(event_type %in% st.shot_events & event_team == away_team), 
+              SA =  sum(event_type %in% st.shot_events & event_team == home_team), 
+              FF =  sum(event_type %in% st.fenwick_events & event_team == away_team), 
+              FA =  sum(event_type %in% st.fenwick_events & event_team == home_team),
+              CF =  sum(event_type %in% st.corsi_events & event_team == away_team), 
+              CA =  sum(event_type %in% st.corsi_events & event_team == home_team),
+              xGF = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal)),
+              xGA = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal)), 
+              
+              # Normal Score Adjustment
+              GF_adj =  sum((event_type == "GOAL" & event_team == away_team) * scr_adj_list$away_goal_adj[home_lead_state]), 
+              GA_adj =  sum((event_type == "GOAL" & event_team == home_team) * scr_adj_list$home_goal_adj[home_lead_state]), 
+              SF_adj =  sum((event_type %in% st.shot_events & event_team == away_team) * scr_adj_list$away_shots_adj[home_lead]), 
+              SA_adj =  sum((event_type %in% st.shot_events & event_team == home_team) * scr_adj_list$home_shots_adj[home_lead]), 
+              FF_adj =  sum((event_type %in% st.fenwick_events & event_team == away_team) * scr_adj_list$away_fenwick_adj[home_lead]), 
+              FA_adj =  sum((event_type %in% st.fenwick_events & event_team == home_team) * scr_adj_list$home_fenwick_adj[home_lead]),
+              CF_adj =  sum((event_type %in% st.corsi_events & event_team == away_team) * scr_adj_list$away_corsi_adj[home_lead]), 
+              CA_adj =  sum((event_type %in% st.corsi_events & event_team == home_team) * scr_adj_list$home_corsi_adj[home_lead]),
+              xGF_adj = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal * scr_adj_list$away_xG_adj[home_lead_state])),
+              xGA_adj = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal * scr_adj_list$home_xG_adj[home_lead_state]))
+              )
+  
+  return(hold)
+  
   }
-  fun.onice_combine_all <- function(data) {
-    
-    # prepare data
-    function_data <- data %>% 
-      filter(game_strength_state %in% st.strength_states) %>% 
-      mutate(event_length = ifelse(is.na(event_length), 0, event_length))
-    
-    # Run Functions
-    h1 <- function_data %>% group_by(game_id, game_date, season, home_on_1, home_team) %>% fun.onice_H_all(., "home_on_1") %>% rename(player = home_on_1) %>% data.frame()
-    h2 <- function_data %>% group_by(game_id, game_date, season, home_on_2, home_team) %>% fun.onice_H_all(., "home_on_2") %>% rename(player = home_on_2) %>% data.frame()
-    h3 <- function_data %>% group_by(game_id, game_date, season, home_on_3, home_team) %>% fun.onice_H_all(., "home_on_3") %>% rename(player = home_on_3) %>% data.frame()
-    h4 <- function_data %>% group_by(game_id, game_date, season, home_on_4, home_team) %>% fun.onice_H_all(., "home_on_4") %>% rename(player = home_on_4) %>% data.frame()
-    h5 <- function_data %>% group_by(game_id, game_date, season, home_on_5, home_team) %>% fun.onice_H_all(., "home_on_5") %>% rename(player = home_on_5) %>% data.frame()
-    h6 <- function_data %>% group_by(game_id, game_date, season, home_on_6, home_team) %>% fun.onice_H_all(., "home_on_6") %>% rename(player = home_on_6) %>% data.frame()
-    
-    a1 <- function_data %>% group_by(game_id, game_date, season, away_on_1, away_team) %>% fun.onice_A_all(., "away_on_1") %>% rename(player = away_on_1) %>% data.frame()
-    a2 <- function_data %>% group_by(game_id, game_date, season, away_on_2, away_team) %>% fun.onice_A_all(., "away_on_2") %>% rename(player = away_on_2) %>% data.frame()
-    a3 <- function_data %>% group_by(game_id, game_date, season, away_on_3, away_team) %>% fun.onice_A_all(., "away_on_3") %>% rename(player = away_on_3) %>% data.frame()
-    a4 <- function_data %>% group_by(game_id, game_date, season, away_on_4, away_team) %>% fun.onice_A_all(., "away_on_4") %>% rename(player = away_on_4) %>% data.frame()
-    a5 <- function_data %>% group_by(game_id, game_date, season, away_on_5, away_team) %>% fun.onice_A_all(., "away_on_5") %>% rename(player = away_on_5) %>% data.frame()
-    a6 <- function_data %>% group_by(game_id, game_date, season, away_on_6, away_team) %>% fun.onice_A_all(., "away_on_6") %>% rename(player = away_on_6) %>% data.frame()
-    
-    # Combine
-    join_df <- Reduce(function(...) merge(..., all = TRUE), list(h1, h2, h3, h4, h5, h6, a1, a2, a3, a4, a5, a6))
-    
-    
-    # Remove Goalies
-    fun.goalie_find <- function(data_) {
-      
-      # Identifies goalies within a given pbp data.frame & returns a data.frame to join for removal
-      
-      goalie_return <- data.frame(player = sort(unique(na.omit(as.character(rbind(data_$home_goalie, data_$away_goalie))))), 
-                                  is_goalie = 1)
-      
-      goalie_return$player <- as.character(goalie_return$player)
-      
-      return(goalie_return)
-      
-      }
-    goalie_remove <- fun.goalie_find(data_ = function_data)
-    
-    join_remove <- join_df[!(join_df$player %in% goalie_remove$player), ]
-    
-    # Format
-    join_return <- join_remove %>% 
-      group_by(player, game_id, game_date, season) %>% 
-      summarise(Team = first(Team), 
-                Opponent = first(Opponent), 
-                is_home = first(is_home), 
-                TOI  = sum(TOI)
-                ) %>% 
-      filter(!is.na(player), 
-             !is.na(game_date) # filtering to catch pbp data issues for all situations
-             ) %>% 
-      select(player, game_id, game_date, season, Team, Opponent, is_home, TOI) %>% 
-      data.frame()
-    
-    return(join_return)
-    
-    }
+fun.componiceCorsi_EV_strength <- function(data, scr_adj_list) {
   
-  # Zone Starts
-  fun.ZS_H_all <- function(data, venue) {
-    
-    hold <- data %>% 
-      filter(event_type == "FAC") %>%  
-      summarise(Team = first(home_team),
-                OZS = sum(event_type == "FAC" & home_zone == "Off"), 
-                NZS = sum(event_type == "FAC" & home_zone == "Neu"), 
-                DZS = sum(event_type == "FAC" & home_zone == "Def")
-      )
-    
-    return(hold)
-  }
-  fun.ZS_A_all <- function(data, venue) {
-    
-    hold <- data %>% 
-      filter(event_type == "FAC") %>%  
-      summarise(Team = first(away_team),
-                OZS = sum(event_type == "FAC" & home_zone == "Def"), 
-                NZS = sum(event_type == "FAC" & home_zone == "Neu"), 
-                DZS = sum(event_type == "FAC" & home_zone == "Off")
-      )
-    
-    return(hold)
-  }
-  fun.ZS_compute_all <- function(data) {
-    
-    h1 <- data %>% group_by(game_id, season, home_on_1) %>% fun.ZS_H_all(., "home_on_1") %>% rename(player = home_on_1) %>% data.frame()
-    h2 <- data %>% group_by(game_id, season, home_on_2) %>% fun.ZS_H_all(., "home_on_2") %>% rename(player = home_on_2) %>% data.frame()
-    h3 <- data %>% group_by(game_id, season, home_on_3) %>% fun.ZS_H_all(., "home_on_3") %>% rename(player = home_on_3) %>% data.frame()
-    h4 <- data %>% group_by(game_id, season, home_on_4) %>% fun.ZS_H_all(., "home_on_4") %>% rename(player = home_on_4) %>% data.frame()
-    h5 <- data %>% group_by(game_id, season, home_on_5) %>% fun.ZS_H_all(., "home_on_5") %>% rename(player = home_on_5) %>% data.frame()
-    h6 <- data %>% group_by(game_id, season, home_on_6) %>% fun.ZS_H_all(., "home_on_6") %>% rename(player = home_on_6) %>% data.frame()
-    
-    a1 <- data %>% group_by(game_id, season, away_on_1) %>% fun.ZS_A_all(., "away_on_1") %>% rename(player = away_on_1) %>% data.frame()
-    a2 <- data %>% group_by(game_id, season, away_on_2) %>% fun.ZS_A_all(., "away_on_2") %>% rename(player = away_on_2) %>% data.frame()
-    a3 <- data %>% group_by(game_id, season, away_on_3) %>% fun.ZS_A_all(., "away_on_3") %>% rename(player = away_on_3) %>% data.frame()
-    a4 <- data %>% group_by(game_id, season, away_on_4) %>% fun.ZS_A_all(., "away_on_4") %>% rename(player = away_on_4) %>% data.frame()
-    a5 <- data %>% group_by(game_id, season, away_on_5) %>% fun.ZS_A_all(., "away_on_5") %>% rename(player = away_on_5) %>% data.frame()
-    a6 <- data %>% group_by(game_id, season, away_on_6) %>% fun.ZS_A_all(., "away_on_6") %>% rename(player = away_on_6) %>% data.frame()
-    
-    # Join
-    merged <- Reduce(function(...) merge(..., all = TRUE), list(h1, h2, h3, h4, h5, h6, a1, a2, a3, a4, a5, a6))
-    
-    summed <- merged %>% 
-      group_by(player, game_id, season) %>%  
-      summarise(Team = first(Team),
-                OZS =  sum(OZS), 
-                NZS =  sum(NZS), 
-                DZS =  sum(DZS)
-                ) %>% 
-      arrange(player) %>% 
-      data.frame()
-    
-    return(summed)
-  }
+  print("on_ice_home", quote = F)
+  h1 <- data %>% group_by(game_id, game_date, season, home_on_1, home_team) %>% fun.oniceCorsiH_EV_strength(., "home_on_1", scr_adj_list) %>% rename(player = home_on_1) %>% data.frame()
+  h2 <- data %>% group_by(game_id, game_date, season, home_on_2, home_team) %>% fun.oniceCorsiH_EV_strength(., "home_on_2", scr_adj_list) %>% rename(player = home_on_2) %>% data.frame()
+  h3 <- data %>% group_by(game_id, game_date, season, home_on_3, home_team) %>% fun.oniceCorsiH_EV_strength(., "home_on_3", scr_adj_list) %>% rename(player = home_on_3) %>% data.frame()
+  h4 <- data %>% group_by(game_id, game_date, season, home_on_4, home_team) %>% fun.oniceCorsiH_EV_strength(., "home_on_4", scr_adj_list) %>% rename(player = home_on_4) %>% data.frame()
+  h5 <- data %>% group_by(game_id, game_date, season, home_on_5, home_team) %>% fun.oniceCorsiH_EV_strength(., "home_on_5", scr_adj_list) %>% rename(player = home_on_5) %>% data.frame()
+  h6 <- data %>% group_by(game_id, game_date, season, home_on_6, home_team) %>% fun.oniceCorsiH_EV_strength(., "home_on_6", scr_adj_list) %>% rename(player = home_on_6) %>% data.frame()
   
-  # Boxscore
-  fun.counts_all <- function(data, venue) {
-    
-    if(venue == "home_team") {
-      
-      # Counts
-      counts_1 <- data %>% 
-        filter(event_type %in% c("GOAL", "BLOCK", "MISS", "SHOT", "HIT", "TAKE", "GIVE"), 
-               event_team == home_team
-               ) %>% 
-        group_by(event_player_1, game_id, season) %>% 
-        summarise(Team = first(home_team),
-                  G = sum(event_type == "GOAL"),
-                  iSF = sum(event_type %in% st.shot_events), 
-                  iFF = sum(event_type %in% st.fenwick_events), 
-                  iCF = sum(event_type %in% st.corsi_events), 
-                  ixG = sum(na.omit(pred_goal)), 
-                  
-                  GIVE = sum(event_type == "GIVE"), 
-                  TAKE = sum(event_type == "TAKE")
-                  ) %>% 
-        rename(player = event_player_1) %>% 
-        data.frame()
-      
-      counts_2 <- data %>% 
-        filter(event_type %in% "GOAL", 
-               event_team == home_team
-               ) %>% 
-        group_by(event_player_2, game_id, season) %>% 
-        summarise(Team = first(home_team), 
-                  A1 = sum(event_type == "GOAL")
-                  ) %>% 
-        rename(player = event_player_2) %>% 
-        data.frame()
-      
-      counts_3 <- data %>% 
-        filter(event_type == "GOAL", 
-               event_team == home_team
-               ) %>% 
-        group_by(event_player_3, game_id, season) %>%
-        summarise(Team = first(home_team), 
-                  A2 = sum(event_type == "GOAL")
-                  ) %>% 
-        rename(player = event_player_3) %>% 
-        data.frame()
-      
-      # Join
-      merged <- Reduce(function(...) merge(..., all = TRUE), list(counts_1, counts_2, counts_3))
-      
-      joined <- merged %>% 
-        mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
-        mutate(Points = G + A1 + A2) %>% 
-        select(player, game_id, season, Team, 
-               G, A1, A2, Points, iSF, iFF, iCF, ixG, 
-               GIVE, TAKE
-               ) %>% 
-        arrange(player, game_id) %>% 
-        data.frame()
-      
-      return(joined)
-      
-      }
-    else {
-      
-      # Compile
-      counts_1 <- data %>% 
-        filter(event_type %in% c("GOAL", "BLOCK", "MISS", "SHOT", "HIT", "TAKE", "GIVE"), 
-               event_team == away_team
-               ) %>% 
-        group_by(event_player_1, game_id, season) %>% 
-        summarise(Team = first(away_team),
-                  G = sum(event_type == "GOAL"),
-                  iSF = sum(event_type %in% st.shot_events), 
-                  iFF = sum(event_type %in% st.fenwick_events), 
-                  iCF = sum(event_type %in% st.corsi_events), 
-                  ixG = sum(na.omit(pred_goal)), 
-                  
-                  GIVE = sum(event_type == "GIVE"), 
-                  TAKE = sum(event_type == "TAKE")
-                  ) %>% 
-        rename(player = event_player_1) %>% 
-        data.frame()
-      
-      counts_2 <- data %>% 
-        filter(event_type %in% c("GOAL"), 
-               event_team == away_team
-               ) %>% 
-        group_by(event_player_2, game_id, season) %>% 
-        summarise(Team = first(away_team), 
-                  A1 = sum(event_type == "GOAL")
-                  ) %>% 
-        rename(player = event_player_2)
-      
-      counts_3 <- data %>% 
-        filter(event_type == "GOAL", 
-               event_team == away_team
-               ) %>% 
-        group_by(event_player_3, game_id, season) %>%
-        summarise(Team = first(away_team), 
-                  A2 = sum(event_type == "GOAL")
-                  ) %>% 
-        rename(player = event_player_3) %>% 
-        data.frame()
-      
-      # Join
-      merged <- Reduce(function(...) merge(..., all = TRUE), list(counts_1, counts_2, counts_3))
-      
-      joined <- merged %>% 
-        mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
-        mutate(Points = G + A1 + A2) %>% 
-        select(player, game_id, season, Team, 
-               G, A1, A2, Points, iSF, iFF, iCF, ixG, 
-               GIVE, TAKE
-               ) %>% 
-        arrange(player, game_id) %>% 
-        data.frame()
-      
-      return(joined)
-      
-      }
-    
-    }
-  fun.faceoff_all <- function(data, venue) {
-    
-    if(venue == "home_team") {
-      
-      faceoffs <- data %>% 
-        filter(event_type == "FAC") %>% 
-        group_by(event_player_2, game_id, season) %>% 
-        mutate(FOW = 1 * (home_team == event_team), 
-               FOL = 1 * (away_team == event_team)
-        ) %>% 
-        summarise(Team = first(home_team),
-                  FOW = sum(FOW), 
-                  FOL = sum(FOL)
-        ) %>% 
-        mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
-        rename(player = event_player_2) %>% 
-        ungroup() %>% 
-        arrange(player, game_id) %>% 
-        data.frame()
-      
-      return(faceoffs)
-      
-    }
-    else {
-      
-      faceoffs <- data %>% 
-        filter(event_type == "FAC") %>% 
-        group_by(event_player_1, game_id, season) %>% 
-        mutate(FOW = 1 * (away_team == event_team), 
-               FOL = 1 * (home_team == event_team)
-        ) %>% 
-        summarise(Team = first(away_team),
-                  FOW = sum(FOW), 
-                  FOL = sum(FOL)
-        ) %>% 
-        mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
-        rename(player = event_player_1) %>% 
-        ungroup() %>% 
-        arrange(player, game_id) %>% 
-        data.frame()
-      
-      return(faceoffs)
-      
-    }
-    
-  }
-  fun.penalty_all <- function(data, venue) {
-    
-    if(venue == "home_team") {
-      
-      pen_1 <- data %>% 
-        filter(event_team == home_team, 
-               event_type %in% c("PENL", "HIT", "BLOCK")
-               ) %>% 
-        group_by(event_player_1, game_id, season) %>% 
-        summarise(Team = first(home_team),
-                  iPENT2 = sum(na.omit(1 * (event_type == "PENL") +
-                                         1 * (event_type == "PENL" & grepl("double minor", tolower(event_detail)) == TRUE) -
-                                         1 * (event_type == "PENL" & grepl("ps \\-|match|fighting|major", tolower(event_detail)) == TRUE) - 
-                                         1 * (event_type == "PENL" & grepl("too many men", tolower(event_description)) == TRUE) - 
-                                         1 * (event_type == "PENL" & grepl("misconduct", tolower(event_description)) == TRUE))), 
-                  iPENT5 = sum(na.omit(event_type == "PENL" & grepl("fighting|major", tolower(event_detail)) == TRUE)), 
-                  iHF = sum(na.omit(event_type == "HIT"))
-                  ) %>% 
-        rename(player = event_player_1) %>% 
-        data.frame()
-      
-      
-      pen_2 <- data %>% 
-        filter(event_team == away_team, 
-               event_type %in% c("PENL", "HIT", "BLOCK")
-               ) %>% 
-        group_by(event_player_2, game_id, season) %>% 
-        summarise(Team = first(home_team), 
-                  iPEND2 = sum(na.omit(1 * (event_type == "PENL") +
-                                         1 * (event_type == "PENL" & grepl("double minor", tolower(event_detail)) == TRUE) -
-                                         1 * (event_type == "PENL" & grepl("ps \\-|match|fighting|major", tolower(event_detail)) == TRUE) - 
-                                         1 * (event_type == "PENL" & grepl("too many men", tolower(event_description)) == TRUE) - 
-                                         1 * (event_type == "PENL" & grepl("misconduct", tolower(event_description)) == TRUE))),
-                  iPEND5 = sum(na.omit(event_type == "PENL" & grepl("fighting|major", tolower(event_detail)) == TRUE)), 
-                  iHA = sum(na.omit(event_type == "HIT")), 
-                  iBLK = sum(event_type == "BLOCK")
-                  ) %>% 
-        rename(player = event_player_2) %>% 
-        data.frame()
-      
-      
-      merged <- Reduce(function(...) merge(..., all = TRUE), list(pen_1, pen_2))
-      
-      joined <- merged %>% 
-        mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
-        select(player, game_id, season, Team, 
-               iBLK, iHF, iHA, 
-               iPENT2, iPEND2, iPENT5, iPEND5
-               ) %>% 
-        arrange(player, game_id) %>% 
-        data.frame()
-      
-      return(joined)
-      
-      }
-    else {
-      
-      pen_1 <- data %>% 
-        filter(event_team == away_team, 
-               event_type %in% c("PENL", "HIT", "BLOCK")
-               ) %>% 
-        group_by(event_player_1, game_id, season) %>% 
-        summarise(Team = first(away_team),
-                  iPENT2 = sum(na.omit(1 * (event_type == "PENL") +
-                                         1 * (event_type == "PENL" & grepl("double minor", tolower(event_detail)) == TRUE) -
-                                         1 * (event_type == "PENL" & grepl("ps \\-|match|fighting|major", tolower(event_detail)) == TRUE) - 
-                                         1 * (event_type == "PENL" & grepl("too many men", tolower(event_description)) == TRUE) - 
-                                         1 * (event_type == "PENL" & grepl("misconduct", tolower(event_description)) == TRUE))), 
-                  iPENT5 = sum(na.omit(event_type == "PENL" & grepl("fighting|major", tolower(event_detail)) == TRUE)), 
-                  iHF = sum(na.omit(event_type == "HIT"))
-                  ) %>% 
-        rename(player = event_player_1) %>% 
-        data.frame()
-      
-      pen_2 <- data %>% 
-        filter(event_team == home_team, 
-               event_type %in% c("PENL", "HIT", "BLOCK")
-               ) %>% 
-        group_by(event_player_2, game_id, season) %>% 
-        summarise(Team = first(away_team),
-                  iPEND2 = sum(na.omit(1 * (event_type == "PENL") +
-                                         1 * (event_type == "PENL" & grepl("double minor", tolower(event_detail)) == TRUE) -
-                                         1 * (event_type == "PENL" & grepl("ps \\-|match|fighting|major", tolower(event_detail)) == TRUE) - 
-                                         1 * (event_type == "PENL" & grepl("too many men", tolower(event_description)) == TRUE) - 
-                                         1 * (event_type == "PENL" & grepl("misconduct", tolower(event_description)) == TRUE))),
-                  iPEND5 = sum(na.omit(event_type == "PENL" & grepl("fighting|major", tolower(event_detail)) == TRUE)), 
-                  iHA = sum(na.omit(event_type == "HIT")), 
-                  iBLK = sum(event_type == "BLOCK")
-                  ) %>% 
-        rename(player = event_player_2) %>% 
-        data.frame()
-      
-      
-      merged <- Reduce(function(...) merge(..., all = TRUE), list(pen_1, pen_2))
-      
-      joined <- merged %>% 
-        mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
-        select(player, game_id, season, Team, 
-               iBLK, iHF, iHA, 
-               iPENT2, iPEND2, iPENT5, iPEND5
-               ) %>% 
-        arrange(player, game_id) %>% 
-        data.frame()
-      
-      return(joined)
-      
-      }
-    
-    }
+  print("on_ice_away", quote = F)
+  a1 <- data %>% group_by(game_id, game_date, season, away_on_1, away_team) %>% fun.oniceCorsiA_EV_strength(., "away_on_1", scr_adj_list) %>% rename(player = away_on_1) %>% data.frame()
+  a2 <- data %>% group_by(game_id, game_date, season, away_on_2, away_team) %>% fun.oniceCorsiA_EV_strength(., "away_on_2", scr_adj_list) %>% rename(player = away_on_2) %>% data.frame()
+  a3 <- data %>% group_by(game_id, game_date, season, away_on_3, away_team) %>% fun.oniceCorsiA_EV_strength(., "away_on_3", scr_adj_list) %>% rename(player = away_on_3) %>% data.frame()
+  a4 <- data %>% group_by(game_id, game_date, season, away_on_4, away_team) %>% fun.oniceCorsiA_EV_strength(., "away_on_4", scr_adj_list) %>% rename(player = away_on_4) %>% data.frame()
+  a5 <- data %>% group_by(game_id, game_date, season, away_on_5, away_team) %>% fun.oniceCorsiA_EV_strength(., "away_on_5", scr_adj_list) %>% rename(player = away_on_5) %>% data.frame()
+  a6 <- data %>% group_by(game_id, game_date, season, away_on_6, away_team) %>% fun.oniceCorsiA_EV_strength(., "away_on_6", scr_adj_list) %>% rename(player = away_on_6) %>% data.frame()
   
-  # Run Functions
-  on_ice_all <- fun.onice_combine_all(data = pbp_data)
   
-  zone_starts_all <- fun.ZS_compute_all(data = pbp_data)
+  # Join all data.frames
+  merged <- Reduce(function(...) merge(..., all = TRUE), list(h1, h2, h3, h4, h5, h6, a1, a2, a3, a4, a5, a6))
   
-  counts_all <- fun.counts_all(data = pbp_data, "home_team") %>% 
-    rbind(., fun.counts_all(data = pbp_data, "away_team")) %>% 
-    arrange(player, game_id)
-  
-  faceoff_all <- fun.faceoff_all(data = pbp_data, "home_team") %>% 
-    rbind(., fun.faceoff_all(data = pbp_data, "away_team")) %>% 
-    arrange(player, game_id)
-  
-  penalty_all <- fun.penalty_all(data = pbp_data, "home_team") %>% 
-    rbind(., fun.penalty_all(data = pbp_data, "away_team")) %>% 
-    arrange(player, game_id)
-  
-  # Team TOI for TOI_perc calculation
-  team_TOI_all <- rbind(
-    pbp_data %>% 
-      group_by(game_id, season, home_team) %>% 
-      summarise(TOI = sum(event_length) / 60) %>% 
-      rename(Team = home_team) %>% 
-      data.frame(), 
-    
-    pbp_data %>% 
-      group_by(game_id, season, away_team) %>% 
-      summarise(TOI = sum(event_length) / 60) %>% 
-      rename(Team = away_team) %>% 
-      data.frame()
-    ) %>% 
-    group_by(game_id, season, Team) %>% 
-    summarise(t_TOI = sum(TOI)) %>% 
-    arrange(game_id, Team) %>% 
+  merge_return <- merged %>% 
+    group_by(player, game_id, game_date, season) %>%  
+    summarise(Team =     first(Team), 
+              Opponent = first(Opponent), 
+              is_home =  first(is_home), 
+              TOI =      sum(TOI), 
+              
+              GF =      sum(GF), 
+              GA =      sum(GA), 
+              SF =      sum(SF), 
+              SA =      sum(SA), 
+              FF =      sum(FF), 
+              FA =      sum(FA), 
+              CF =      sum(CF), 
+              CA =      sum(CA), 
+              xGF =     sum(xGF), 
+              xGA =     sum(xGA), 
+              
+              GF_adj =  sum(GF_adj), 
+              GA_adj =  sum(GA_adj), 
+              SF_adj =  sum(SF_adj), 
+              SA_adj =  sum(SA_adj), 
+              FF_adj =  sum(FF_adj), 
+              FA_adj =  sum(FA_adj), 
+              CF_adj =  sum(CF_adj), 
+              CA_adj =  sum(CA_adj), 
+              xGF_adj = sum(xGF_adj), 
+              xGA_adj = sum(xGA_adj)
+              ) %>% 
+    filter(!is.na(player)) %>% 
     data.frame()
   
+  return(merge_return)
   
-  ## --------------- ##
-  ##   Combine All   ##
-  ## --------------- ##
+  }
+
+# Teams: On Ice Corsi For / Against, TOI - per game
+fun.oniceTeamCorsiH_EV_strength <- function(data, scr_adj_list) {
   
-  test_join <- on_ice_all %>% 
-    full_join(., zone_starts_all, by = c("player", "game_id", "season", "Team")) %>% 
-    full_join(., counts_all, by = c("player", "game_id", "season", "Team")) %>% 
-    full_join(., faceoff_all, by = c("player", "game_id", "season", "Team")) %>% 
-    full_join(., penalty_all, by = c("player", "game_id", "season", "Team")) %>% 
-    left_join(., team_TOI_all, by = c("game_id", "season", "Team")) %>% 
-    mutate_if(is.numeric, funs(ifelse(is.na(.), 0, .)))
+  hold <- data %>% 
+    summarise(TOI = sum(event_length) / 60, 
+              Team = first(home_team), 
+              
+              # Unadjusted
+              GF =  sum(event_type == "GOAL" & event_team == home_team), 
+              GA =  sum(event_type == "GOAL" & event_team == away_team), 
+              SF =  sum(event_type %in% st.shot_events & event_team == home_team), 
+              SA =  sum(event_type %in% st.shot_events & event_team == away_team), 
+              FF =  sum(event_type %in% st.fenwick_events & event_team == home_team), 
+              FA =  sum(event_type %in% st.fenwick_events & event_team == away_team),
+              CF =  sum(event_type %in% st.corsi_events & event_team == home_team), 
+              CA =  sum(event_type %in% st.corsi_events & event_team == away_team),
+              xGF = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal)),
+              xGA = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal)), 
+              
+              # Normal Score Adjustment
+              GF_adj =  sum((event_type == "GOAL" & event_team == home_team) * scr_adj_list$home_goal_adj[home_lead_state]), 
+              GA_adj =  sum((event_type == "GOAL" & event_team == away_team) * scr_adj_list$away_goal_adj[home_lead_state]), 
+              SF_adj =  sum((event_type %in% st.shot_events & event_team == home_team) * scr_adj_list$home_shots_adj[home_lead]), 
+              SA_adj =  sum((event_type %in% st.shot_events & event_team == away_team) * scr_adj_list$away_shots_adj[home_lead]), 
+              FF_adj =  sum((event_type %in% st.fenwick_events & event_team == home_team) * scr_adj_list$home_fenwick_adj[home_lead]), 
+              FA_adj =  sum((event_type %in% st.fenwick_events & event_team == away_team) * scr_adj_list$away_fenwick_adj[home_lead]),
+              CF_adj =  sum((event_type %in% st.corsi_events & event_team == home_team) * scr_adj_list$home_corsi_adj[home_lead]), 
+              CA_adj =  sum((event_type %in% st.corsi_events & event_team == away_team) * scr_adj_list$away_corsi_adj[home_lead]),
+              xGF_adj = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal * scr_adj_list$home_xG_adj[home_lead_state])),
+              xGA_adj = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal * scr_adj_list$away_xG_adj[home_lead_state]))
+              )
+  
+  return(hold)
+  
+  }
+fun.oniceTeamCorsiA_EV_strength <- function(data, scr_adj_list) {
+  
+  hold <- data %>% 
+    summarise(TOI = sum(event_length) / 60, 
+              Team = first(away_team), 
+              
+              # Unadjusted
+              GF =  sum(event_type == "GOAL" & event_team == away_team), 
+              GA =  sum(event_type == "GOAL" & event_team == home_team), 
+              SF =  sum(event_type %in% st.shot_events & event_team == away_team), 
+              SA =  sum(event_type %in% st.shot_events & event_team == home_team), 
+              FF =  sum(event_type %in% st.fenwick_events & event_team == away_team), 
+              FA =  sum(event_type %in% st.fenwick_events & event_team == home_team),
+              CF =  sum(event_type %in% st.corsi_events & event_team == away_team), 
+              CA =  sum(event_type %in% st.corsi_events & event_team == home_team),
+              xGF = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal)),
+              xGA = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal)), 
+              
+              # Normal Score Adjustment
+              GF_adj =  sum((event_type == "GOAL" & event_team == away_team) * scr_adj_list$away_goal_adj[home_lead_state]), 
+              GA_adj =  sum((event_type == "GOAL" & event_team == home_team) * scr_adj_list$home_goal_adj[home_lead_state]), 
+              SF_adj =  sum((event_type %in% st.shot_events & event_team == away_team) * scr_adj_list$away_shots_adj[home_lead]), 
+              SA_adj =  sum((event_type %in% st.shot_events & event_team == home_team) * scr_adj_list$home_shots_adj[home_lead]), 
+              FF_adj =  sum((event_type %in% st.fenwick_events & event_team == away_team) * scr_adj_list$away_fenwick_adj[home_lead]), 
+              FA_adj =  sum((event_type %in% st.fenwick_events & event_team == home_team) * scr_adj_list$home_fenwick_adj[home_lead]),
+              CF_adj =  sum((event_type %in% st.corsi_events & event_team == away_team) * scr_adj_list$away_corsi_adj[home_lead]), 
+              CA_adj =  sum((event_type %in% st.corsi_events & event_team == home_team) * scr_adj_list$home_corsi_adj[home_lead]),
+              xGF_adj = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal * scr_adj_list$away_xG_adj[home_lead_state])),
+              xGA_adj = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal * scr_adj_list$home_xG_adj[home_lead_state]))
+              )
+  
+  return(hold)
+  
+  }
+fun.componiceCorsiTeam_EV_strength <- function(data, scr_adj_list) {
+  
+  print("team_on_ice_home", quote = F)
+  h_df <- data %>% 
+    group_by(game_id, season, home_team) %>% 
+    fun.oniceTeamCorsiH_EV_strength(., scr_adj_list) %>% 
+    data.frame()
+  
+  print("team_on_ice_away", quote = F)
+  a_df <- data %>% 
+    group_by(game_id, season, away_team) %>% 
+    fun.oniceTeamCorsiA_EV_strength(., scr_adj_list) %>% 
+    data.frame()
+  
+  merged <- Reduce(function(...) merge(..., all = TRUE), list(h_df, a_df))
+  
+  merge_return <- merged %>% 
+    group_by(Team, game_id, season) %>% 
+    summarise_at(vars(TOI, 
+                      GF, GA, SF, SA, FF, FA, CF, CA, xGF, xGA, 
+                      GF_adj, GA_adj, SF_adj, SA_adj, FF_adj, FA_adj, CF_adj, CA_adj, xGF_adj, xGA_adj), 
+                 funs(sum)
+                 ) %>% 
+    data.frame()
+  
+  return(merge_return)
+  
+  }
+
+# Merge skaters and team on-ice metrics
+fun.shotmetrics_EV_strength <- function(data, scr_adj_list) {
+  
+  # Run functions
+  skater <- fun.componiceCorsi_EV_strength(data, scr_adj_list)
+  team <-   fun.componiceCorsiTeam_EV_strength(data, scr_adj_list)
+  
+  joined <- left_join(skater, team, by = c("game_id", "Team", "season"))
+  
+  names(joined) <- c("player", "game_id", "game_date", "season", "Team", "Opponent", "is_home", 
+                     
+                     "TOI", 
+                     "onGF", "onGA", "onSF", "onSA", "onFF", "onFA", "onCF", "onCA", "onxGF", "onxGA", 
+                     "onGF_adj", "onGA_adj", "onSF_adj", "onSA_adj", "onFF_adj", "onFA_adj", "onCF_adj", "onCA_adj", "onxGF_adj", "onxGA_adj", 
+                     
+                     "t_TOI", 
+                     "t_GF", "t_GA", "t_SF", "t_SA", "t_FF", "t_FA", "t_CF", "t_CA", "t_xGF", "t_xGA", 
+                     "t_GF_adj", "t_GA_adj", "t_SF_adj", "t_SA_adj", "t_FF_adj", "t_FA_adj", "t_CF_adj", "t_CA_adj", "t_xGF_adj", "t_xGA_adj"
+                     )
   
   # Remove goalies
   fun.goalie_remove <- function(data_) {
     
     # Identifies goalies within a given pbp data.frame & returns a data.frame to join for removal
     goalie_return <- data.frame(player = sort(unique(na.omit(as.character(rbind(data_$home_goalie, data_$away_goalie))))), 
-                                is_goalie = 1
-                                )
+                                is_goalie = 1)
     
     goalie_return$player <- as.character(goalie_return$player)
     
     return(goalie_return)
     
     }
-  goalieremove <- fun.goalie_remove(data_ = pbp_data)
   
-  all <- test_join %>% 
+  goalieremove <- fun.goalie_remove(data_ = data)
+  
+  all <- joined %>% 
     left_join(., goalieremove, "player") %>% 
     filter(is.na(is_goalie)) %>% 
     select(-c(is_goalie)) %>% 
     arrange(player, game_id) %>% 
-    filter(!is.na(player), 
-           !is.na(game_date) # filtering to catch pbp data issues for all situations
-           ) %>% 
-    select(player, game_id, game_date, season, Team, Opponent, is_home,  
-           TOI, G:ixG, iBLK, iHF, iHA, GIVE, TAKE, iPENT2:iPEND5, FOW, FOL, OZS, NZS, DZS, 
-           t_TOI
-           ) %>% 
     data.frame()
+  
+  return(all)
+  
+  }
+
+# Zone Starts
+fun.ZS_H_EV_strength <- function(data, venue) {
+  
+  hold <- data %>% 
+    filter(event_type == "FAC") %>%  
+    summarise(Team = first(home_team),
+              OZS = sum(event_type == "FAC" & home_zone == "Off"), 
+              NZS = sum(event_type == "FAC" & home_zone == "Neu"), 
+              DZS = sum(event_type == "FAC" & home_zone == "Def")
+              )
+  
+  return(hold)
+  
+  }
+fun.ZS_A_EV_strength <- function(data, venue) {
+  
+  hold <- data %>% 
+    filter(event_type == "FAC") %>%  
+    summarise(Team = first(away_team),
+              OZS = sum(event_type == "FAC" & home_zone == "Def"), 
+              NZS = sum(event_type == "FAC" & home_zone == "Neu"), 
+              DZS = sum(event_type == "FAC" & home_zone == "Off")
+              )
+  
+  return(hold)
+  
+  }
+fun.ZS_compute_EV_strength <- function(data) {
+  
+  print("zone_starts_home", quote = F)
+  h1 <- data %>% group_by(game_id, season, home_on_1) %>% fun.ZS_H_EV_strength(., "home_on_1") %>% rename(player = home_on_1) %>% data.frame()
+  h2 <- data %>% group_by(game_id, season, home_on_2) %>% fun.ZS_H_EV_strength(., "home_on_2") %>% rename(player = home_on_2) %>% data.frame()
+  h3 <- data %>% group_by(game_id, season, home_on_3) %>% fun.ZS_H_EV_strength(., "home_on_3") %>% rename(player = home_on_3) %>% data.frame()
+  h4 <- data %>% group_by(game_id, season, home_on_4) %>% fun.ZS_H_EV_strength(., "home_on_4") %>% rename(player = home_on_4) %>% data.frame()
+  h5 <- data %>% group_by(game_id, season, home_on_5) %>% fun.ZS_H_EV_strength(., "home_on_5") %>% rename(player = home_on_5) %>% data.frame()
+  h6 <- data %>% group_by(game_id, season, home_on_6) %>% fun.ZS_H_EV_strength(., "home_on_6") %>% rename(player = home_on_6) %>% data.frame()
+  
+  print("zone_starts_away", quote = F)
+  a1 <- data %>% group_by(game_id, season, away_on_1) %>% fun.ZS_A_EV_strength(., "away_on_1") %>% rename(player = away_on_1) %>% data.frame()
+  a2 <- data %>% group_by(game_id, season, away_on_2) %>% fun.ZS_A_EV_strength(., "away_on_2") %>% rename(player = away_on_2) %>% data.frame()
+  a3 <- data %>% group_by(game_id, season, away_on_3) %>% fun.ZS_A_EV_strength(., "away_on_3") %>% rename(player = away_on_3) %>% data.frame()
+  a4 <- data %>% group_by(game_id, season, away_on_4) %>% fun.ZS_A_EV_strength(., "away_on_4") %>% rename(player = away_on_4) %>% data.frame()
+  a5 <- data %>% group_by(game_id, season, away_on_5) %>% fun.ZS_A_EV_strength(., "away_on_5") %>% rename(player = away_on_5) %>% data.frame()
+  a6 <- data %>% group_by(game_id, season, away_on_6) %>% fun.ZS_A_EV_strength(., "away_on_6") %>% rename(player = away_on_6) %>% data.frame()
+  
+  # Join
+  merged <- Reduce(function(...) merge(..., all = TRUE), list(h1, h2, h3, h4, h5, h6, a1, a2, a3, a4, a5, a6))
+  
+  summed <- merged %>% 
+    group_by(player, game_id, season) %>%  
+    summarise(Team = first(Team),
+              OZS =  sum(OZS), 
+              NZS =  sum(NZS), 
+              DZS =  sum(DZS)
+              ) %>% 
+    arrange(player) %>% 
+    data.frame()
+  
+  return(summed)
+  
+  }
+
+# Boxscore
+fun.counts_EV_strength <- function(data, venue) {
+  
+  if (venue == "home_team") {
+    
+    # Counts
+    counts_1 <- data %>% 
+      filter(event_type %in% c("GOAL", "BLOCK", "MISS", "SHOT", "HIT", "TAKE", "GIVE"), 
+             event_team == home_team
+             ) %>% 
+      group_by(event_player_1, game_id, season) %>% 
+      summarise(Team = first(home_team),
+                G = sum(event_type == "GOAL"),
+                iSF = sum(event_type %in% st.shot_events),
+                iCF = sum(event_type %in% st.corsi_events), 
+                iFF = sum(event_type %in% st.fenwick_events),
+                ixG = sum(na.omit(pred_goal)), 
+                
+                GIVE_o = sum(event_type == "GIVE" & event_zone == "Off"), 
+                GIVE_n = sum(event_type == "GIVE" & event_zone == "Neu"), 
+                GIVE_d = sum(event_type == "GIVE" & event_zone == "Def"), 
+                
+                TAKE_o = sum(event_type == "TAKE" & event_zone == "Off"), 
+                TAKE_n = sum(event_type == "TAKE" & event_zone == "Neu"), 
+                TAKE_d = sum(event_type == "TAKE" & event_zone == "Def")
+                ) %>% 
+      rename(player = event_player_1) %>% 
+      data.frame()
+    
+    counts_2 <- data %>% 
+      filter(event_type %in% c("GOAL"), 
+             event_team == home_team
+             ) %>% 
+      group_by(event_player_2, game_id, season) %>% 
+      summarise(Team = first(home_team), 
+                A1 = sum(event_type == "GOAL")
+                ) %>% 
+      rename(player = event_player_2) %>% 
+      data.frame()
+    
+    counts_3 <- data %>% 
+      filter(event_type == "GOAL", 
+             event_team == home_team
+             ) %>% 
+      group_by(event_player_3, game_id, season) %>%
+      summarise(Team = first(home_team), 
+                A2 = sum(event_type == "GOAL")
+                ) %>% 
+      rename(player = event_player_3) %>% 
+      data.frame()
+    
+    # Join
+    merged <- Reduce(function(...) merge(..., all = TRUE), list(counts_1, counts_2, counts_3))
+    
+    joined <- merged %>% 
+      mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+      mutate(Points = G + A1 + A2) %>% 
+      select(player, game_id, season, Team, 
+             G, A1, A2, Points, 
+             iSF, iCF, iFF, ixG,
+             GIVE_o, GIVE_n, GIVE_d, TAKE_o, TAKE_n, TAKE_d
+             ) %>% 
+      arrange(player, game_id) %>% 
+      data.frame()
+    
+    return(joined)
+    
+    }
+  else {
+    
+    # Compile
+    counts_1 <- data %>% 
+      filter(event_type %in% c("GOAL", "BLOCK", "MISS", "SHOT", "HIT", "TAKE", "GIVE"), 
+             event_team == away_team
+             ) %>% 
+      group_by(event_player_1, game_id, season) %>% 
+      summarise(Team = first(away_team),
+                G = sum(event_type == "GOAL"),
+                iSF = sum(event_type %in% st.shot_events),
+                iCF = sum(event_type %in% st.corsi_events),
+                iFF = sum(event_type %in% st.fenwick_events), 
+                ixG = sum(na.omit(pred_goal)), 
+                
+                GIVE_o = sum(event_type == "GIVE" & event_zone == "Off"), 
+                GIVE_n = sum(event_type == "GIVE" & event_zone == "Neu"), 
+                GIVE_d = sum(event_type == "GIVE" & event_zone == "Def"), 
+                
+                TAKE_o = sum(event_type == "TAKE" & event_zone == "Off"), 
+                TAKE_n = sum(event_type == "TAKE" & event_zone == "Neu"), 
+                TAKE_d = sum(event_type == "TAKE" & event_zone == "Def")
+                ) %>% 
+      rename(player = event_player_1) %>% 
+      data.frame()
+    
+    counts_2 <- data %>% 
+      filter(event_type %in% c("GOAL"), 
+             event_team == away_team
+             ) %>% 
+      group_by(event_player_2, game_id, season) %>% 
+      summarise(Team = first(away_team), 
+                A1 = sum(event_type == "GOAL")
+                ) %>% 
+      rename(player = event_player_2) %>% 
+      data.frame()
+    
+    counts_3 <- data %>% 
+      filter(event_type == "GOAL", 
+             event_team == away_team
+             ) %>% 
+      group_by(event_player_3, game_id, season) %>%
+      summarise(Team = first(away_team), 
+                A2 = sum(event_type == "GOAL")
+                ) %>% 
+      rename(player = event_player_3) %>% 
+      data.frame()
+    
+    # Join
+    merged <- Reduce(function(...) merge(..., all = TRUE), list(counts_1, counts_2, counts_3))
+    
+    joined <- merged %>% 
+      mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+      mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
+      mutate(Points = G + A1 + A2) %>% 
+      select(player, game_id, season, Team, 
+             G, A1, A2, Points,
+             iSF, iCF, iFF, ixG,
+             GIVE_o, GIVE_n, GIVE_d, TAKE_o, TAKE_n, TAKE_d
+             ) %>% 
+      arrange(player, game_id) %>% 
+      data.frame()
+    
+    return(joined)
+    
+    }
+  
+  }
+fun.faceoff_EV_strength <- function(data, venue) {
+  
+  if (venue == "home_team") {
+    
+    faceoffs <- data %>% 
+      filter(event_type == "FAC") %>% 
+      group_by(event_player_2, game_id, season) %>% 
+      mutate(FOW = 1 * (home_team == event_team), 
+             FOL = 1 * (away_team == event_team)
+             ) %>% 
+      summarise(Team = first(home_team),
+                FOW = sum(FOW), 
+                FOL = sum(FOL)
+                ) %>% 
+      mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+      rename(player = event_player_2) %>% 
+      ungroup() %>% 
+      arrange(player, game_id) %>% 
+      data.frame()
+    
+    return(faceoffs)
+    
+    }
+  else {
+    
+    faceoffs <- data %>% 
+      filter(event_type == "FAC") %>% 
+      group_by(event_player_1, game_id, season) %>% 
+      mutate(FOW = 1 * (away_team == event_team), 
+             FOL = 1 * (home_team == event_team)
+             ) %>% 
+      summarise(Team = first(away_team),
+                FOW = sum(FOW), 
+                FOL = sum(FOL)
+                ) %>% 
+      mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+      rename(player = event_player_1) %>% 
+      ungroup() %>% 
+      arrange(player, game_id) %>% 
+      data.frame()
+    
+    return(faceoffs)
+    
+    }
+  
+  }
+fun.penalty_EV_strength <- function(data, venue) {
+  
+  if (venue == "home_team") {
+    
+    pen_1 <- data %>% 
+      filter(event_team == home_team, 
+             event_type %in% c("PENL", "HIT", "BLOCK")
+             ) %>% 
+      group_by(event_player_1, game_id, season) %>% 
+      summarise(Team = first(home_team),
+                iPENT2 = sum(na.omit(1 * (event_type == "PENL") + # Manny Perry's Filter - found on GitHub linked above
+                                       1 * (event_type == "PENL" & grepl("double minor", tolower(event_detail)) == TRUE) -
+                                       1 * (event_type == "PENL" & grepl("ps \\-|match|fighting|major", tolower(event_detail)) == TRUE) - 
+                                       1 * (event_type == "PENL" & grepl("too many men", tolower(event_description)) == TRUE) - 
+                                       1 * (event_type == "PENL" & grepl("misconduct", tolower(event_description)) == TRUE))),
+                iPENT5 = sum(na.omit(event_type == "PENL" & grepl("fighting|major", tolower(event_detail)) == TRUE)), 
+                
+                iHF_o = sum(event_type == "HIT" & event_zone == "Off"), 
+                iHF_n = sum(event_type == "HIT" & event_zone == "Neu"), 
+                iHF_d = sum(event_type == "HIT" & event_zone == "Def")
+                ) %>% 
+      rename(player = event_player_1) %>% 
+      data.frame()
+    
+    
+    pen_2 <- data %>% 
+      filter(event_team == away_team, 
+             event_type %in% c("PENL", "HIT", "BLOCK")
+             ) %>% 
+      group_by(event_player_2, game_id, season) %>% 
+      summarise(Team = first(home_team), 
+                iPEND2 = sum(na.omit(1 * (event_type == "PENL") + # Manny Perry's Filter - found on GitHub linked above
+                                       1 * (event_type == "PENL" & grepl("double minor", tolower(event_detail)) == TRUE) -
+                                       1 * (event_type == "PENL" & grepl("ps \\-|match|fighting|major", tolower(event_detail)) == TRUE) - 
+                                       1 * (event_type == "PENL" & grepl("too many men", tolower(event_description)) == TRUE) - 
+                                       1 * (event_type == "PENL" & grepl("misconduct", tolower(event_description)) == TRUE))),
+                iPEND5 = sum(na.omit(event_type == "PENL" & grepl("fighting|major", tolower(event_detail)) == TRUE)), 
+                
+                iHA_o = sum(event_type == "HIT" & event_zone == "Def"), 
+                iHA_n = sum(event_type == "HIT" & event_zone == "Neu"), 
+                iHA_d = sum(event_type == "HIT" & event_zone == "Off"), 
+                
+                iBLK = sum(event_type == "BLOCK")
+                ) %>% 
+      rename(player = event_player_2) %>% 
+      data.frame()
+    
+    
+    merged <- Reduce(function(...) merge(..., all = TRUE), list(pen_1, pen_2))
+    
+    joined <- merged %>% 
+      mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+      mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
+      select(player, game_id, season, Team, 
+             iPENT2, iPEND2, iPENT5, iPEND5, iBLK, 
+             iHF_o, iHF_n, iHF_d, iHA_o, iHA_n, iHA_d
+             ) %>% 
+      arrange(player, game_id) %>% 
+      data.frame()
+    
+    return(joined)
+    
+    }
+  else {
+    
+    pen_1 <- data %>% 
+      filter(event_team == away_team, 
+             event_type %in% c("PENL", "HIT", "BLOCK")
+             ) %>% 
+      group_by(event_player_1, game_id, season) %>% 
+      summarise(Team = first(away_team),
+                iPENT2 = sum(na.omit(1 * (event_type == "PENL") + # Manny Perry's Filter - found on GitHub linked above
+                                       1 * (event_type == "PENL" & grepl("double minor", tolower(event_detail)) == TRUE) -
+                                       1 * (event_type == "PENL" & grepl("ps \\-|match|fighting|major", tolower(event_detail)) == TRUE) - 
+                                       1 * (event_type == "PENL" & grepl("too many men", tolower(event_description)) == TRUE) - 
+                                       1 * (event_type == "PENL" & grepl("misconduct", tolower(event_description)) == TRUE))),
+                iPENT5 = sum(na.omit(event_type == "PENL" & grepl("fighting|major", tolower(event_detail)) == TRUE)), 
+                
+                iHF_o = sum(event_type == "HIT" & event_zone == "Off"), 
+                iHF_n = sum(event_type == "HIT" & event_zone == "Neu"), 
+                iHF_d = sum(event_type == "HIT" & event_zone == "Def")
+                ) %>% 
+      rename(player = event_player_1) %>% 
+      data.frame()
+    
+    pen_2 <- data %>% 
+      filter(event_team == home_team, 
+             event_type %in% c("PENL", "HIT", "BLOCK")
+             ) %>% 
+      group_by(event_player_2, game_id, season) %>% 
+      summarise(Team = first(away_team),
+                iPEND2 = sum(na.omit(1 * (event_type == "PENL") + # Manny Perry's Filter - found on GitHub linked above
+                                       1 * (event_type == "PENL" & grepl("double minor", tolower(event_detail)) == TRUE) -
+                                       1 * (event_type == "PENL" & grepl("ps \\-|match|fighting|major", tolower(event_detail)) == TRUE) - 
+                                       1 * (event_type == "PENL" & grepl("too many men", tolower(event_description)) == TRUE) - 
+                                       1 * (event_type == "PENL" & grepl("misconduct", tolower(event_description)) == TRUE))),
+                iPEND5 = sum(na.omit(event_type == "PENL" & grepl("fighting|major", tolower(event_detail)) == TRUE)), 
+                
+                iHA_o = sum(event_type == "HIT" & event_zone == "Def"), 
+                iHA_n = sum(event_type == "HIT" & event_zone == "Neu"), 
+                iHA_d = sum(event_type == "HIT" & event_zone == "Off"), 
+                
+                iBLK = sum(event_type == "BLOCK")
+                ) %>% 
+      rename(player = event_player_2) %>% 
+      data.frame()
+    
+    
+    merged <- Reduce(function(...) merge(..., all = TRUE), list(pen_1, pen_2))
+    
+    joined <- merged %>% 
+      mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+      mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
+      select(player, game_id, season, Team, 
+             iPENT2, iPEND2, iPENT5, iPEND5, iBLK, 
+             iHF_o, iHF_n, iHF_d, iHA_o, iHA_n, iHA_d
+             ) %>% 
+      arrange(player, game_id) %>% 
+      data.frame()
+    
+    return(joined)
+    
+    }
+  
+  }
+
+###  Run all functions
+fun.combine_counts_EV_strength <- function(data, strength, scr_adj_list) { 
+  
+  print(paste("season:", unique(data$season)), quote = F)
+  
+  # Filter pbp / join prior face time for corsi events
+  data <- data %>% 
+    filter(game_strength_state %in% strength, 
+           game_period < 5
+           ) %>% 
+    select(-c(face_index:shift_length)) %>% 
+    mutate(scradj = home_score - away_score, 
+           home_lead = ifelse(scradj >= 3, 3, 
+                              ifelse(scradj <= -3, -3, scradj)),
+           home_lead_state = ifelse(home_lead < 0, 1, 
+                                    ifelse(home_lead == 0, 2, 
+                                           ifelse(home_lead > 0, 3, home_lead))), 
+           home_lead = home_lead + 4, 
+           event_length = ifelse(is.na(event_length), 0, event_length)
+           ) %>% 
+    rename(pred_goal = pred_XGB_7)
+  
+  
+  ### Run functions
+  shot_metrics <- fun.shotmetrics_EV_strength(data, scr_adj_list)
+  zone_start <-   fun.ZS_compute_EV_strength(data)
+  
+  print("counts", quote = F)
+  counts_all <- fun.counts_EV_strength(data, "home_team") %>% 
+    rbind(., fun.counts_EV_strength(data, "away_team")) %>% 
+    arrange(player, game_id)
+  
+  print("faceoffs", quote = F)
+  faceoff_all <- fun.faceoff_EV_strength(data, "home_team") %>% 
+    rbind(., fun.faceoff_EV_strength(data, "away_team")) %>% 
+    arrange(player, game_id)
+  
+  print("penalties", quote = F)
+  penalty_all <- fun.penalty_EV_strength(data, "home_team") %>% 
+    rbind(., fun.penalty_EV_strength(data, "away_team")) %>% 
+    arrange(player, game_id)
+  
+  
+  # Join
+  print("combine", quote = F)
+  
+  metrics_combined <- shot_metrics %>% 
+    left_join(., zone_start,  by = c("player", "game_id", "season", "Team")) %>% 
+    left_join(., counts_all,  by = c("player", "game_id", "season", "Team")) %>% 
+    left_join(., faceoff_all, by = c("player", "game_id", "season", "Team")) %>% 
+    left_join(., penalty_all, by = c("player", "game_id", "season", "Team")) %>% 
+    mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+    select(player, game_id, game_date, season, Team, Opponent, is_home, TOI, 
+           G, A1, A2, Points, 
+           iSF, iFF, iCF, ixG,
+           iBLK, 
+           GIVE_o:TAKE_d, 
+           iHF_o:iHA_d, 
+           FOW, FOL, 
+           OZS, NZS, DZS, 
+           iPENT2, iPEND2, iPENT5, iPEND5, 
+           onGF:onxGA_adj, 
+           t_TOI:t_xGA_adj
+           ) %>% 
+    mutate(player = ifelse(player == "SEBASTIAN.AHO" & Team == "NYI", "5EBASTIAN.AHO", player)) %>% # FIX NYI AHO
+    arrange(player, game_id) %>% 
+    data.frame()
+  
+  return(metrics_combined)
   
   }
 
 
-#######################
+#########################
+
+
+## ------------------- ##
+##   5v4, etc. Games   ##
+## ------------------- ##
+
+#########################
+
+# Skaters: On Ice Corsi For / Against, TOI, Team - per game
+fun.oniceCorsiH_PP_strength <- function(data, venue, strength, scr_adj_list) {
+  
+  hold <- data %>% 
+    filter(game_strength_state %in% strength) %>% 
+    summarise(TOI = sum(event_length) / 60, 
+              
+              Team = first(home_team), 
+              Opponent = first(away_team), 
+              is_home = 1, 
+              
+              GF =  sum(event_type == "GOAL" & event_team == home_team), 
+              GA =  sum(event_type == "GOAL" & event_team == away_team),
+              SF =  sum(event_type %in% st.shot_events & event_team == home_team), 
+              SA =  sum(event_type %in% st.shot_events & event_team == away_team), 
+              FF =  sum(event_type %in% st.fenwick_events & event_team == home_team), 
+              FA =  sum(event_type %in% st.fenwick_events & event_team == away_team),
+              CF =  sum(event_type %in% st.corsi_events & event_team == home_team), 
+              CA =  sum(event_type %in% st.corsi_events & event_team == away_team), 
+              xGF = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal)),
+              xGA = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal)), 
+              
+              GF_adj =  sum((event_type == "GOAL" & event_team == home_team) * scr_adj_list$home_goal_adj[home_lead_state]), 
+              SF_adj =  sum((event_type %in% st.shot_events & event_team == home_team) * scr_adj_list$home_shot_adj[home_lead_state]), 
+              FF_adj =  sum((event_type %in% st.fenwick_events & event_team == home_team) * scr_adj_list$home_fenwick_adj[home_lead_state]), 
+              CF_adj =  sum((event_type %in% st.corsi_events & event_team == home_team) * scr_adj_list$home_corsi_adj[home_lead_state]), 
+              xGF_adj = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal * scr_adj_list$home_xG_adj[home_lead_state]))
+              )
+  
+  return(hold)
+  
+  }
+fun.oniceCorsiA_PP_strength <- function(data, venue, strength, scr_adj_list) {
+  
+  hold <- data %>% 
+    filter(game_strength_state %in% paste(rev(unlist(strsplit(strength, NULL))), collapse = "")) %>%  # reverse strength state entered into function
+    summarise(TOI = sum(event_length) / 60, 
+              
+              Team = first(away_team), 
+              Opponent = first(home_team), 
+              is_home = 0, 
+              
+              GF =  sum(event_type == "GOAL" & event_team == away_team), 
+              GA =  sum(event_type == "GOAL" & event_team == home_team),
+              SF =  sum(event_type %in% st.shot_events & event_team == away_team), 
+              SA =  sum(event_type %in% st.shot_events & event_team == home_team), 
+              FF =  sum(event_type %in% st.fenwick_events & event_team == away_team), 
+              FA =  sum(event_type %in% st.fenwick_events & event_team == home_team),
+              CF =  sum(event_type %in% st.corsi_events & event_team == away_team), 
+              CA =  sum(event_type %in% st.corsi_events & event_team == home_team),
+              xGF = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal)),
+              xGA = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal)), 
+              
+              GF_adj =  sum((event_type == "GOAL" & event_team == away_team) * scr_adj_list$away_goal_adj[home_lead_state]),
+              SF_adj =  sum((event_type %in% st.shot_events & event_team == away_team) * scr_adj_list$away_shot_adj[home_lead_state]), 
+              FF_adj =  sum((event_type %in% st.fenwick_events & event_team == away_team) * scr_adj_list$away_fenwick_adj[home_lead_state]), 
+              CF_adj =  sum((event_type %in% st.corsi_events & event_team == away_team) * scr_adj_list$away_corsi_adj[home_lead_state]), 
+              xGF_adj = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal * scr_adj_list$away_xG_adj[home_lead_state]))
+              )
+  
+  return(hold)
+  
+  }
+fun.componiceCorsi_PP_strength <- function(data, strength, scr_adj_list) {
+  
+  print("on_ice_home", quote = F)
+  h1 <- data %>% group_by(game_id, game_date, season, home_on_1, home_team) %>% fun.oniceCorsiH_PP_strength(., "home_on_1", strength, scr_adj_list) %>% rename(player = home_on_1) %>% data.frame()
+  h2 <- data %>% group_by(game_id, game_date, season, home_on_2, home_team) %>% fun.oniceCorsiH_PP_strength(., "home_on_2", strength, scr_adj_list) %>% rename(player = home_on_2) %>% data.frame()
+  h3 <- data %>% group_by(game_id, game_date, season, home_on_3, home_team) %>% fun.oniceCorsiH_PP_strength(., "home_on_3", strength, scr_adj_list) %>% rename(player = home_on_3) %>% data.frame()
+  h4 <- data %>% group_by(game_id, game_date, season, home_on_4, home_team) %>% fun.oniceCorsiH_PP_strength(., "home_on_4", strength, scr_adj_list) %>% rename(player = home_on_4) %>% data.frame()
+  h5 <- data %>% group_by(game_id, game_date, season, home_on_5, home_team) %>% fun.oniceCorsiH_PP_strength(., "home_on_5", strength, scr_adj_list) %>% rename(player = home_on_5) %>% data.frame()
+  h6 <- data %>% group_by(game_id, game_date, season, home_on_6, home_team) %>% fun.oniceCorsiH_PP_strength(., "home_on_6", strength, scr_adj_list) %>% rename(player = home_on_6) %>% data.frame()
+  
+  print("on_ice_away", quote = F)
+  a1 <- data %>% group_by(game_id, game_date, season, away_on_1, away_team) %>% fun.oniceCorsiA_PP_strength(., "away_on_1", strength, scr_adj_list) %>% rename(player = away_on_1) %>% data.frame()
+  a2 <- data %>% group_by(game_id, game_date, season, away_on_2, away_team) %>% fun.oniceCorsiA_PP_strength(., "away_on_2", strength, scr_adj_list) %>% rename(player = away_on_2) %>% data.frame()
+  a3 <- data %>% group_by(game_id, game_date, season, away_on_3, away_team) %>% fun.oniceCorsiA_PP_strength(., "away_on_3", strength, scr_adj_list) %>% rename(player = away_on_3) %>% data.frame()
+  a4 <- data %>% group_by(game_id, game_date, season, away_on_4, away_team) %>% fun.oniceCorsiA_PP_strength(., "away_on_4", strength, scr_adj_list) %>% rename(player = away_on_4) %>% data.frame()
+  a5 <- data %>% group_by(game_id, game_date, season, away_on_5, away_team) %>% fun.oniceCorsiA_PP_strength(., "away_on_5", strength, scr_adj_list) %>% rename(player = away_on_5) %>% data.frame()
+  a6 <- data %>% group_by(game_id, game_date, season, away_on_6, away_team) %>% fun.oniceCorsiA_PP_strength(., "away_on_6", strength, scr_adj_list) %>% rename(player = away_on_6) %>% data.frame()
+  
+  
+  merged <- Reduce(function(...) merge(..., all = TRUE), list(h1, h2, h3, h4, h5, h6, a1, a2, a3, a4, a5, a6))
+  
+  merge_return <- merged %>% 
+    group_by(player, game_id, game_date, season) %>%  
+    summarise(Team =     first(Team), 
+              Opponent = first(Opponent), 
+              is_home =  first(is_home), 
+              TOI =     sum(TOI), 
+              GF =      sum(GF), 
+              GA =      sum(GA), 
+              SF =      sum(SF), 
+              SA =      sum(SA), 
+              FF =      sum(FF), 
+              FA =      sum(FA), 
+              CF =      sum(CF), 
+              CA =      sum(CA), 
+              xGF =     sum(xGF), 
+              xGA =     sum(xGA), 
+              GF_adj =  sum(GF_adj), 
+              SF_adj =  sum(SF_adj), 
+              FF_adj =  sum(FF_adj), 
+              CF_adj =  sum(CF_adj), 
+              xGF_adj = sum(xGF_adj) 
+              ) %>% 
+    filter(!is.na(player)) %>% 
+    data.frame()
+  
+  return(merge_return)
+  
+  }
+
+# Teams: On Ice Corsi For / Against, TOI - per game
+fun.oniceTeamCorsiH_PP_strength <- function(data, strength, scr_adj_list) {
+  
+  hold <- data %>% 
+    filter(game_strength_state %in% strength) %>% 
+    summarise(TOI = sum(event_length) / 60, 
+              Team = first(home_team), 
+              
+              GF =  sum(event_type == "GOAL" & event_team == home_team), 
+              GA =  sum(event_type == "GOAL" & event_team == away_team),
+              SF =  sum(event_type %in% st.shot_events & event_team == home_team), 
+              SA =  sum(event_type %in% st.shot_events & event_team == away_team), 
+              FF =  sum(event_type %in% st.fenwick_events & event_team == home_team), 
+              FA =  sum(event_type %in% st.fenwick_events & event_team == away_team),
+              CF =  sum(event_type %in% st.corsi_events & event_team == home_team), 
+              CA =  sum(event_type %in% st.corsi_events & event_team == away_team), 
+              xGF = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal)),
+              xGA = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal)), 
+              
+              GF_adj =  sum((event_type == "GOAL" & event_team == home_team) * scr_adj_list$home_goal_adj[home_lead_state]), 
+              SF_adj =  sum((event_type %in% st.shot_events & event_team == home_team) * scr_adj_list$home_shot_adj[home_lead_state]), 
+              FF_adj =  sum((event_type %in% st.fenwick_events & event_team == home_team) * scr_adj_list$home_fenwick_adj[home_lead_state]), 
+              CF_adj =  sum((event_type %in% st.corsi_events & event_team == home_team) * scr_adj_list$home_corsi_adj[home_lead_state]), 
+              xGF_adj = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal * scr_adj_list$home_xG_adj[home_lead_state]))
+              )
+  
+  return(hold)
+  
+  }
+fun.oniceTeamCorsiA_PP_strength <- function(data, strength, scr_adj_list) {
+  
+  hold <- data %>% 
+    filter(game_strength_state %in% paste(rev(unlist(strsplit(strength, NULL))), collapse = "")) %>%  # reverse strength state entered into function
+    summarise(TOI = sum(event_length) / 60, 
+              Team = first(away_team), 
+              
+              GF =  sum(event_type == "GOAL" & event_team == away_team), 
+              GA =  sum(event_type == "GOAL" & event_team == home_team),
+              SF =  sum(event_type %in% st.shot_events & event_team == away_team), 
+              SA =  sum(event_type %in% st.shot_events & event_team == home_team), 
+              FF =  sum(event_type %in% st.fenwick_events & event_team == away_team), 
+              FA =  sum(event_type %in% st.fenwick_events & event_team == home_team),
+              CF =  sum(event_type %in% st.corsi_events & event_team == away_team), 
+              CA =  sum(event_type %in% st.corsi_events & event_team == home_team),
+              xGF = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal)),
+              xGA = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal)), 
+              
+              GF_adj =  sum((event_type == "GOAL" & event_team == away_team) * scr_adj_list$away_goal_adj[home_lead_state]),
+              SF_adj =  sum((event_type %in% st.shot_events & event_team == away_team) * scr_adj_list$away_shot_adj[home_lead_state]), 
+              FF_adj =  sum((event_type %in% st.fenwick_events & event_team == away_team) * scr_adj_list$away_fenwick_adj[home_lead_state]), 
+              CF_adj =  sum((event_type %in% st.corsi_events & event_team == away_team) * scr_adj_list$away_corsi_adj[home_lead_state]), 
+              xGF_adj = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal * scr_adj_list$away_xG_adj[home_lead_state]))
+              )
+  
+  return(hold)
+  
+  }
+fun.componiceCorsiTeam_PP_strength <- function(data, strength, scr_adj_list) {
+  
+  print("team_on_ice_home", quote = F)
+  h_df <- data %>% 
+    group_by(game_id, season, home_team) %>% 
+    fun.oniceTeamCorsiH_PP_strength(., strength, scr_adj_list) 
+  
+  print("team_on_ice_away", quote = F)
+  a_df <- data %>% 
+    group_by(game_id, season, away_team) %>% 
+    fun.oniceTeamCorsiA_PP_strength(., strength, scr_adj_list) 
+  
+  merged <- Reduce(function(...) merge(..., all = TRUE), list(h_df, a_df))
+  
+  merge_return <- merged %>% 
+    group_by(Team, game_id, season) %>% 
+    summarise_at(vars(TOI, 
+                      GF, GA, SF, SA, FF, FA, CF, CA, xGF, xGA, 
+                      GF_adj, SF_adj, FF_adj, CF_adj, xGF_adj), 
+                 funs(sum)
+                 ) %>% 
+    data.frame()
+  
+  return(merge_return)
+  
+  }
+
+# Merge skaters and team on-ice metrics
+fun.shotmetrics_PP_strength <- function(data, strength, scr_adj_list) {
+  
+  # Run functions
+  skater <- fun.componiceCorsi_PP_strength(data, strength, scr_adj_list)
+  team <-   fun.componiceCorsiTeam_PP_strength(data, strength, scr_adj_list)
+  
+  joined <- left_join(skater, team, by = c("game_id", "Team", "season"))
+  
+  names(joined) <- c("player", "game_id", "game_date", "season", "Team", "Opponent", "is_home", 
+                     
+                     "TOI", 
+                     "onGF", "onGA", "onSF", "onSA", "onFF", "onFA", "onCF", "onCA", "onxGF", "onxGA",
+                     "onGF_adj", "onSF_adj", "onFF_adj", "onCF_adj", "onxGF_adj",
+                     
+                     "t_TOI", 
+                     "t_GF", "t_GA", "t_SF", "t_SA", "t_FF", "t_FA", "t_CF", "t_CA", "t_xGF", "t_xGA", 
+                     "t_GF_adj", "t_SF_adj", "t_FF_adj", "t_CF_adj", "t_xGF_adj"
+                     )
+  
+  # Remove goalies
+  fun.goalie_remove <- function(data_) {
+    
+    # Identifies goalies within a given pbp data.frame & returns a data.frame to join for removal
+    goalie_return <- data.frame(player = sort(unique(na.omit(as.character(rbind(data_$home_goalie, data_$away_goalie))))), 
+                                is_goalie = 1)
+    
+    goalie_return$player <- as.character(goalie_return$player)
+    
+    return(goalie_return)
+    
+    }
+  goalieremove <- fun.goalie_remove(data_ = data)
+  
+  all <- joined %>% 
+    left_join(., goalieremove, "player") %>% 
+    filter(is.na(is_goalie)) %>% 
+    select(-c(is_goalie)) %>% 
+    arrange(player, game_id) %>% 
+    data.frame()
+  
+  return(all)
+  
+  }
+
+# Zone Starts
+fun.ZS_H_PP_strength <- function(data, venue, strength) {
+  
+  hold <- data %>% 
+    filter(game_strength_state %in% strength,
+           event_type == "FAC"
+           ) %>%  
+    summarise(Team = first(home_team),
+              OZS = sum(event_type == "FAC" & home_zone == "Off"), 
+              NZS = sum(event_type == "FAC" & home_zone == "Neu"), 
+              DZS = sum(event_type == "FAC" & home_zone == "Def")
+              )
+  
+  return(hold)
+  
+  }
+fun.ZS_A_PP_strength <- function(data, venue, strength) {
+  
+  hold <- data %>% 
+    filter(game_strength_state %in% paste(rev(unlist(strsplit(strength, NULL))), collapse = ""),  # reverse strength state entered into function
+           event_type == "FAC"
+           ) %>%  
+    summarise(Team = first(away_team),
+              OZS = sum(event_type == "FAC" & home_zone == "Def"), 
+              NZS = sum(event_type == "FAC" & home_zone == "Neu"), 
+              DZS = sum(event_type == "FAC" & home_zone == "Off")
+              )
+  
+  return(hold)
+  
+  }
+fun.ZS_compute_PP_strength <- function(data, strength) {
+  
+  print("zone_starts_home", quote = F)
+  h1 <- data %>% group_by(game_id, season, home_on_1) %>% fun.ZS_H_PP_strength(., "home_on_1", strength) %>% rename(player = home_on_1) %>% data.frame()
+  h2 <- data %>% group_by(game_id, season, home_on_2) %>% fun.ZS_H_PP_strength(., "home_on_2", strength) %>% rename(player = home_on_2) %>% data.frame()
+  h3 <- data %>% group_by(game_id, season, home_on_3) %>% fun.ZS_H_PP_strength(., "home_on_3", strength) %>% rename(player = home_on_3) %>% data.frame()
+  h4 <- data %>% group_by(game_id, season, home_on_4) %>% fun.ZS_H_PP_strength(., "home_on_4", strength) %>% rename(player = home_on_4) %>% data.frame()
+  h5 <- data %>% group_by(game_id, season, home_on_5) %>% fun.ZS_H_PP_strength(., "home_on_5", strength) %>% rename(player = home_on_5) %>% data.frame()
+  h6 <- data %>% group_by(game_id, season, home_on_6) %>% fun.ZS_H_PP_strength(., "home_on_6", strength) %>% rename(player = home_on_6) %>% data.frame()
+  
+  print("zone_starts_away", quote = F)
+  a1 <- data %>% group_by(game_id, season, away_on_1) %>% fun.ZS_A_PP_strength(., "away_on_1", strength) %>% rename(player = away_on_1) %>% data.frame()
+  a2 <- data %>% group_by(game_id, season, away_on_2) %>% fun.ZS_A_PP_strength(., "away_on_2", strength) %>% rename(player = away_on_2) %>% data.frame()
+  a3 <- data %>% group_by(game_id, season, away_on_3) %>% fun.ZS_A_PP_strength(., "away_on_3", strength) %>% rename(player = away_on_3) %>% data.frame()
+  a4 <- data %>% group_by(game_id, season, away_on_4) %>% fun.ZS_A_PP_strength(., "away_on_4", strength) %>% rename(player = away_on_4) %>% data.frame()
+  a5 <- data %>% group_by(game_id, season, away_on_5) %>% fun.ZS_A_PP_strength(., "away_on_5", strength) %>% rename(player = away_on_5) %>% data.frame()
+  a6 <- data %>% group_by(game_id, season, away_on_6) %>% fun.ZS_A_PP_strength(., "away_on_6", strength) %>% rename(player = away_on_6) %>% data.frame()
+  
+  # Join
+  merged <- Reduce(function(...) merge(..., all = TRUE), list(h1, h2, h3, h4, h5, h6, a1, a2, a3, a4, a5, a6))
+  
+  summed <- merged %>% 
+    group_by(player, game_id, season) %>%  
+    summarise(Team = first(Team),
+              OZS =  sum(OZS), 
+              NZS =  sum(NZS), 
+              DZS =  sum(DZS)
+              ) %>% 
+    arrange(player)
+  
+  return(summed)
+  
+  }
+
+# Boxscore
+fun.counts_PP_strength <- function(data, venue, strength) {
+  
+  if (venue == "home_team") {
+    
+    hold <- data %>% 
+      filter(game_strength_state %in% strength, 
+             event_team == home_team)
+    
+    # Counts
+    counts_1 <- hold %>% 
+      group_by(event_player_1, game_id, season) %>% 
+      filter(event_type %in% c("GOAL", "BLOCK", "MISS", "SHOT", "HIT", "TAKE", "GIVE")) %>% 
+      summarise(Team = first(home_team),
+                
+                G = sum(event_type == "GOAL"),
+                iSF = sum(event_type %in% st.shot_events),
+                iCF = sum(event_type %in% st.corsi_events), 
+                iFF = sum(event_type %in% st.fenwick_events),
+                ixG = sum(na.omit(pred_goal)), 
+                
+                GIVE_o = sum(event_type == "GIVE" & event_zone == "Off"), 
+                GIVE_n = sum(event_type == "GIVE" & event_zone == "Neu"), 
+                GIVE_d = sum(event_type == "GIVE" & event_zone == "Def"), 
+                
+                TAKE_o = sum(event_type == "TAKE" & event_zone == "Off"), 
+                TAKE_n = sum(event_type == "TAKE" & event_zone == "Neu"), 
+                TAKE_d = sum(event_type == "TAKE" & event_zone == "Def")
+                ) %>% 
+      rename(player = event_player_1) %>% 
+      data.frame()
+    
+    counts_2 <- hold %>% 
+      group_by(event_player_2, game_id, season) %>% 
+      filter(event_type %in% c("GOAL")) %>% 
+      summarise(Team = first(home_team), 
+                A1 = sum(event_type == "GOAL")
+                ) %>% 
+      rename(player = event_player_2) %>% 
+      data.frame()
+    
+    counts_3 <- hold %>% 
+      group_by(event_player_3, game_id, season) %>%
+      filter(event_type == "GOAL") %>% 
+      summarise(Team = first(home_team), 
+                A2 = sum(event_type == "GOAL")
+                ) %>% 
+      rename(player = event_player_3) %>% 
+      data.frame()
+    
+    # Join
+    merged <- Reduce(function(...) merge(..., all = TRUE), list(counts_1, counts_2, counts_3))
+    
+    joined <- merged %>% 
+      mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+      mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
+      mutate(Points = G + A1 + A2) %>% 
+      select(player, game_id, season, Team, 
+             G, A1, A2, Points, 
+             iSF, iCF, iFF, ixG,
+             GIVE_o, GIVE_n, GIVE_d, 
+             TAKE_o, TAKE_n, TAKE_d
+             ) %>% 
+      arrange(player, game_id) %>% 
+      data.frame()
+    
+    return(joined)
+    
+    }
+  else {
+    
+    hold <- data %>% 
+      filter(game_strength_state %in% paste(rev(unlist(strsplit(strength, NULL))), collapse = ""),  # reverse strength state entered into function
+             event_team == away_team)
+    
+    # Compile
+    counts_1 <- hold %>% 
+      group_by(event_player_1, game_id, season) %>% 
+      filter(event_type %in% c("GOAL", "BLOCK", "MISS", "SHOT", "HIT", "TAKE", "GIVE")) %>% 
+      summarise(Team = first(away_team),
+                
+                G = sum(event_type == "GOAL"),
+                iSF = sum(event_type %in% st.shot_events),
+                iCF = sum(event_type %in% st.corsi_events),
+                iFF = sum(event_type %in% st.fenwick_events), 
+                ixG = sum(na.omit(pred_goal)), 
+                
+                GIVE_o = sum(event_type == "GIVE" & event_zone == "Off"), 
+                GIVE_n = sum(event_type == "GIVE" & event_zone == "Neu"), 
+                GIVE_d = sum(event_type == "GIVE" & event_zone == "Def"), 
+                
+                TAKE_o = sum(event_type == "TAKE" & event_zone == "Off"), 
+                TAKE_n = sum(event_type == "TAKE" & event_zone == "Neu"), 
+                TAKE_d = sum(event_type == "TAKE" & event_zone == "Def")
+                ) %>% 
+      rename(player = event_player_1) %>% 
+      data.frame()
+    
+    counts_2 <- hold %>% 
+      group_by(event_player_2, game_id, season) %>% 
+      filter(event_type %in% c("GOAL")) %>% 
+      summarise(Team = first(away_team), 
+                A1 = sum(event_type == "GOAL")
+                ) %>% 
+      rename(player = event_player_2) %>% 
+      data.frame()
+    
+    counts_3 <- hold %>% 
+      group_by(event_player_3, game_id, season) %>%
+      filter(event_type == "GOAL") %>% 
+      summarise(Team = first(away_team), 
+                A2 = sum(event_type == "GOAL")
+                ) %>% 
+      rename(player = event_player_3) %>% 
+      data.frame()
+    
+    # Join
+    merged <- Reduce(function(...) merge(..., all = TRUE), list(counts_1, counts_2, counts_3))
+    
+    joined <- merged %>% 
+      mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+      mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
+      mutate(Points = G + A1 + A2) %>% 
+      select(player, game_id, season, Team, 
+             G, A1, A2, Points, 
+             iSF, iCF, iFF, ixG,
+             GIVE_o, GIVE_n, GIVE_d, 
+             TAKE_o, TAKE_n, TAKE_d
+             ) %>% 
+      arrange(player, game_id) %>% 
+      data.frame()
+    
+    return(joined)
+    
+    }
+  
+  }
+fun.faceoff_PP_strength <- function(data, venue, strength) {
+  
+  if (venue == "home_team") {
+    
+    faceoffs <- data %>% 
+      filter(game_strength_state %in% strength, 
+             event_type == "FAC"
+             ) %>% 
+      group_by(event_player_2, game_id, season) %>% 
+      mutate(FOW = 1 * (home_team == event_team), 
+             FOL = 1 * (away_team == event_team)
+             ) %>% 
+      summarise(Team = first(home_team),
+                FOW = sum(FOW), 
+                FOL = sum(FOL)
+                ) %>% 
+      mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+      rename(player = event_player_2) %>% 
+      ungroup() %>% 
+      arrange(player, game_id) %>% 
+      data.frame()
+    
+    return(faceoffs)
+    
+    }
+  else {
+    
+    faceoffs <- data %>% 
+      filter(game_strength_state %in% paste(rev(unlist(strsplit(strength, NULL))), collapse = ""),  # reverse strength state entered into function
+             event_type == "FAC" 
+             ) %>% 
+      group_by(event_player_1, game_id, season) %>% 
+      mutate(FOW = 1 * (away_team == event_team), 
+             FOL = 1 * (home_team == event_team)
+             ) %>% 
+      summarise(Team = first(away_team),
+                FOW = sum(FOW), 
+                FOL = sum(FOL)
+                ) %>% 
+      mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+      rename(player = event_player_1) %>% 
+      ungroup() %>% 
+      arrange(player, game_id) %>% 
+      data.frame()
+    
+    return(faceoffs)
+    
+    }
+  
+  }
+fun.penalty_PP_strength <- function(data, venue, strength) {
+  
+  if (venue == "home_team") {
+    
+    pen_1 <- data %>% 
+      group_by(event_player_1, game_id, season) %>% 
+      filter(game_strength_state %in% strength,  
+             event_team == home_team, 
+             event_type %in% c("PENL", "HIT", "BLOCK")
+             ) %>% 
+      summarise(Team = first(home_team),
+                iPENT2 = sum(na.omit(1 * (event_type == "PENL") +
+                                       1 * (event_type == "PENL" & grepl("double minor", tolower(event_detail)) == TRUE) -
+                                       1 * (event_type == "PENL" & grepl("ps \\-|match|fighting|major", tolower(event_detail)) == TRUE) - 
+                                       1 * (event_type == "PENL" & grepl("too many men", tolower(event_description)) == TRUE) - 
+                                       1 * (event_type == "PENL" & grepl("misconduct", tolower(event_description)) == TRUE))),
+                iPENT5 = sum(na.omit(event_type == "PENL" & grepl("fighting|major", tolower(event_detail)) == TRUE)), 
+                
+                iHF_o = sum(event_type == "HIT" & event_zone == "Off"), 
+                iHF_n = sum(event_type == "HIT" & event_zone == "Neu"), 
+                iHF_d = sum(event_type == "HIT" & event_zone == "Def")
+                ) %>% 
+      rename(player = event_player_1) %>% 
+      data.frame()
+    
+    
+    pen_2 <- data %>% 
+      group_by(event_player_2, game_id, season) %>% 
+      filter(game_strength_state %in% strength,  
+             event_team == away_team, 
+             event_type %in% c("PENL", "HIT", "BLOCK")
+             ) %>% 
+      summarise(Team = first(home_team), 
+                iPEND2 = sum(na.omit(1 * (event_type == "PENL") +
+                                       1 * (event_type == "PENL" & grepl("double minor", tolower(event_detail)) == TRUE) -
+                                       1 * (event_type == "PENL" & grepl("ps \\-|match|fighting|major", tolower(event_detail)) == TRUE) - 
+                                       1 * (event_type == "PENL" & grepl("too many men", tolower(event_description)) == TRUE) - 
+                                       1 * (event_type == "PENL" & grepl("misconduct", tolower(event_description)) == TRUE))),
+                iPEND5 = sum(na.omit(event_type == "PENL" & grepl("fighting|major", tolower(event_detail)) == TRUE)), 
+                
+                iHA_o = sum(event_type == "HIT" & event_zone == "Def"), 
+                iHA_n = sum(event_type == "HIT" & event_zone == "Neu"), 
+                iHA_d = sum(event_type == "HIT" & event_zone == "Off")
+                ) %>% 
+      rename(player = event_player_2) %>% 
+      data.frame()
+    
+    
+    merged <- Reduce(function(...) merge(..., all = TRUE), list(pen_1, pen_2))
+    
+    joined <- merged %>% 
+      mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+      mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
+      select(player, game_id, season, Team, 
+             iPENT2, iPEND2, iPENT5, iPEND5,
+             iHF_o, iHF_n, iHF_d, 
+             iHA_o, iHA_n, iHA_d
+             ) %>% 
+      arrange(player, game_id) %>% 
+      data.frame()
+    
+    return(joined)
+    
+    }
+  else {
+    
+    pen_1 <- data %>% 
+      group_by(event_player_1, game_id, season) %>% 
+      filter(game_strength_state %in% paste(rev(unlist(strsplit(strength, NULL))), collapse = ""),  # reverse strength state entered into function
+             event_team == away_team, 
+             event_type %in% c("PENL", "HIT", "BLOCK")
+             ) %>% 
+      summarise(Team = first(away_team),
+                iPENT2 = sum(na.omit(1 * (event_type == "PENL") +
+                                       1 * (event_type == "PENL" & grepl("double minor", tolower(event_detail)) == TRUE) -
+                                       1 * (event_type == "PENL" & grepl("ps \\-|match|fighting|major", tolower(event_detail)) == TRUE) - 
+                                       1 * (event_type == "PENL" & grepl("too many men", tolower(event_description)) == TRUE) - 
+                                       1 * (event_type == "PENL" & grepl("misconduct", tolower(event_description)) == TRUE))),
+                iPENT5 = sum(na.omit(event_type == "PENL" & grepl("fighting|major", tolower(event_detail)) == TRUE)), 
+                
+                iHF_o = sum(event_type == "HIT" & event_zone == "Off"), 
+                iHF_n = sum(event_type == "HIT" & event_zone == "Neu"), 
+                iHF_d = sum(event_type == "HIT" & event_zone == "Def")
+                ) %>% 
+      rename(player = event_player_1) %>% 
+      data.frame()
+    
+    pen_2 <- data %>% 
+      group_by(event_player_2, game_id, season) %>% 
+      filter(game_strength_state %in% paste(rev(unlist(strsplit(strength, NULL))), collapse = ""),  # reverse strength state entered into function
+             event_team == home_team, 
+             event_type %in% c("PENL", "HIT", "BLOCK")
+             ) %>% 
+      summarise(Team = first(away_team),
+                iPEND2 = sum(na.omit(1 * (event_type == "PENL") +
+                                       1 * (event_type == "PENL" & grepl("double minor", tolower(event_detail)) == TRUE) -
+                                       1 * (event_type == "PENL" & grepl("ps \\-|match|fighting|major", tolower(event_detail)) == TRUE) - 
+                                       1 * (event_type == "PENL" & grepl("too many men", tolower(event_description)) == TRUE) - 
+                                       1 * (event_type == "PENL" & grepl("misconduct", tolower(event_description)) == TRUE))),
+                iPEND5 = sum(na.omit(event_type == "PENL" & grepl("fighting|major", tolower(event_detail)) == TRUE)), 
+                
+                iHA_o = sum(event_type == "HIT" & event_zone == "Def"), 
+                iHA_n = sum(event_type == "HIT" & event_zone == "Neu"), 
+                iHA_d = sum(event_type == "HIT" & event_zone == "Off")
+                ) %>% 
+      rename(player = event_player_2) %>% 
+      data.frame()
+    
+    
+    merged <- Reduce(function(...) merge(..., all = TRUE), list(pen_1, pen_2))
+    
+    joined <- merged %>% 
+      mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+      mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
+      select(player, game_id, season, Team, 
+             iPENT2, iPEND2, iPENT5, iPEND5,
+             iHF_o, iHF_n, iHF_d, 
+             iHA_o, iHA_n, iHA_d
+             ) %>% 
+      arrange(player, game_id) %>% 
+      data.frame()
+    
+    return(joined)
+    
+    }
+  
+  }
+
+###  Run all functions
+fun.combine_counts_PP_strength <- function(data, strength, scr_adj_list) { 
+  
+  print(paste("season:", unique(data$season)), quote = F)
+  
+  # Filter pbp / join prior face time for corsi events
+  data <- data %>% 
+    filter(game_strength_state %in% c(strength, paste(rev(unlist(strsplit(strength, NULL))), collapse = "")), 
+           game_period < 5
+           ) %>% 
+    select(-c(face_index:shift_length)) %>% 
+    mutate(scradj = home_score - away_score, 
+           home_lead = ifelse(scradj >= 3, 3, 
+                              ifelse(scradj <= -3, -3, scradj)),
+           home_lead_state = ifelse(home_lead < 0, 1, 
+                                    ifelse(home_lead == 0, 2, 
+                                           ifelse(home_lead > 0, 3, home_lead))), 
+           home_lead = home_lead + 4, 
+           event_length = ifelse(is.na(event_length), 0, event_length)
+           ) %>% 
+    rename(pred_goal = pred_XGB_7)
+  
+  
+  ### Run functions
+  shot_metrics <- fun.shotmetrics_PP_strength(data, strength, scr_adj_list)
+  zone_start <-   fun.ZS_compute_PP_strength(data, strength)
+  
+  print("counts", quote = F)
+  counts_all <- fun.counts_PP_strength(data, "home_team", strength) %>% 
+    rbind(., fun.counts_PP_strength(data, "away_team", strength)) %>% 
+    arrange(player, game_id)
+  
+  print("faceoffs", quote = F)
+  faceoff_all <- fun.faceoff_PP_strength(data, "home_team", strength) %>% 
+    rbind(., fun.faceoff_PP_strength(data, "away_team", strength)) %>% 
+    arrange(player, game_id)
+  
+  print("penalties", quote = F)
+  penalty_all <- fun.penalty_PP_strength(data, "home_team", strength) %>% 
+    rbind(., fun.penalty_PP_strength(data, "away_team", strength)) %>% 
+    arrange(player, game_id)
+  
+  
+  # Join
+  print("combine", quote = F)
+  metrics_combined <- shot_metrics %>% 
+    left_join(., zone_start,  by = c("player", "game_id", "season", "Team")) %>% 
+    left_join(., counts_all,  by = c("player", "game_id", "season", "Team")) %>% 
+    left_join(., faceoff_all, by = c("player", "game_id", "season", "Team")) %>% 
+    left_join(., penalty_all, by = c("player", "game_id", "season", "Team")) %>% 
+    select(player, game_id, game_date, season, Team, Opponent, is_home, 
+           TOI, 
+           G, A1, A2, Points, 
+           iSF, iFF, iCF, ixG,
+           GIVE_o:TAKE_d,
+           iHF_o:iHA_d,
+           FOW, FOL, 
+           OZS, NZS, DZS, 
+           iPENT2, iPEND2, iPENT5, iPEND5, 
+           onGF:onxGF_adj, 
+           t_TOI:t_xGF_adj
+           ) %>% 
+    # Patch for if no PP goals were scored
+    mutate(A1 = ifelse(is.na(A1), 0, A1), 
+           A2 = ifelse(is.na(A2), 0, A2)
+           ) %>% 
+    arrange(player, game_id) %>% 
+    mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+    data.frame()
+  
+  return(metrics_combined)
+  
+  }
+
+
+#########################
+
+
+## ------------------- ##
+##   4v5, etc. Games   ##
+## ------------------- ##
+
+#########################
+
+# Skaters: On Ice Corsi For / Against, TOI, Team - per game
+fun.oniceCorsiH_SH_strength <- function(data, venue, strength, scr_adj_list) {
+  
+  hold <- data %>% 
+    filter(game_strength_state %in% strength) %>% 
+    summarise(TOI = sum(event_length) / 60, 
+              
+              Team = first(home_team), 
+              Opponent = first(away_team), 
+              is_home = 1, 
+              
+              GF =  sum(event_type == "GOAL" & event_team == home_team),
+              GA =  sum(event_type == "GOAL" & event_team == away_team), 
+              SF =  sum(event_type %in% st.shot_events & event_team == home_team), 
+              SA =  sum(event_type %in% st.shot_events & event_team == away_team), 
+              FF =  sum(event_type %in% st.fenwick_events & event_team == home_team),
+              FA =  sum(event_type %in% st.fenwick_events & event_team == away_team), 
+              CF =  sum(event_type %in% st.corsi_events & event_team == home_team),
+              CA =  sum(event_type %in% st.corsi_events & event_team == away_team), 
+              xGF = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal)), 
+              xGA = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal)), 
+              
+              GA_adj =  sum((event_type == "GOAL" & event_team == away_team) * scr_adj_list$away_goal_adj[home_lead_state]), 
+              SA_adj =  sum((event_type %in% st.shot_events & event_team == away_team) * scr_adj_list$away_shot_adj[home_lead_state]), 
+              FA_adj =  sum((event_type %in% st.fenwick_events & event_team == away_team) * scr_adj_list$away_fenwick_adj[home_lead_state]), 
+              CA_adj =  sum((event_type %in% st.corsi_events & event_team == away_team) * scr_adj_list$away_corsi_adj[home_lead_state]), 
+              xGA_adj = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal * scr_adj_list$away_xG_adj[home_lead_state]))
+              )
+  
+  return(hold)
+  
+  }
+fun.oniceCorsiA_SH_strength <- function(data, venue, strength, scr_adj_list) {
+  
+  hold <- data %>% 
+    filter(game_strength_state %in% paste(rev(unlist(strsplit(strength, NULL))), collapse = "")) %>%  # reverse strength state entered into function
+    summarise(TOI = sum(event_length) / 60, 
+              
+              Team = first(away_team), 
+              Opponent = first(home_team), 
+              is_home = 0, 
+              
+              GF =  sum(event_type == "GOAL" & event_team == away_team),
+              GA =  sum(event_type == "GOAL" & event_team == home_team), 
+              SF =  sum(event_type %in% st.shot_events & event_team == away_team), 
+              SA =  sum(event_type %in% st.shot_events & event_team == home_team), 
+              FF =  sum(event_type %in% st.fenwick_events & event_team == away_team),
+              FA =  sum(event_type %in% st.fenwick_events & event_team == home_team), 
+              CF =  sum(event_type %in% st.corsi_events & event_team == away_team),
+              CA =  sum(event_type %in% st.corsi_events & event_team == home_team), 
+              xGF = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal)), 
+              xGA = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal)), 
+              
+              GA =  sum((event_type == "GOAL" & event_team == home_team) * scr_adj_list$home_goal_adj[home_lead_state]), 
+              SA =  sum((event_type %in% st.shot_events & event_team == home_team) * scr_adj_list$home_shot_adj[home_lead_state]), 
+              FA =  sum((event_type %in% st.fenwick_events & event_team == home_team) * scr_adj_list$home_fenwick_adj[home_lead_state]), 
+              CA =  sum((event_type %in% st.corsi_events & event_team == home_team) * scr_adj_list$home_corsi_adj[home_lead_state]), 
+              xGA = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal * scr_adj_list$home_xG_adj[home_lead_state]))
+              )
+  
+  return(hold)
+  
+  }
+fun.componiceCorsi_SH_strength <- function(data, strength, scr_adj_list) {
+  
+  print("on_ice_home", quote = F)
+  h1 <- data %>% group_by(game_id, game_date, season, home_on_1, home_team) %>% fun.oniceCorsiH_SH_strength(., "home_on_1", strength, scr_adj_list) %>% rename(player = home_on_1) %>% data.frame()
+  h2 <- data %>% group_by(game_id, game_date, season, home_on_2, home_team) %>% fun.oniceCorsiH_SH_strength(., "home_on_2", strength, scr_adj_list) %>% rename(player = home_on_2) %>% data.frame()
+  h3 <- data %>% group_by(game_id, game_date, season, home_on_3, home_team) %>% fun.oniceCorsiH_SH_strength(., "home_on_3", strength, scr_adj_list) %>% rename(player = home_on_3) %>% data.frame()
+  h4 <- data %>% group_by(game_id, game_date, season, home_on_4, home_team) %>% fun.oniceCorsiH_SH_strength(., "home_on_4", strength, scr_adj_list) %>% rename(player = home_on_4) %>% data.frame()
+  h5 <- data %>% group_by(game_id, game_date, season, home_on_5, home_team) %>% fun.oniceCorsiH_SH_strength(., "home_on_5", strength, scr_adj_list) %>% rename(player = home_on_5) %>% data.frame()
+  h6 <- data %>% group_by(game_id, game_date, season, home_on_6, home_team) %>% fun.oniceCorsiH_SH_strength(., "home_on_6", strength, scr_adj_list) %>% rename(player = home_on_6) %>% data.frame()
+  
+  print("on_ice_away", quote = F)
+  a1 <- data %>% group_by(game_id, game_date, season, away_on_1, away_team) %>% fun.oniceCorsiA_SH_strength(., "away_on_1", strength, scr_adj_list) %>% rename(player = away_on_1) %>% data.frame()
+  a2 <- data %>% group_by(game_id, game_date, season, away_on_2, away_team) %>% fun.oniceCorsiA_SH_strength(., "away_on_2", strength, scr_adj_list) %>% rename(player = away_on_2) %>% data.frame()
+  a3 <- data %>% group_by(game_id, game_date, season, away_on_3, away_team) %>% fun.oniceCorsiA_SH_strength(., "away_on_3", strength, scr_adj_list) %>% rename(player = away_on_3) %>% data.frame()
+  a4 <- data %>% group_by(game_id, game_date, season, away_on_4, away_team) %>% fun.oniceCorsiA_SH_strength(., "away_on_4", strength, scr_adj_list) %>% rename(player = away_on_4) %>% data.frame()
+  a5 <- data %>% group_by(game_id, game_date, season, away_on_5, away_team) %>% fun.oniceCorsiA_SH_strength(., "away_on_5", strength, scr_adj_list) %>% rename(player = away_on_5) %>% data.frame()
+  a6 <- data %>% group_by(game_id, game_date, season, away_on_6, away_team) %>% fun.oniceCorsiA_SH_strength(., "away_on_6", strength, scr_adj_list) %>% rename(player = away_on_6) %>% data.frame()
+  
+  
+  merged <- Reduce(function(...) merge(..., all = TRUE), list(h1, h2, h3, h4, h5, h6, a1, a2, a3, a4, a5, a6))
+  
+  merge_return <- merged %>% 
+    group_by(player, game_id, game_date, season) %>%  
+    summarise(Team =     first(Team), 
+              Opponent = first(Opponent), 
+              is_home =  first(is_home), 
+              TOI =     sum(TOI), 
+              
+              GF =       sum(GF), 
+              GA =       sum(GA), 
+              SF =       sum(SF), 
+              SA =       sum(SA), 
+              FF =       sum(FF), 
+              FA =       sum(FA), 
+              CF =       sum(CF), 
+              CA =       sum(CA), 
+              xGF =      sum(xGF), 
+              xGA =      sum(xGA), 
+              
+              GA_adj =   sum(GA_adj), 
+              SA_adj =   sum(SA_adj), 
+              FA_adj =   sum(FA_adj), 
+              CA_adj =   sum(CA_adj), 
+              xGA_adj =  sum(xGA_adj)
+              ) %>% 
+    filter(!is.na(player)) %>% 
+    data.frame()
+  
+  return(merge_return)
+  
+  }
+
+# Teams: On Ice Corsi For / Against, TOI - per game
+fun.oniceTeamCorsiH_SH_strength <- function(data, strength, scr_adj_list) {
+  
+  hold <- data %>% 
+    filter(game_strength_state %in% strength) %>% 
+    summarise(TOI = sum(event_length) / 60, 
+              Team = first(home_team), 
+              
+              GF =  sum(event_type == "GOAL" & event_team == home_team),
+              GA =  sum(event_type == "GOAL" & event_team == away_team), 
+              SF =  sum(event_type %in% st.shot_events & event_team == home_team), 
+              SA =  sum(event_type %in% st.shot_events & event_team == away_team), 
+              FF =  sum(event_type %in% st.fenwick_events & event_team == home_team),
+              FA =  sum(event_type %in% st.fenwick_events & event_team == away_team), 
+              CF =  sum(event_type %in% st.corsi_events & event_team == home_team),
+              CA =  sum(event_type %in% st.corsi_events & event_team == away_team), 
+              xGF = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal)), 
+              xGA = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal)), 
+              
+              GA_adj =  sum((event_type == "GOAL" & event_team == away_team) * scr_adj_list$away_goal_adj[home_lead_state]), 
+              SA_adj =  sum((event_type %in% st.shot_events & event_team == away_team) * scr_adj_list$away_shot_adj[home_lead_state]), 
+              FA_adj =  sum((event_type %in% st.fenwick_events & event_team == away_team) * scr_adj_list$away_fenwick_adj[home_lead_state]), 
+              CA_adj =  sum((event_type %in% st.corsi_events & event_team == away_team) * scr_adj_list$away_corsi_adj[home_lead_state]), 
+              xGA_adj = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal * scr_adj_list$away_xG_adj[home_lead_state]))
+              )
+  
+  return(hold)
+  
+  }
+fun.oniceTeamCorsiA_SH_strength <- function(data, strength, scr_adj_list) {
+  
+  hold <- data %>% 
+    filter(game_strength_state %in% paste(rev(unlist(strsplit(strength, NULL))), collapse = "")) %>%  # reverse strength state entered into function
+    summarise(TOI = sum(event_length) / 60, 
+              Team = first(away_team), 
+              
+              GF =  sum(event_type == "GOAL" & event_team == away_team),
+              GA =  sum(event_type == "GOAL" & event_team == home_team), 
+              SF =  sum(event_type %in% st.shot_events & event_team == away_team), 
+              SA =  sum(event_type %in% st.shot_events & event_team == home_team), 
+              FF =  sum(event_type %in% st.fenwick_events & event_team == away_team),
+              FA =  sum(event_type %in% st.fenwick_events & event_team == home_team), 
+              CF =  sum(event_type %in% st.corsi_events & event_team == away_team),
+              CA =  sum(event_type %in% st.corsi_events & event_team == home_team), 
+              xGF = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal)), 
+              xGA = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal)), 
+              
+              GA =  sum((event_type == "GOAL" & event_team == home_team) * scr_adj_list$home_goal_adj[home_lead_state]), 
+              SA =  sum((event_type %in% st.shot_events & event_team == home_team) * scr_adj_list$home_shot_adj[home_lead_state]), 
+              FA =  sum((event_type %in% st.fenwick_events & event_team == home_team) * scr_adj_list$home_fenwick_adj[home_lead_state]), 
+              CA =  sum((event_type %in% st.corsi_events & event_team == home_team) * scr_adj_list$home_corsi_adj[home_lead_state]), 
+              xGA = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal * scr_adj_list$home_xG_adj[home_lead_state]))
+              )
+  
+  return(hold)
+  
+  }
+fun.componiceCorsiTeam_SH_strength <- function(data, strength, scr_adj_list) {
+  
+  print("team_on_ice_home", quote = F)
+  h_df <- data %>% 
+    group_by(game_id, season, home_team) %>% 
+    fun.oniceTeamCorsiH_SH_strength(., strength, scr_adj_list) 
+  
+  print("team_on_ice_away", quote = F)
+  a_df <- data %>% 
+    group_by(game_id, season, away_team) %>% 
+    fun.oniceTeamCorsiA_SH_strength(., strength, scr_adj_list) 
+  
+  merged <- Reduce(function(...) merge(..., all = TRUE), list(h_df, a_df))
+  
+  merge_return <- merged %>% 
+    group_by(Team, game_id, season) %>% 
+    summarise_at(vars(TOI, 
+                      GF, GA, SF, SA, FF, FA, CF, CA, xGF, xGA, 
+                      GA_adj, SA_adj, FA_adj, CA_adj, xGA_adj), 
+                 funs(sum)
+                 ) %>% 
+    data.frame()
+  
+  return(merge_return)
+  
+  }
+
+# Merge skaters and team on-ice metrics
+fun.shotmetrics_SH_strength <- function(data, strength, scr_adj_list) {
+  
+  # Run functions
+  skater <- fun.componiceCorsi_SH_strength(data, strength, scr_adj_list)
+  team <-   fun.componiceCorsiTeam_SH_strength(data, strength, scr_adj_list)
+  
+  joined <- left_join(skater, team, by = c("game_id", "Team", "season"))
+  
+  names(joined) <- c("player", "game_id", "game_date", "season", "Team", "Opponent", "is_home", 
+                     
+                     "TOI", 
+                     "onGF", "onGA", "onSF", "onSA", "onFF", "onFA", "onCF", "onCA", "onxGF", "onxGA",
+                     "onGA_adj", "onSA_adj", "onFA_adj", "onCA_adj", "onxGA_adj", 
+                     
+                     "t_TOI", 
+                     "t_GF", "t_GA", "t_SF", "t_SA", "t_FF", "t_FA", "t_CF", "t_CA", "t_xGF", "t_xGA", 
+                     "t_GA_adj", "t_SA_adj", "t_FA_adj", "t_CA_adj", "t_xGA_adj"
+                     )
+  
+  # Remove goalies
+  fun.goalie_remove <- function(data_) {
+    
+    # Identifies goalies within a given pbp data.frame & returns a data.frame to join for removal
+    goalie_return <- data.frame(player = sort(unique(na.omit(as.character(rbind(data_$home_goalie, data_$away_goalie))))), 
+                                is_goalie = 1)
+    
+    goalie_return$player <- as.character(goalie_return$player)
+    
+    return(goalie_return)
+    
+    }
+  goalieremove <- fun.goalie_remove(data_ = data)
+  
+  all <- joined %>% 
+    left_join(., goalieremove, "player") %>% 
+    filter(is.na(is_goalie)) %>% 
+    select(-c(is_goalie)) %>% 
+    arrange(player, game_id) %>% 
+    data.frame()
+  
+  return(all)
+  
+  }
+
+# Zone Starts
+fun.ZS_H_SH_strength <- function(data, venue, strength) {
+  
+  hold <- data %>% 
+    filter(game_strength_state %in% strength, 
+           event_type == "FAC"
+           ) %>% 
+    summarise(Team = first(home_team),
+              OZS = sum(event_type == "FAC" & home_zone == "Off"), 
+              NZS = sum(event_type == "FAC" & home_zone == "Neu"), 
+              DZS = sum(event_type == "FAC" & home_zone == "Def")
+              )
+  
+  return(hold)
+  
+  }
+fun.ZS_A_SH_strength <- function(data, venue, strength) {
+  
+  hold <- data %>% 
+    filter(game_strength_state %in% paste(rev(unlist(strsplit(strength, NULL))), collapse = ""),  # reverse strength state entered into function
+           event_type == "FAC"
+           ) %>%  
+    summarise(Team = first(away_team),
+              OZS = sum(event_type == "FAC" & home_zone == "Def"), 
+              NZS = sum(event_type == "FAC" & home_zone == "Neu"), 
+              DZS = sum(event_type == "FAC" & home_zone == "Off")
+              )
+  
+  return(hold)
+  
+  }
+fun.ZS_compute_SH_strength <- function(data, strength) {
+  
+  print("zone_starts_home", quote = F)
+  h1 <- data %>% group_by(game_id, season, home_on_1) %>% fun.ZS_H_SH_strength(., "home_on_1", strength) %>% rename(player = home_on_1) %>% data.frame()
+  h2 <- data %>% group_by(game_id, season, home_on_2) %>% fun.ZS_H_SH_strength(., "home_on_2", strength) %>% rename(player = home_on_2) %>% data.frame()
+  h3 <- data %>% group_by(game_id, season, home_on_3) %>% fun.ZS_H_SH_strength(., "home_on_3", strength) %>% rename(player = home_on_3) %>% data.frame()
+  h4 <- data %>% group_by(game_id, season, home_on_4) %>% fun.ZS_H_SH_strength(., "home_on_4", strength) %>% rename(player = home_on_4) %>% data.frame()
+  h5 <- data %>% group_by(game_id, season, home_on_5) %>% fun.ZS_H_SH_strength(., "home_on_5", strength) %>% rename(player = home_on_5) %>% data.frame()
+  h6 <- data %>% group_by(game_id, season, home_on_6) %>% fun.ZS_H_SH_strength(., "home_on_6", strength) %>% rename(player = home_on_6) %>% data.frame()
+  
+  print("zone_starts_away", quote = F)
+  a1 <- data %>% group_by(game_id, season, away_on_1) %>% fun.ZS_A_SH_strength(., "away_on_1", strength) %>% rename(player = away_on_1) %>% data.frame()
+  a2 <- data %>% group_by(game_id, season, away_on_2) %>% fun.ZS_A_SH_strength(., "away_on_2", strength) %>% rename(player = away_on_2) %>% data.frame()
+  a3 <- data %>% group_by(game_id, season, away_on_3) %>% fun.ZS_A_SH_strength(., "away_on_3", strength) %>% rename(player = away_on_3) %>% data.frame()
+  a4 <- data %>% group_by(game_id, season, away_on_4) %>% fun.ZS_A_SH_strength(., "away_on_4", strength) %>% rename(player = away_on_4) %>% data.frame()
+  a5 <- data %>% group_by(game_id, season, away_on_5) %>% fun.ZS_A_SH_strength(., "away_on_5", strength) %>% rename(player = away_on_5) %>% data.frame()
+  a6 <- data %>% group_by(game_id, season, away_on_6) %>% fun.ZS_A_SH_strength(., "away_on_6", strength) %>% rename(player = away_on_6) %>% data.frame()
+  
+  # Join
+  merged <- Reduce(function(...) merge(..., all = TRUE), list(h1, h2, h3, h4, h5, h6, a1, a2, a3, a4, a5, a6))
+  
+  summed <- merged %>% 
+    group_by(player, game_id, season) %>%  
+    summarise(Team = first(Team),
+              OZS =  sum(OZS), 
+              NZS =  sum(NZS), 
+              DZS =  sum(DZS)
+              ) %>% 
+    arrange(player)
+  
+  return(summed)
+  
+  }
+
+# Boxscore
+fun.counts_SH_strength <- function(data, venue, strength) {
+  
+  if (venue == "home_team") {
+    
+    hold <- data %>% 
+      filter(game_strength_state %in% strength,  
+             event_team == home_team)
+    
+    # Counts
+    counts_1 <- hold %>% 
+      group_by(event_player_1, game_id, season) %>% 
+      filter(event_type %in% c("GOAL", "BLOCK", "MISS", "SHOT", "HIT", "TAKE", "GIVE")) %>% 
+      summarise(Team = first(home_team),
+                G = sum(event_type == "GOAL"),
+                iSF = sum(event_type %in% st.shot_events),
+                iCF = sum(event_type %in% st.corsi_events), 
+                iFF = sum(event_type %in% st.fenwick_events),
+                ixG = sum(na.omit(pred_goal)), 
+                
+                GIVE_o = sum(event_type == "GIVE" & event_zone == "Off"), 
+                GIVE_n = sum(event_type == "GIVE" & event_zone == "Neu"), 
+                GIVE_d = sum(event_type == "GIVE" & event_zone == "Def"), 
+                
+                TAKE_o = sum(event_type == "TAKE" & event_zone == "Off"), 
+                TAKE_n = sum(event_type == "TAKE" & event_zone == "Neu"), 
+                TAKE_d = sum(event_type == "TAKE" & event_zone == "Def")
+                ) %>% 
+      rename(player = event_player_1) %>% 
+      data.frame()
+    
+    counts_2 <- hold %>% 
+      group_by(event_player_2, game_id, season) %>% 
+      filter(event_type %in% c("GOAL")) %>% 
+      summarise(Team = first(home_team), 
+                A1 = sum(event_type == "GOAL") 
+                ) %>% 
+      rename(player = event_player_2) %>% 
+      data.frame()
+    
+    counts_3 <- hold %>% 
+      group_by(event_player_3, game_id, season) %>%
+      filter(event_type == "GOAL") %>% 
+      summarise(Team = first(home_team), 
+                A2 = sum(event_type == "GOAL") 
+                ) %>% 
+      rename(player = event_player_3) %>% 
+      data.frame()
+    
+    # Join
+    merged <- Reduce(function(...) merge(..., all = TRUE), list(counts_1, counts_2, counts_3))
+    
+    joined <- merged %>% 
+      mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+      mutate(Points = G + A1 + A2) %>% 
+      select(player, game_id, season, Team, 
+             G, A1, A2, Points, 
+             iSF, iCF, iFF, ixG, 
+             GIVE_o, GIVE_n, GIVE_d, 
+             TAKE_o, TAKE_n, TAKE_d
+             ) %>% 
+      arrange(player, game_id) %>% 
+      data.frame()
+    
+    return(joined)
+    
+    }
+  else {
+    
+    hold <- data %>% 
+      filter(game_strength_state %in% paste(rev(unlist(strsplit(strength, NULL))), collapse = ""),  # reverse strength state entered into function
+             event_team == away_team)
+    
+    # Compile
+    counts_1 <- hold %>% 
+      group_by(event_player_1, game_id, season) %>% 
+      filter(event_type %in% c("GOAL", "BLOCK", "MISS", "SHOT", "HIT", "TAKE", "GIVE")) %>% 
+      summarise(Team = first(away_team),
+                G = sum(event_type == "GOAL"),
+                iSF = sum(event_type %in% st.shot_events),
+                iCF = sum(event_type %in% st.corsi_events),
+                iFF = sum(event_type %in% st.fenwick_events), 
+                ixG = sum(na.omit(pred_goal)), 
+                
+                GIVE_o = sum(event_type == "GIVE" & event_zone == "Off"), 
+                GIVE_n = sum(event_type == "GIVE" & event_zone == "Neu"), 
+                GIVE_d = sum(event_type == "GIVE" & event_zone == "Def"), 
+                
+                TAKE_o = sum(event_type == "TAKE" & event_zone == "Off"), 
+                TAKE_n = sum(event_type == "TAKE" & event_zone == "Neu"), 
+                TAKE_d = sum(event_type == "TAKE" & event_zone == "Def")
+                ) %>% 
+      rename(player = event_player_1) %>% 
+      data.frame()
+    
+    counts_2 <- hold %>% 
+      group_by(event_player_2, game_id, season) %>% 
+      filter(event_type %in% c("GOAL")) %>% 
+      summarise(Team = first(away_team), 
+                A1 = sum(event_type == "GOAL")
+      ) %>% 
+      rename(player = event_player_2) %>% 
+      data.frame()
+    
+    counts_3 <- hold %>% 
+      group_by(event_player_3, game_id, season) %>%
+      filter(event_type == "GOAL") %>% 
+      summarise(Team = first(away_team), 
+                A2 = sum(event_type == "GOAL")
+                ) %>% 
+      rename(player = event_player_3) %>% 
+      data.frame()
+    
+    # Join
+    merged <- Reduce(function(...) merge(..., all = TRUE), list(counts_1, counts_2, counts_3))
+    
+    joined <- merged %>% 
+      mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+      mutate(Points = G + A1 + A2) %>% 
+      select(player, game_id, season, Team, 
+             G, A1, A2, Points,
+             iSF, iCF, iFF, ixG,
+             GIVE_o, GIVE_n, GIVE_d, 
+             TAKE_o, TAKE_n, TAKE_d
+             ) %>% 
+      arrange(player, game_id) %>% 
+      data.frame()
+    
+    return(joined)
+    
+    }
+  
+  }
+fun.faceoff_SH_strength <- function(data, venue, strength) {
+  
+  if (venue == "home_team") {
+    
+    faceoffs <- data %>% 
+      filter(game_strength_state %in% strength, 
+             event_type == "FAC"
+             ) %>% 
+      group_by(event_player_2, game_id, season) %>% 
+      mutate(FOW = 1 * (home_team == event_team), 
+             FOL = 1 * (away_team == event_team)
+             ) %>% 
+      summarise(Team = first(home_team),
+                FOW = sum(FOW), 
+                FOL = sum(FOL)
+                ) %>% 
+      mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+      rename(player = event_player_2) %>% 
+      ungroup() %>% 
+      arrange(player, game_id) %>% 
+      data.frame()
+    
+    return(faceoffs)
+    
+    }
+  else {
+    
+    faceoffs <- data %>% 
+      filter(game_strength_state %in% paste(rev(unlist(strsplit(strength, NULL))), collapse = ""),  # reverse strength state entered into function
+             event_type == "FAC"
+             ) %>% 
+      group_by(event_player_1, game_id, season) %>% 
+      mutate(FOW = 1 * (away_team == event_team), 
+             FOL = 1 * (home_team == event_team)
+             ) %>% 
+      summarise(Team = first(away_team),
+                FOW = sum(FOW), 
+                FOL = sum(FOL)
+                ) %>% 
+      mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+      rename(player = event_player_1) %>% 
+      ungroup() %>% 
+      arrange(player, game_id) %>% 
+      data.frame()
+    
+    return(faceoffs)
+    
+    }
+  
+  }
+fun.penalty_SH_strength <- function(data, venue, strength) {
+  
+  if (venue == "home_team") {
+    
+    pen_1 <- data %>% 
+      group_by(event_player_1, game_id, season) %>% 
+      filter(game_strength_state %in% strength,  
+             event_team == home_team, 
+             event_type %in% c("PENL", "HIT", "BLOCK")
+             ) %>% 
+      summarise(Team = first(home_team),
+                iPENT2 = sum(na.omit(1 * (event_type == "PENL") +
+                                       1 * (event_type == "PENL" & grepl("double minor", tolower(event_detail)) == TRUE) -
+                                       1 * (event_type == "PENL" & grepl("ps \\-|match|fighting|major", tolower(event_detail)) == TRUE) - 
+                                       1 * (event_type == "PENL" & grepl("too many men", tolower(event_description)) == TRUE) - 
+                                       1 * (event_type == "PENL" & grepl("misconduct", tolower(event_description)) == TRUE))),
+                iPENT5 = sum(na.omit(event_type == "PENL" & grepl("fighting|major", tolower(event_detail)) == TRUE)), 
+                
+                iHF_o = sum(event_type == "HIT" & event_zone == "Off"), 
+                iHF_n = sum(event_type == "HIT" & event_zone == "Neu"), 
+                iHF_d = sum(event_type == "HIT" & event_zone == "Def")
+                ) %>% 
+      rename(player = event_player_1) %>% 
+      data.frame()
+    
+    
+    pen_2 <- data %>% 
+      group_by(event_player_2, game_id, season) %>% 
+      filter(game_strength_state %in% strength,  
+             event_team == away_team, 
+             event_type %in% c("PENL", "HIT", "BLOCK")
+             ) %>% 
+      summarise(Team = first(home_team), 
+                iPEND2 = sum(na.omit(1 * (event_type == "PENL") +
+                                       1 * (event_type == "PENL" & grepl("double minor", tolower(event_detail)) == TRUE) -
+                                       1 * (event_type == "PENL" & grepl("ps \\-|match|fighting|major", tolower(event_detail)) == TRUE) - 
+                                       1 * (event_type == "PENL" & grepl("too many men", tolower(event_description)) == TRUE) - 
+                                       1 * (event_type == "PENL" & grepl("misconduct", tolower(event_description)) == TRUE))),
+                iPEND5 = sum(na.omit(event_type == "PENL" & grepl("fighting|major", tolower(event_detail)) == TRUE)), 
+                
+                iHA_o = sum(event_type == "HIT" & event_zone == "Def"), 
+                iHA_n = sum(event_type == "HIT" & event_zone == "Neu"), 
+                iHA_d = sum(event_type == "HIT" & event_zone == "Off"), 
+                
+                iBLK = sum(event_type == "BLOCK")
+                ) %>% 
+      rename(player = event_player_2) %>% 
+      data.frame()
+    
+    
+    merged <- Reduce(function(...) merge(..., all = TRUE), list(pen_1, pen_2))
+    
+    joined <- merged %>% 
+      mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+      mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
+      select(player, game_id, season, Team, 
+             iPENT2, iPEND2, iPENT5, iPEND5, 
+             iBLK,
+             iHF_o, iHF_n, iHF_d, 
+             iHA_o, iHA_n, iHA_d
+             ) %>% 
+      arrange(player, game_id) %>% 
+      data.frame()
+    
+    return(joined)
+    
+    }
+  else {
+    
+    pen_1 <- data %>% 
+      group_by(event_player_1, game_id, season) %>% 
+      filter(game_strength_state %in% paste(rev(unlist(strsplit(strength, NULL))), collapse = ""),  # reverse strength state entered into function
+             event_team == away_team, 
+             event_type %in% c("PENL", "HIT", "BLOCK")
+             ) %>% 
+      summarise(Team = first(away_team),
+                iPENT2 = sum(na.omit(1 * (event_type == "PENL") +
+                                       1 * (event_type == "PENL" & grepl("double minor", tolower(event_detail)) == TRUE) -
+                                       1 * (event_type == "PENL" & grepl("ps \\-|match|fighting|major", tolower(event_detail)) == TRUE) - 
+                                       1 * (event_type == "PENL" & grepl("too many men", tolower(event_description)) == TRUE) - 
+                                       1 * (event_type == "PENL" & grepl("misconduct", tolower(event_description)) == TRUE))),
+                iPENT5 = sum(na.omit(event_type == "PENL" & grepl("fighting|major", tolower(event_detail)) == TRUE)), 
+                
+                iHF_o = sum(event_type == "HIT" & event_zone == "Off"), 
+                iHF_n = sum(event_type == "HIT" & event_zone == "Neu"), 
+                iHF_d = sum(event_type == "HIT" & event_zone == "Def")
+                ) %>% 
+      rename(player = event_player_1) %>% 
+      data.frame()
+    
+    pen_2 <- data %>% 
+      group_by(event_player_2, game_id, season) %>% 
+      filter(game_strength_state %in% paste(rev(unlist(strsplit(strength, NULL))), collapse = ""),  # reverse strength state entered into function
+             event_team == home_team, 
+             event_type %in% c("PENL", "HIT", "BLOCK")
+             ) %>% 
+      summarise(Team = first(away_team),
+                iPEND2 = sum(na.omit(1 * (event_type == "PENL") +
+                                       1 * (event_type == "PENL" & grepl("double minor", tolower(event_detail)) == TRUE) -
+                                       1 * (event_type == "PENL" & grepl("ps \\-|match|fighting|major", tolower(event_detail)) == TRUE) - 
+                                       1 * (event_type == "PENL" & grepl("too many men", tolower(event_description)) == TRUE) - 
+                                       1 * (event_type == "PENL" & grepl("misconduct", tolower(event_description)) == TRUE))),
+                iPEND5 = sum(na.omit(event_type == "PENL" & grepl("fighting|major", tolower(event_detail)) == TRUE)), 
+                
+                iHA_o = sum(event_type == "HIT" & event_zone == "Def"), 
+                iHA_n = sum(event_type == "HIT" & event_zone == "Neu"), 
+                iHA_d = sum(event_type == "HIT" & event_zone == "Off"), 
+                
+                iBLK = sum(event_type == "BLOCK")
+                ) %>% 
+      rename(player = event_player_2) %>% 
+      data.frame()
+    
+    
+    merged <- Reduce(function(...) merge(..., all=TRUE), list(pen_1, pen_2))
+    
+    joined <- merged %>% 
+      mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+      mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
+      select(player, game_id, season, Team, 
+             iPENT2, iPEND2, iPENT5, iPEND5, 
+             iBLK, 
+             iHF_o, iHF_n, iHF_d, 
+             iHA_o, iHA_n, iHA_d
+             ) %>% 
+      arrange(player, game_id) %>% 
+      data.frame()
+    
+    return(joined)
+    
+    }
+  
+  }
+
+###  Run all functions
+fun.combine_counts_SH_strength <- function(data, strength, scr_adj_list) { 
+  
+  print(paste("season:", unique(data$season)), quote = F)
+  
+  # Filter pbp / join prior face time for corsi events
+  data <- data %>% 
+    filter(game_strength_state %in% st.pp_strength, 
+           game_period < 5
+           ) %>% 
+    select(-c(face_index:shift_length)) %>% 
+    mutate(scradj = home_score - away_score, 
+           home_lead = ifelse(scradj >= 3, 3, 
+                              ifelse(scradj <= -3, -3, scradj)),
+           home_lead_state = ifelse(home_lead < 0, 1, 
+                                    ifelse(home_lead == 0, 2, 
+                                           ifelse(home_lead > 0, 3, home_lead))), 
+           home_lead = home_lead + 4, 
+           event_length = ifelse(is.na(event_length), 0, event_length)
+           ) %>% 
+    rename(pred_goal = pred_XGB_7)
+  
+  
+  ### Run functions
+  shot_metrics <- fun.shotmetrics_SH_strength(data, strength, scr_adj_list)
+  zone_start <-   fun.ZS_compute_SH_strength(data, strength)
+  
+  print("counts", quote = F)
+  counts_all <- fun.counts_SH_strength(data, "home_team", strength) %>% 
+    rbind(., fun.counts_SH_strength(data, "away_team", strength)) %>% 
+    arrange(player, game_id)
+  
+  print("faceoffs", quote = F)
+  faceoff_all <- fun.faceoff_SH_strength(data, "home_team", strength) %>% 
+    rbind(., fun.faceoff_SH_strength(data, "away_team", strength)) %>% 
+    arrange(player, game_id)
+  
+  print("penalties", quote = F)
+  penalty_all <- fun.penalty_SH_strength(data, "home_team", strength) %>% 
+    rbind(., fun.penalty_SH_strength(data, "away_team", strength)) %>% 
+    arrange(player, game_id)
+  
+  
+  # Join
+  print("combine", quote = F)
+  metrics_combined <- shot_metrics %>% 
+    left_join(., zone_start,  by = c("player", "game_id", "season", "Team")) %>% 
+    left_join(., counts_all,  by = c("player", "game_id", "season", "Team")) %>% 
+    left_join(., faceoff_all, by = c("player", "game_id", "season", "Team")) %>% 
+    left_join(., penalty_all, by = c("player", "game_id", "season", "Team")) %>% 
+    select(player, game_id, game_date, season, Team, Opponent, is_home, TOI, 
+           G, A1, A2, Points, 
+           iSF, iFF, iCF, ixG,
+           iBLK,  
+           GIVE_o:TAKE_d, 
+           iHF_o:iHA_d, 
+           FOW, FOL, 
+           OZS, NZS, DZS, 
+           iPENT2, iPEND2, iPENT5, iPEND5, 
+           onGF:onxGA_adj, 
+           t_TOI:t_xGA_adj
+           ) %>% 
+    # Patch for if no SH goals were scored
+    mutate(A1 = ifelse(is.na(A1), 0, A1), 
+           A2 = ifelse(is.na(A2), 0, A2)
+           ) %>% 
+    arrange(player, game_id) %>% 
+    mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+    mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
+    data.frame()
+  
+  
+  return(metrics_combined)
+  
+  }
+
+
+#########################
+
 
 
 ## ------------------------------- ##
@@ -12439,6 +14601,7 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
 
 
 #############################
+
 
 
 

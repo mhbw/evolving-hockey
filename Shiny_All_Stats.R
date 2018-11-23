@@ -44,6 +44,9 @@ xG_model_XGB_10_EN <- readRDS("data/xG_model_XGB_10yr_EN_1.rds")
 score_adj_EV <- readRDS("data/score_adj_EV_list.rds") # all together in a list - EV
 score_adj_PP <- readRDS("data/score_adj_PP_list.rds") # all together in a list - PP
 score_adj_SH <- readRDS("data/score_adj_SH_list.rds") # all together in a list - SH
+score_adj_5v5 <- readRDS("data/score_adj_5v5_list.rds") # all together in a list - 5v5
+score_adj_5v4 <- readRDS("data/score_adj_5v4_list.rds") # all together in a list - 5v4
+score_adj_4v5 <- readRDS("data/score_adj_4v5_list.rds") # all together in a list - 4v5
 
 # Penalty Goals Scoring Rates
 scoring_rates <- readRDS("data/scoring_rates2.rds") # updated with newest version including '17-18 data
@@ -804,8 +807,6 @@ team_games_new_pbp <- fun.team_game_labels(pbp_data = pbp_df)
 
 
 
-
-
 # Verify All Games Are Included in All Data Frames from Above
 fun.check_new_games <- function() { 
   
@@ -879,9 +880,13 @@ fun.check_new_games <- function() {
 check_new_games <- fun.check_new_games()
 
 
+# TOR v CBJ 2018020308 - No Penalties
+
+
 
 
 ## ---------------- SAVE NEW DATA AND LOAD TOTAL DATA ---------------- ##
+
 
 
 
@@ -940,7 +945,8 @@ dbDisconnect(db)
 #dbDisconnect(db)
 
 
-
+# PIT v ??? 20180xxxxx - Only Offsetting Penalties
+# TOR v CBJ 2018020308 - No Penalties
 
 # Check game_id counts in database
 fun.check_db_games <- function(db_name) { 
