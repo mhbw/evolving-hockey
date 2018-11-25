@@ -6635,16 +6635,28 @@ fun.teammate <- function(pbp_data, strength) {
   
   print(paste("season:", unique(pbp_data$season)), quote = F)
   
-  # Home data filter
+  # Home data strength state filter
   if (strength == "even") { 
     data_home <- pbp_data %>% 
       filter(game_strength_state %in% st.even_strength, 
              game_period < 5)
     
     }
+  else if (strength == "5v5") { 
+    data_home <- pbp_data %>% 
+      filter(game_strength_state == "5v5", 
+             game_period < 5)
+    
+    }
   else if (strength == "powerplay") { 
     data_home <- pbp_data %>% 
       filter(game_strength_state %in% c("5v4", "5v3", "4v3"), 
+             game_period < 5)
+    
+    }
+  else if (strength == "5v4") { 
+    data_home <- pbp_data %>% 
+      filter(game_strength_state %in% c("5v4"), 
              game_period < 5)
     
     }
@@ -6654,19 +6666,25 @@ fun.teammate <- function(pbp_data, strength) {
              game_period < 5)
     
     }
-  else if (strength == "5v5") { 
+  else if (strength == "4v5") { 
     data_home <- pbp_data %>% 
-      filter(game_strength_state == "5v5", 
+      filter(game_strength_state %in% c("4v5"), 
              game_period < 5)
-  
+    
     }
   
-  # Away data filter
+  # Away data strength state filter
   if (strength == "even") { 
     data_away <- pbp_data %>% 
       filter(game_strength_state %in% st.even_strength, 
              game_period < 5)
   
+    }
+  else if (strength == "5v5") { 
+    data_away <- pbp_data %>% 
+      filter(game_strength_state == "5v5", 
+             game_period < 5)
+    
     }
   else if (strength == "powerplay") { 
     data_away <- pbp_data %>% 
@@ -6674,17 +6692,23 @@ fun.teammate <- function(pbp_data, strength) {
              game_period < 5)
   
     }
+  else if (strength == "5v4") { 
+    data_away <- pbp_data %>% 
+      filter(game_strength_state %in%  c("4v5"), 
+             game_period < 5)
+    
+    }
   else if (strength == "shorthanded") { 
     data_away <- pbp_data %>%
       filter(game_strength_state %in% c("5v4", "5v3", "4v3"), 
              game_period < 5)
   
     }
-  else if (strength == "5v5") { 
-    data_away <- pbp_data %>% 
-      filter(game_strength_state == "5v5", 
+  else if (strength == "4v5") { 
+    data_away <- pbp_data %>%
+      filter(game_strength_state %in% c("5v4"), 
              game_period < 5)
-  
+    
     }
   
   

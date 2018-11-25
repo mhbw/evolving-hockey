@@ -44,9 +44,17 @@ xG_model_XGB_10_EN <- readRDS("data/xG_model_XGB_10yr_EN_1.rds")
 score_adj_EV <- readRDS("data/score_adj_EV_list.rds") # all together in a list - EV
 score_adj_PP <- readRDS("data/score_adj_PP_list.rds") # all together in a list - PP
 score_adj_SH <- readRDS("data/score_adj_SH_list.rds") # all together in a list - SH
+
 score_adj_5v5 <- readRDS("data/score_adj_5v5_list.rds") # all together in a list - 5v5
+score_adj_4v4 <- readRDS("data/score_adj_4v4_list.rds") # all together in a list - 4v4
+score_adj_3v3 <- readRDS("data/score_adj_3v3_list.rds") # all together in a list - 3v3
+
 score_adj_5v4 <- readRDS("data/score_adj_5v4_list.rds") # all together in a list - 5v4
-score_adj_4v5 <- readRDS("data/score_adj_4v5_list.rds") # all together in a list - 4v5
+score_adj_5v3 <- readRDS("data/score_adj_5v4_list.rds") # all together in a list - 5v4
+score_adj_4v3 <- readRDS("data/score_adj_5v4_list.rds") # all together in a list - 5v4
+
+#score_adj_4v5 <- readRDS("data/score_adj_4v5_list.rds") # all together in a list - 4v5 *** not used
+
 
 # Penalty Goals Scoring Rates
 scoring_rates <- readRDS("data/scoring_rates2.rds") # updated with newest version including '17-18 data
@@ -880,8 +888,6 @@ fun.check_new_games <- function() {
 check_new_games <- fun.check_new_games()
 
 
-# TOR v CBJ 2018020308 - No Penalties
-
 
 
 
@@ -945,8 +951,10 @@ dbDisconnect(db)
 #dbDisconnect(db)
 
 
+
 # PIT v ??? 20180xxxxx - Only Offsetting Penalties
 # TOR v CBJ 2018020308 - No Penalties
+# TOR v PHI 2018020348 - No Penalties
 
 # Check game_id counts in database
 fun.check_db_games <- function(db_name) { 
@@ -1031,9 +1039,9 @@ gc()
 db <- DBI::dbConnect(SQLite(), dbname = "data/NHL_db_1819.sqlite") # NEW DATABASE NAME
 
 pbp_joined <-     db %>% tbl("pbp_full") %>% data.frame()
-#shifts_joined <-  db %>% tbl("shifts_full") %>% data.frame()    # not needed here
-#rosters_joined <- db %>% tbl("rosters_full") %>% data.frame()   # not needed here
-#game_labels_joined <- db %>% tbl("game_charts_labels") %>% data.frame()
+#shifts_joined <-      db %>% tbl("shifts_full") %>% data.frame()         # not needed here
+#rosters_joined <-     db %>% tbl("rosters_full") %>% data.frame()        # not needed here
+#game_labels_joined <- db %>% tbl("game_charts_labels") %>% data.frame()  # not needed here
 
 games_all_sit_joined <- db %>% tbl("games_data_all_sit") %>% data.frame()
 games_EV_joined <-      db %>% tbl("games_data_EV") %>% data.frame()
