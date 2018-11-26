@@ -801,9 +801,9 @@ adj_pen_games_new <- fun.pen_value_sum_add(pen_data = adj_pen_games, skater_data
 ## ------------------------------ ##
 
 team_games_all_sit_new <- fun.team_games_all_sit(data = pbp_df)
-team_games_EV_new <-      fun.team_games_EV(data = pbp_df)
-team_games_PP_new <-      fun.team_games_PP(data = pbp_df)
-team_games_SH_new <-      fun.team_games_SH(data = pbp_df)
+team_games_EV_new <-      fun.team_games_EV(data = pbp_df, strength = "EV")
+team_games_PP_new <-      fun.team_games_PP(data = pbp_df, strength = "PP")
+team_games_SH_new <-      fun.team_games_SH(data = pbp_df, strength = "SH")
 
 
 ## --------------------------- ##

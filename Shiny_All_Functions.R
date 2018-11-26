@@ -6648,6 +6648,7 @@ fun.teammate <- function(pbp_data, strength) {
              game_period < 5)
     
     }
+  
   else if (strength == "powerplay") { 
     data_home <- pbp_data %>% 
       filter(game_strength_state %in% c("5v4", "5v3", "4v3"), 
@@ -6660,6 +6661,7 @@ fun.teammate <- function(pbp_data, strength) {
              game_period < 5)
     
     }
+  
   else if (strength == "shorthanded") { 
     data_home <- pbp_data %>% 
       filter(game_strength_state %in% c("4v5", "3v5", "3v4"), 
@@ -6686,6 +6688,7 @@ fun.teammate <- function(pbp_data, strength) {
              game_period < 5)
     
     }
+  
   else if (strength == "powerplay") { 
     data_away <- pbp_data %>% 
       filter(game_strength_state %in%  c("4v5", "3v5", "3v4"), 
@@ -6698,6 +6701,7 @@ fun.teammate <- function(pbp_data, strength) {
              game_period < 5)
     
     }
+  
   else if (strength == "shorthanded") { 
     data_away <- pbp_data %>%
       filter(game_strength_state %in% c("5v4", "5v3", "4v3"), 
@@ -7958,10 +7962,20 @@ fun.team_games_all_sit <- function(data) {
   }
 
 ## Even-Strength
-fun.team_games_EV <- function(data) {
+fun.team_games_EV <- function(data, strength) {
   
+  # In-function filter for strength state
+  if (strength == "EV") {
+    strength_ <- st.even_strength
+    
+    } else {
+      strength_ <- strength
+    
+      }
+  
+  # Filter pbp data / add required columns
   data <- data %>% 
-    filter(game_strength_state %in% st.even_strength, 
+    filter(game_strength_state %in% strength_, 
            game_period < 5
            ) %>% 
     mutate(scradj = home_score - away_score, 
@@ -8089,15 +8103,32 @@ fun.team_games_EV <- function(data) {
     arrange(Team, game_id) %>% 
     data.frame()
   
+  
+  # Remove columns not used in below strength states
+  if (strength != "EV") { 
+    games <- games %>% select(-c(TOI_5v5:TOI_3v3))
+    
+    }
+  
   return(games)
   
   }
 
 ## Powerplay
-fun.team_games_PP <- function(data) {
+fun.team_games_PP <- function(data, strength) {
   
+  # In-function filter for strength state: pbp data
+  if (strength == "PP") {
+    strength_ <- st.pp_strength
+    
+    } else {
+      strength_ <- c(strength, paste(rev(unlist(strsplit(strength, NULL))), collapse = ""))
+    
+      }
+  
+  # Filter pbp data / add required columns
   data <- data %>% 
-    filter(game_strength_state %in% st.pp_strength, 
+    filter(game_strength_state %in% strength_, 
            game_period < 5
            ) %>% 
     select(-c(face_index:shift_length)) %>% 
@@ -8113,9 +8144,21 @@ fun.team_games_PP <- function(data) {
     rename(pred_goal = pred_XGB_7)
   
   
+  # in-function strength for filter: home/away data
+  if (strength == "PP") { 
+    strength_home <- c("5v4", "5v3", "4v3")
+    strength_away <- c("4v5", "3v5", "3v4")
+    
+    } else { 
+      strength_home <- strength
+      strength_away <- paste(rev(unlist(strsplit(strength, NULL))), collapse = "")
+    
+      }
+  
+  
   # Sum data per game
   team_h <- data %>% 
-    filter(game_strength_state %in% c("5v4", "5v3", "4v3")) %>% 
+    filter(game_strength_state %in% strength_home) %>% 
     group_by(home_team, season, game_id, game_date) %>% 
     summarise(Opponent = first(away_team), 
               
@@ -8157,7 +8200,7 @@ fun.team_games_PP <- function(data) {
     data.frame()
   
   team_a <- data %>% 
-    filter(game_strength_state %in% c("4v5", "3v5", "3v4")) %>% 
+    filter(game_strength_state %in% strength_away) %>% 
     group_by(away_team, season, game_id, game_date) %>% 
     summarise(Opponent = first(home_team), 
               
@@ -8209,15 +8252,33 @@ fun.team_games_PP <- function(data) {
     arrange(Team, game_id) %>% 
     data.frame()
   
+  
+  # Remove columns not used in below strength states
+  if (strength != "PP") { 
+    games <- games %>% select(-c(TOI_5v4:TOI_4v3))
+    
+    }
+  
+  
   return(games)
   
   }
 
 ## Shorthanded   
-fun.team_games_SH <- function(data) {
+fun.team_games_SH <- function(data, strength) {
   
+  # In-function filter for strength state: pbp data
+  if (strength == "SH") {
+    strength_ <- st.pp_strength
+    
+    } else {
+      strength_ <- c(strength, paste(rev(unlist(strsplit(strength, NULL))), collapse = ""))
+    
+      }
+  
+  # Filter pbp data / add required columns
   data <- data %>% 
-    filter(game_strength_state %in% st.pp_strength, 
+    filter(game_strength_state %in% strength_, 
            game_period < 5
            ) %>% 
     select(-c(face_index:shift_length)) %>% 
@@ -8233,9 +8294,21 @@ fun.team_games_SH <- function(data) {
     rename(pred_goal = pred_XGB_7)
   
   
+  # in-function strength for filter: home/away data
+  if (strength == "SH") { 
+    strength_home <- c("4v5", "3v5", "3v4")
+    strength_away <- c("5v4", "5v3", "4v3")
+    
+    } else { 
+      strength_home <- strength
+      strength_away <- paste(rev(unlist(strsplit(strength, NULL))), collapse = "")
+    
+      }
+  
+  
   # Data per game
   team_h <- data %>% 
-    filter(game_strength_state %in% c("4v5", "3v5", "3v4")) %>% 
+    filter(game_strength_state %in% strength_home) %>% 
     group_by(home_team, season, game_id, game_date) %>% 
     summarise(Opponent = first(away_team), 
               
@@ -8276,7 +8349,7 @@ fun.team_games_SH <- function(data) {
     data.frame()
   
   team_a <- data %>% 
-    filter(game_strength_state %in% c("5v4", "5v3", "4v3")) %>% 
+    filter(game_strength_state %in% strength_away) %>% 
     group_by(away_team, season, game_id, game_date) %>% 
     summarise(Opponent = first(home_team), 
               
@@ -8328,6 +8401,13 @@ fun.team_games_SH <- function(data) {
            ) %>% 
     arrange(Team, game_id) %>% 
     data.frame()
+  
+  
+  # Remove columns not used in below strength states
+  if (strength != "SH") { 
+    games <- games %>% select(-c(TOI_4v5:TOI_3v4))
+    
+    }
   
   return(games)
   
@@ -8776,7 +8856,7 @@ fun.relative_teammate <- function(TM_data, games_data, position_data, strength, 
   
   if (strength == "even") { 
     
-    if (sum_type == "per_team") { 
+    if (sum_type == "per_team") {    # removed other summing types
       
       # Player on-ice raw and per 60 numbers
       player_metrics_EV <- games_data %>% 
@@ -8898,7 +8978,7 @@ fun.relative_teammate <- function(TM_data, games_data, position_data, strength, 
   
   if (strength == "powerplay") { 
     
-    if (sum_type == "per_team") { 
+    if (sum_type == "per_team") {    # removed other summing types
       
       # Calculate relative to teammate
       player_metrics_PP <- games_data %>% 
@@ -9002,7 +9082,7 @@ fun.relative_teammate <- function(TM_data, games_data, position_data, strength, 
   
   if (strength == "shorthanded") { 
     
-    if (sum_type == "per_team") { 
+    if (sum_type == "per_team") {    # removed other summing types
       
       # SH - Relative to Teammate "New"
       player_metrics_SH <- games_data %>% 
@@ -9086,6 +9166,299 @@ fun.relative_teammate <- function(TM_data, games_data, position_data, strength, 
                GA60_state:xGA60_state, 
                rel_TM_GA60:rel_TM_xGA60, rel_TM_GA60_state:rel_TM_xGA60_state, 
                rel_TM_GA_impact:rel_TM_xGA_impact, rel_TM_GA_state_impact:rel_TM_xGA_state_impact
+               ) %>% 
+        mutate_if(is.numeric, funs(round(., 2))) %>% 
+        rename(position = position_p, 
+               TOI = TOI_p
+               ) %>% 
+        data.frame()
+      
+      # Return list
+      return_list <- list(WOWY_data =   WOWY_df, 
+                          rel_TM_data = rel_impact_SH)
+      
+      return(return_list)
+      
+      }
+    
+    }
+  
+  if (strength == "5v5") { 
+    
+    if (sum_type == "per_team") {    # removed other summing types
+      
+      # Player on-ice raw and per 60 numbers
+      player_metrics_EV <- games_data %>% 
+        group_by(player, season, Team) %>% 
+        mutate(GP = 1) %>% 
+        summarise_at(vars(TOI, GP, onGF:onxGA), 
+                     funs(sum)
+                     ) %>% 
+        mutate(onSH.perc = ifelse(onGF > 0 & onSF > 0, 100 * (onGF / onSF), 0)) %>% # on-ice shooting % relative to teammate
+        mutate_at(vars(onGF:onxGA), # convert columns to per 60
+                  funs((. / TOI) * 60)
+                  ) %>% 
+        ungroup() %>% 
+        
+        rename_at(vars(onGF:onxGA), # rename to per 60
+                  funs(paste0(gsub("on", "",.), "60"))
+                  ) %>% 
+        left_join(., position_data, by = "player") %>% 
+        data.frame()
+      
+      # Teammate on-ice raw and per 60 numbers
+      teammate_metrics_EV <- player_metrics_EV %>% 
+        rename(teammate = player)
+      
+      # Calculate WOWY data
+      WOWY_df <- TM_data %>% 
+        rename(TOI_tog = TOI) %>% 
+        group_by(player, teammate, season, Team) %>% 
+        summarise(TOI_tog = sum(TOI_tog)) %>% 
+        ungroup() %>% 
+        left_join(., player_metrics_EV, by = c("player", "season", "Team")) %>% # join player metrics
+        left_join(., teammate_metrics_EV, by = c("teammate", "season", "Team"), suffix = c("_p", "_t")) %>% # join teammate metrics
+        mutate(player_TOI_perc_w = TOI_tog / TOI_p) %>% 
+        mutate_at(vars(ends_with("_t")), # add "weighted raw" columns 
+                  .funs = funs(weighted = . * player_TOI_perc_w)
+                  ) %>% 
+        data.frame()
+      
+      # Calculate relative to teammate metrics
+      joined_df_EV <- WOWY_df %>% 
+        group_by_at(vars(player, position_p, season, Team, TOI_p, GF60_p:xGA60_p, onSH.perc_p)) %>% 
+        summarise_at(vars(player_TOI_perc_w, GF60_t_weighted:xGA60_t_weighted, onSH.perc_t_weighted), # sum "weighted raw" columns
+                     funs(sum)
+                     ) %>% 
+        ungroup() %>% 
+        mutate_at(vars(GF60_t_weighted:xGA60_t_weighted, onSH.perc_t_weighted), # finalzie weighted avg of teammates
+                  funs(. / player_TOI_perc_w)
+                  ) %>% 
+        rename_at(vars(GF60_p:xGA60_p, onSH.perc_p), # rename players
+                  funs(gsub("_p", "",.))
+                  ) %>% 
+        rename_at(vars(GF60_t_weighted:xGA60_t_weighted, onSH.perc_t_weighted), # rename teammates
+                  funs(paste0("w_TM_", gsub("_t_weighted", "",.)))
+                  ) %>% 
+        mutate(rel_TM_GF60 =  GF60 - w_TM_GF60, 
+               rel_TM_GA60 =  GA60 - w_TM_GA60, 
+               rel_TM_SF60 =  SF60 - w_TM_SF60, 
+               rel_TM_SA60 =  SA60 - w_TM_SA60, 
+               rel_TM_FF60 =  FF60 - w_TM_FF60, 
+               rel_TM_FA60 =  FA60 - w_TM_FA60, 
+               rel_TM_CF60 =  CF60 - w_TM_CF60, 
+               rel_TM_CA60 =  CA60 - w_TM_CA60, 
+               rel_TM_xGF60 = xGF60 - w_TM_xGF60, 
+               rel_TM_xGA60 = xGA60 - w_TM_xGA60, 
+               
+               rel_TM_SH_perc = onSH.perc - w_TM_onSH.perc
+               ) %>% 
+        data.frame()
+      
+      # Create impact numbers and clean up
+      rel_impact_EV <- joined_df_EV %>% 
+        mutate_at(vars(contains("rel_TM_")), # create expanded "impact" columns
+                  .funs = funs(impact = round((. / 60) * TOI_p, 2))
+                  ) %>% 
+        rename_at(vars(rel_TM_GF60_impact:rel_TM_xGA60_impact), 
+                  funs(gsub("60", "", .))
+                  ) %>% 
+        select(player, position_p, season, Team, TOI_p, 
+               GF60:xGA60,
+               
+               rel_TM_GF60:rel_TM_xGA60,
+               rel_TM_SH_perc, 
+               
+               rel_TM_GF_impact:rel_TM_xGA_impact
+               ) %>% 
+        rename(position = position_p, 
+               TOI = TOI_p
+               ) %>% 
+        mutate_if(is.numeric, funs(round(., 3))) %>% 
+        mutate(TOI = round(TOI, 2)) %>% 
+        data.frame()
+      
+      
+      return_list <- list(WOWY_data =   WOWY_df, 
+                          rel_TM_data = rel_impact_EV)
+      
+      return(return_list)
+      
+      }
+    
+    }
+  
+  if (strength == "5v4") { 
+    
+    if (sum_type == "per_team") {    # removed other summing types
+      
+      # Calculate relative to teammate
+      player_metrics_PP <- games_data %>% 
+        filter(TOI > 0) %>% 
+        group_by(player, season, Team) %>% 
+        mutate(GP = 1) %>% 
+        summarise_at(vars(TOI, GP, onGF, onSF, onFF, onCF, onxGF), 
+                     funs(sum)
+                     ) %>% 
+        mutate(onSH.perc = ifelse(onGF > 0 & onSF > 0, 100 * (onGF / onSF), 0)) %>% # for on-ice shooting % relative to teammate
+        mutate_at(vars(onGF, onSF, onFF, onCF, onxGF), # convert columns to per 60
+                  funs((. / TOI) * 60)
+                  ) %>% 
+        ungroup() %>% 
+        rename_at(vars(onGF, onSF, onFF, onCF, onxGF), # rename to per 60
+                  funs(paste0(gsub("on", "",.), "60"))
+                  ) %>% 
+        left_join(., position_data, by = "player") %>% 
+        data.frame()
+      
+      # Teammate on-ice raw and per 60 numbers
+      teammate_metrics_PP <- player_metrics_PP %>% 
+        rename(teammate = player)
+      
+      # Calculate relative to teammate numbers
+      WOWY_df <- TM_data %>% 
+        rename(TOI_tog = TOI) %>% 
+        group_by(player, teammate, season, Team) %>% 
+        summarise(TOI_tog = sum(TOI_tog)) %>% 
+        ungroup() %>% 
+        left_join(., player_metrics_PP, by = c("player", "season", "Team")) %>% # join player metrics
+        left_join(., teammate_metrics_PP, by = c("teammate", "season", "Team"), suffix = c("_p", "_t")) %>% # join teammate metrics
+        mutate(player_TOI_perc_w = TOI_tog / TOI_p) %>% 
+        mutate_at(vars(ends_with("_t")), # add "weighted raw" columns 
+                  .funs = funs(weighted = . * player_TOI_perc_w)
+                  ) %>% 
+        data.frame()
+      
+      joined_df_PP <- WOWY_df %>% 
+        group_by_at(vars(player, position_p, season, Team, TOI_p, GF60_p:xGF60_p, onSH.perc_p)) %>% 
+        summarise_at(vars(player_TOI_perc_w, GF60_t_weighted:xGF60_t_weighted, onSH.perc_t_weighted), 
+                     funs(sum)
+                     ) %>% 
+        ungroup() %>% 
+        mutate_at(vars(GF60_t_weighted:xGF60_t_weighted, onSH.perc_t_weighted), # finalzie weighted avg of teammates
+                  funs(. / player_TOI_perc_w)
+                  ) %>% 
+        rename_at(vars(GF60_p:xGF60_p, onSH.perc_p), 
+                  funs(gsub("_p", "",.))
+                  ) %>% 
+        rename_at(vars(GF60_t_weighted:xGF60_t_weighted, onSH.perc_t_weighted), 
+                  funs(paste0("w_TM_", gsub("_t_weighted", "",.)))
+                  ) %>% 
+        mutate(rel_TM_GF60 =    GF60 - w_TM_GF60, 
+               rel_TM_SF60 =    SF60 - w_TM_SF60, 
+               rel_TM_FF60 =    FF60 - w_TM_FF60, 
+               rel_TM_CF60 =    CF60 - w_TM_CF60, 
+               rel_TM_xGF60 =   xGF60 - w_TM_xGF60, 
+               rel_TM_SH_perc = onSH.perc - w_TM_onSH.perc
+               ) %>% 
+        data.frame()
+      
+      # Create impact numbers and clean up
+      rel_impact_PP <- joined_df_PP %>% 
+        mutate_at(vars(contains("rel_TM_")), # create expanded "impact" columns
+                  .funs = funs(impact = round((. / 60) * TOI_p, 2))
+                  ) %>% 
+        rename_at(vars(rel_TM_GF60_impact:rel_TM_xGF60_impact), 
+                  funs(gsub("60", "", .))
+                  ) %>% 
+        select(player, position_p, season, Team, TOI_p, 
+               GF60:xGF60, 
+               rel_TM_GF60:rel_TM_xGF60, 
+               rel_TM_GF_impact:rel_TM_xGF_impact
+               ) %>% 
+        mutate_if(is.numeric, funs(round(., 2))) %>% 
+        rename(position = position_p, 
+               TOI = TOI_p
+               ) %>% 
+        data.frame()
+      
+      return_list <- list(WOWY_data =   WOWY_df, 
+                          rel_TM_data = rel_impact_PP)
+      
+      return(return_list)
+      
+      }
+    
+    }
+  
+  if (strength == "4v5") { 
+    
+    if (sum_type == "per_team") {    # removed other summing types
+      
+      # SH - Relative to Teammate "New"
+      player_metrics_SH <- games_data %>% 
+        filter(TOI > 0) %>% 
+        group_by(player, season, Team) %>% 
+        mutate(GP = 1) %>% 
+        summarise_at(vars(TOI, GP, onGA, onSA, onFA, onCA, onxGA), 
+                     funs(sum)
+                     ) %>% 
+        mutate_at(vars(onGA, onSA, onFA, onCA, onxGA), # convert columns to per 60
+                  funs((. / TOI) * 60)
+                  ) %>% 
+        ungroup() %>% 
+        rename_at(vars(onGA, onSA, onFA, onCA, onxGA), # rename to per 60
+                  funs(paste0(gsub("on", "",.), "60"))
+                  ) %>% 
+        left_join(., position_data, by = "player") %>% 
+        data.frame()
+      
+      # Teammate on-ice raw and per 60 numbers
+      teammate_metrics_SH <- player_metrics_SH %>% 
+        rename(teammate = player)
+      
+      # Calculate relative to teammate numbers
+      WOWY_df <- TM_data %>% 
+        rename(TOI_tog = TOI) %>% 
+        group_by(player, teammate, season, Team) %>% 
+        summarise(TOI_tog = sum(TOI_tog)) %>% 
+        ungroup() %>% 
+        left_join(., player_metrics_SH, by = c("player", "season", "Team")) %>% # join player metrics
+        left_join(., teammate_metrics_SH, by = c("teammate", "season", "Team"), suffix = c("_p", "_t")) %>% # join teammate metrics
+        mutate(player_TOI_perc_w = TOI_tog / TOI_p) %>% 
+        mutate_at(vars(ends_with("_t")), # add "weighted raw" columns 
+                  .funs = funs(weighted = . * player_TOI_perc_w)
+                  ) %>% 
+        data.frame()
+      
+      joined_df_SH <- WOWY_df %>% 
+        group_by_at(vars(player, position_p, season, Team, TOI_p, GA60_p:xGA60_p)) %>% 
+        summarise_at(vars(player_TOI_perc_w, GA60_t_weighted:xGA60_t_weighted), 
+                     funs(sum)
+                     ) %>% 
+        ungroup() %>% 
+        mutate_at(vars(GA60_t_weighted:xGA60_t_weighted), # finalzie weighted avg of teammates
+                  funs(. / player_TOI_perc_w)
+                  ) %>% 
+        rename_at(vars(GA60_p:xGA60_p), 
+                  funs(gsub("_p", "",.))
+                  ) %>% 
+        rename_at(vars(GA60_t_weighted:xGA60_t_weighted), 
+                  funs(paste0("w_TM_", gsub("_t_weighted", "",.)))
+                  ) %>% 
+        rename_at(vars(contains("_state")), # fix state adj names
+                  funs(gsub("_state60", "60_state", .))
+                  ) %>% 
+        mutate(rel_TM_GA60 =  GA60 - w_TM_GA60, 
+               rel_TM_SA60 =  SA60 - w_TM_SA60, 
+               rel_TM_FA60 =  FA60 - w_TM_FA60, 
+               rel_TM_CA60 =  CA60 - w_TM_CA60, 
+               rel_TM_xGA60 = xGA60 - w_TM_xGA60
+               ) %>% 
+        data.frame()
+      
+      # Create impact numbers and clean up
+      rel_impact_SH <- joined_df_SH %>% 
+        mutate_at(vars(contains("rel_TM_")), # create expanded "impact" columns
+                  .funs = funs(impact = round((. / 60) * TOI_p, 2))
+                  ) %>%  
+        rename_at(vars(rel_TM_GA60_impact:rel_TM_xGA60_impact), 
+                  funs(gsub("60", "", .))
+                  ) %>% 
+        select(player, position_p, season, Team, TOI_p, 
+               GA60:xGA60, 
+               rel_TM_GA60:rel_TM_xGA60, 
+               rel_TM_GA_impact:rel_TM_xGA_impact
                ) %>% 
         mutate_if(is.numeric, funs(round(., 2))) %>% 
         rename(position = position_p, 
