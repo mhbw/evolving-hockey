@@ -8144,7 +8144,7 @@ fun.team_games_PP <- function(data, strength) {
     rename(pred_goal = pred_XGB_7)
   
   
-  # in-function strength for filter: home/away data
+  # In-function strength for filter: home/away data
   if (strength == "PP") { 
     strength_home <- c("5v4", "5v3", "4v3")
     strength_away <- c("4v5", "3v5", "3v4")

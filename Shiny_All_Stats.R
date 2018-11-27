@@ -202,30 +202,30 @@ source("Shiny_All_Functions.R")
 
 #############################
 
-# Create Team IDs Data Frame 
-fun.Team_IDs <- function() { 
-  
-  IDs <- data.frame(matrix(nrow = 33, ncol = 2))
-  IDs$X1 <- c("N.J", "NYI", "NYR", "PHI", "PIT", "BOS", "BUF", "MTL", "OTT", "TOR", 
-              "1000", "CAR", "FLA", "T.B", "WSH", "CHI", "DET", "NSH", "STL", "CGY", 
-              "COL", "EDM", "VAN", "ANA", "DAL", "L.A", "1000", "S.J", "CBJ", "MIN", 
-              "WPG", "ARI", "VGK")
-  
-  IDs$X2 <- seq(1:33)
-  IDs$X2 <- ifelse(IDs$X2 == 31, 52, IDs$X2)
-  IDs$X2 <- ifelse(IDs$X2 == 32, 53, IDs$X2)
-  IDs$X2 <- ifelse(IDs$X2 == 33, 54, IDs$X2)
-  names(IDs) <- c("Team", "ID")
-  
-  return(IDs)
-  
-  }
-Team_ID <- fun.Team_IDs()
-
-
 # Scrape Schedule of previous games
 fun.schedule <- function(start, end) { 
   
+  # Create Team IDs
+  fun.Team_IDs <- function() { 
+    
+    IDs <- data.frame(matrix(nrow = 33, ncol = 2))
+    IDs$X1 <- c("N.J", "NYI", "NYR", "PHI", "PIT", "BOS", "BUF", "MTL", "OTT", "TOR", 
+                "1000", "CAR", "FLA", "T.B", "WSH", "CHI", "DET", "NSH", "STL", "CGY", 
+                "COL", "EDM", "VAN", "ANA", "DAL", "L.A", "1000", "S.J", "CBJ", "MIN", 
+                "WPG", "ARI", "VGK")
+    
+    IDs$X2 <- seq(1:33)
+    IDs$X2 <- ifelse(IDs$X2 == 31, 52, IDs$X2)
+    IDs$X2 <- ifelse(IDs$X2 == 32, 53, IDs$X2)
+    IDs$X2 <- ifelse(IDs$X2 == 33, 54, IDs$X2)
+    names(IDs) <- c("Team", "ID")
+    
+    return(IDs)
+    
+    }
+  Team_ID <- fun.Team_IDs()
+  
+  # Scrape Schedule
   sched <- ds.scrape_schedule(start,
                               end, 
                               try_tolerance = 5, 
@@ -736,34 +736,28 @@ paste0("Season: ", unique(pbp_df$season), "  //  Games: ", length(unique(pbp_df$
 ## -------------------- RUN GAME BY GAME FUNCTIONS --------------------- ##
 
 
-
-
-## ----------------------- ##
-##   Even-Strength Games   ##
-## ----------------------- ##
-
-games_EV_new <- fun.combine_counts(data = pbp_df)
-
-
 ## -------------------------- ##
-##   Powerplay Games Script   ##
+##   Skaters - Game By Game   ##
 ## -------------------------- ##
-
-games_PP_new <- fun.combine_counts_PP(data = pbp_df)
-
-
-## ------------------------------ ##
-##    Shorthanded Games Script    ##
-## ------------------------------ ##
-
-games_SH_new <- fun.combine_counts_SH(data = pbp_df)
-
-
-## ------------------------ ##
-##   All Sit Games Script   ##
-## ------------------------ ##
 
 games_all_sit_new <- fun.all_sit_standard(data_ = pbp_df)
+
+games_EV_new <- fun.combine_counts(data = pbp_df)
+games_PP_new <- fun.combine_counts_PP(data = pbp_df)
+games_SH_new <- fun.combine_counts_SH(data = pbp_df)
+
+games_5v5_new <- fun.combine_counts_EV_strength(data = pbp_df, strength = "5v5", scr_adj_list = score_adj_5v5)
+games_4v4_new <- fun.combine_counts_EV_strength(data = pbp_df, strength = "4v4", scr_adj_list = score_adj_4v4)
+games_3v3_new <- fun.combine_counts_EV_strength(data = pbp_df, strength = "3v3", scr_adj_list = score_adj_3v3)
+
+games_5v4_new <- fun.combine_counts_PP_strength(data = pbp_df, strength = "5v4", scr_adj_list = score_adj_5v4)
+games_5v3_new <- fun.combine_counts_PP_strength(data = pbp_df, strength = "5v3", scr_adj_list = score_adj_5v3)
+games_4v3_new <- fun.combine_counts_PP_strength(data = pbp_df, strength = "4v3", scr_adj_list = score_adj_4v3)
+
+games_4v5_new <- fun.combine_counts_SH_strength(data = pbp_df, strength = "4v5", scr_adj_list = score_adj_5v4)
+games_3v5_new <- fun.combine_counts_SH_strength(data = pbp_df, strength = "3v5", scr_adj_list = score_adj_5v3)
+games_3v4_new <- fun.combine_counts_SH_strength(data = pbp_df, strength = "3v4", scr_adj_list = score_adj_4v3)
+
 
 
 ## ------------------------------- ##
@@ -774,12 +768,18 @@ teammate_TOI_EV_new <- fun.teammate(pbp_data = pbp_df, strength = "even")
 teammate_TOI_PP_new <- fun.teammate(pbp_data = pbp_df, strength = "powerplay")
 teammate_TOI_SH_new <- fun.teammate(pbp_data = pbp_df, strength = "shorthanded")
 
+teammate_TOI_5v5_new <- fun.teammate(pbp_data = pbp_df, strength = "5v5")
+teammate_TOI_5v4_new <- fun.teammate(pbp_data = pbp_df, strength = "5v4")
+teammate_TOI_4v5_new <- fun.teammate(pbp_data = pbp_df, strength = "4v5")
+
+
 
 ## -------------------------- ##
 ##   Goalies - Game by Game   ##
 ## -------------------------- ##
 
 goalie_games_all_sit_new <- fun.goalie_games(data = pbp_df)
+
 
 
 ## ---------------------------- ##
@@ -796,14 +796,29 @@ adj_pen_games <- fun.pen_value_sum(main_data = pen_calc_main, xtra_data = pen_ca
 adj_pen_games_new <- fun.pen_value_sum_add(pen_data = adj_pen_games, skater_data = games_all_sit_new, goalie_data = goalie_games_all_sit_new, position_data = player_position)
 
 
+
 ## ------------------------------ ##
 ##   Team Stats Games Functions   ##
 ## ------------------------------ ##
 
 team_games_all_sit_new <- fun.team_games_all_sit(data = pbp_df)
-team_games_EV_new <-      fun.team_games_EV(data = pbp_df, strength = "EV")
-team_games_PP_new <-      fun.team_games_PP(data = pbp_df, strength = "PP")
-team_games_SH_new <-      fun.team_games_SH(data = pbp_df, strength = "SH")
+
+team_games_EV_new <- fun.team_games_EV(data = pbp_df, strength = "EV")
+team_games_PP_new <- fun.team_games_PP(data = pbp_df, strength = "PP")
+team_games_SH_new <- fun.team_games_SH(data = pbp_df, strength = "SH")
+
+team_games_5v5_new <- fun.team_games_EV(data = pbp_df, strength = "5v5")
+team_games_4v4_new <- fun.team_games_EV(data = pbp_df, strength = "4v4")
+team_games_3v3_new <- fun.team_games_EV(data = pbp_df, strength = "3v3")
+
+team_games_5v4_new <- fun.team_games_PP(data = pbp_df, strength = "5v4")
+team_games_5v3_new <- fun.team_games_PP(data = pbp_df, strength = "5v3")
+team_games_4v3_new <- fun.team_games_PP(data = pbp_df, strength = "4v3")
+
+team_games_4v5_new <- fun.team_games_SH(data = pbp_df, strength = "4v5")
+team_games_3v5_new <- fun.team_games_SH(data = pbp_df, strength = "3v5")
+team_games_3v4_new <- fun.team_games_SH(data = pbp_df, strength = "3v4")
+
 
 
 ## --------------------------- ##
@@ -908,18 +923,40 @@ dbWriteTable(db, "games_data_all_sit", games_all_sit_new, overwrite = F, append 
 dbWriteTable(db, "games_data_EV", games_EV_new, overwrite = F, append = T)
 dbWriteTable(db, "games_data_PP", games_PP_new, overwrite = F, append = T)
 dbWriteTable(db, "games_data_SH", games_SH_new, overwrite = F, append = T)
+dbWriteTable(db, "games_data_5v5", games_5v5_new, overwrite = F, append = T)
+dbWriteTable(db, "games_data_4v4", games_4v4_new, overwrite = F, append = T)
+dbWriteTable(db, "games_data_3v3", games_3v3_new, overwrite = F, append = T)
+dbWriteTable(db, "games_data_5v4", games_5v4_new, overwrite = F, append = T)
+dbWriteTable(db, "games_data_5v3", games_5v3_new, overwrite = F, append = T)
+dbWriteTable(db, "games_data_4v3", games_4v3_new, overwrite = F, append = T)
+dbWriteTable(db, "games_data_4v5", games_4v5_new, overwrite = F, append = T)
+dbWriteTable(db, "games_data_3v5", games_3v5_new, overwrite = F, append = T)
+dbWriteTable(db, "games_data_3v4", games_3v4_new, overwrite = F, append = T)
 
 dbWriteTable(db, "team_data_all_sit", team_games_all_sit_new, overwrite = F, append = T)
 dbWriteTable(db, "team_data_EV", team_games_EV_new, overwrite = F, append = T)
 dbWriteTable(db, "team_data_PP", team_games_PP_new, overwrite = F, append = T)
 dbWriteTable(db, "team_data_SH", team_games_SH_new, overwrite = F, append = T)
+dbWriteTable(db, "team_data_5v5", team_games_5v5_new, overwrite = F, append = T)
+dbWriteTable(db, "team_data_4v4", team_games_4v4_new, overwrite = F, append = T)
+dbWriteTable(db, "team_data_3v3", team_games_3v3_new, overwrite = F, append = T)
+dbWriteTable(db, "team_data_5v4", team_games_5v4_new, overwrite = F, append = T)
+dbWriteTable(db, "team_data_5v3", team_games_5v3_new, overwrite = F, append = T)
+dbWriteTable(db, "team_data_4v3", team_games_4v3_new, overwrite = F, append = T)
+dbWriteTable(db, "team_data_4v5", team_games_4v5_new, overwrite = F, append = T)
+dbWriteTable(db, "team_data_3v5", team_games_3v5_new, overwrite = F, append = T)
+dbWriteTable(db, "team_data_3v4", team_games_3v4_new, overwrite = F, append = T)
 
 dbWriteTable(db, "TOI_together_data_EV", teammate_TOI_EV_new, overwrite = F, append = T)
 dbWriteTable(db, "TOI_together_data_PP", teammate_TOI_PP_new, overwrite = F, append = T)
 dbWriteTable(db, "TOI_together_data_SH", teammate_TOI_SH_new, overwrite = F, append = T)
+dbWriteTable(db, "TOI_together_data_5v5", teammate_TOI_5v5_new, overwrite = F, append = T)
+dbWriteTable(db, "TOI_together_data_5v4", teammate_TOI_5v4_new, overwrite = F, append = T)
+dbWriteTable(db, "TOI_together_data_4v5", teammate_TOI_4v5_new, overwrite = F, append = T)
 
 dbWriteTable(db, "goalie_games_all_sit", goalie_games_all_sit_new, overwrite = F, append = T)
 dbWriteTable(db, "adj_pen_games_all_sit", adj_pen_games_new, overwrite = F, append = T)
+
 
 dbDisconnect(db)
 
