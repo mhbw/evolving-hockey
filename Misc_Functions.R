@@ -23,29 +23,29 @@ source("ALLSCRAPE.R")
 
 ##############################
 
-# Create Team IDs Data Frame 
-fun.Team_IDs <- function() { 
-  
-  IDs <- data.frame(matrix(nrow = 33, ncol = 2))
-  IDs$X1 <- c("N.J", "NYI", "NYR", "PHI", "PIT", "BOS", "BUF", "MTL", "OTT", "TOR", 
-              "1000", "CAR", "FLA", "T.B", "WSH", "CHI", "DET", "NSH", "STL", "CGY", 
-              "COL", "EDM", "VAN", "ANA", "DAL", "L.A", "1000", "S.J", "CBJ", "MIN", 
-              "WPG", "ARI", "VGK")
-  
-  IDs$X2 <- seq(1:33)
-  IDs$X2 <- ifelse(IDs$X2 == 31, 52, IDs$X2)
-  IDs$X2 <- ifelse(IDs$X2 == 32, 53, IDs$X2)
-  IDs$X2 <- ifelse(IDs$X2 == 33, 54, IDs$X2)
-  names(IDs) <- c("Team", "ID")
-  
-  return(IDs)
-  
-  }
-Team_ID <- fun.Team_IDs()
-
-
 # Scrape Schedule of previous games
 fun.schedule <- function(start, end) { 
+  
+  # Create Team IDs Data Frame 
+  fun.Team_IDs <- function() { 
+    
+    IDs <- data.frame(matrix(nrow = 33, ncol = 2))
+    IDs$X1 <- c("N.J", "NYI", "NYR", "PHI", "PIT", "BOS", "BUF", "MTL", "OTT", "TOR", 
+                "1000", "CAR", "FLA", "T.B", "WSH", "CHI", "DET", "NSH", "STL", "CGY", 
+                "COL", "EDM", "VAN", "ANA", "DAL", "L.A", "1000", "S.J", "CBJ", "MIN", 
+                "WPG", "ARI", "VGK")
+    
+    IDs$X2 <- seq(1:33)
+    IDs$X2 <- ifelse(IDs$X2 == 31, 52, IDs$X2)
+    IDs$X2 <- ifelse(IDs$X2 == 32, 53, IDs$X2)
+    IDs$X2 <- ifelse(IDs$X2 == 33, 54, IDs$X2)
+    names(IDs) <- c("Team", "ID")
+    
+    return(IDs)
+    
+    }
+  Team_ID <- fun.Team_IDs()
+  
   
   sched <- ds.scrape_schedule(start,
                               end, 

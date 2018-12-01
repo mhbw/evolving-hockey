@@ -1492,7 +1492,8 @@ fun.all_sit_standard <- function(data_) {
     full_join(., faceoff_all, by = c("player", "game_id", "season", "Team")) %>% 
     full_join(., penalty_all, by = c("player", "game_id", "season", "Team")) %>% 
     left_join(., team_TOI_all, by = c("game_id", "season", "Team")) %>% 
-    mutate_if(is.numeric, funs(ifelse(is.na(.), 0, .)))
+    mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+    mutate_if(is.logical, funs(replace(., is.na(.), 0)))
   
   # Remove goalies
   fun.goalie_remove <- function(data_) {
@@ -2284,7 +2285,6 @@ fun.combine_counts <- function(data) {
     left_join(., counts_all,  by = c("player", "game_id", "season", "Team")) %>% 
     left_join(., faceoff_all, by = c("player", "game_id", "season", "Team")) %>% 
     left_join(., penalty_all, by = c("player", "game_id", "season", "Team")) %>% 
-    mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
     select(player, game_id, game_date, season, Team, Opponent, is_home, TOI, 
            G, A1, A2, Points, G_adj, A1_adj, A2_adj, Points_adj, 
            iSF, iFF, iCF, ixG, iCF_adj, ixG_adj, 
@@ -2299,6 +2299,8 @@ fun.combine_counts <- function(data) {
            ) %>% 
     mutate(player = ifelse(player == "SEBASTIAN.AHO" & Team == "NYI", "5EBASTIAN.AHO", player)) %>% # FIX NYI AHO
     arrange(player, game_id) %>% 
+    mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+    mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
     data.frame()
   
   return(metrics_combined)
@@ -3086,6 +3088,7 @@ fun.combine_counts_PP <- function(data) {
            ) %>% 
     arrange(player, game_id) %>% 
     mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+    mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
     data.frame()
   
   return(metrics_combined)
@@ -4576,7 +4579,6 @@ fun.combine_counts_EV_strength <- function(data, strength, scr_adj_list) {
     left_join(., counts_all,  by = c("player", "game_id", "season", "Team")) %>% 
     left_join(., faceoff_all, by = c("player", "game_id", "season", "Team")) %>% 
     left_join(., penalty_all, by = c("player", "game_id", "season", "Team")) %>% 
-    mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
     select(player, game_id, game_date, season, Team, Opponent, is_home, TOI, 
            G, A1, A2, Points, 
            iSF, iFF, iCF, ixG,
@@ -4591,6 +4593,8 @@ fun.combine_counts_EV_strength <- function(data, strength, scr_adj_list) {
            ) %>% 
     mutate(player = ifelse(player == "SEBASTIAN.AHO" & Team == "NYI", "5EBASTIAN.AHO", player)) %>% # FIX NYI AHO
     arrange(player, game_id) %>% 
+    mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+    mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
     data.frame()
   
   return(metrics_combined)
@@ -5297,6 +5301,7 @@ fun.combine_counts_PP_strength <- function(data, strength, scr_adj_list) {
            ) %>% 
     arrange(player, game_id) %>% 
     mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+    mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
     data.frame()
   
   return(metrics_combined)
@@ -6946,7 +6951,6 @@ fun.goalie_games <- function(data) {
     left_join(joined_shots, ., by = c("player", "game_id", "season", "Team")) %>% 
     left_join(goalies, ., by = c("player", "game_id", "season", "Team")) %>% 
     ungroup() %>% 
-    mutate_if(is.numeric, funs(round(., 2))) %>% 
     select(player, game_id, game_date, season, Team, Opponent, is_home, 
            TOI, GA, SA, GA_, FA, xGA
            ) %>% 
@@ -7955,6 +7959,8 @@ fun.team_games_all_sit <- function(data) {
            TOI, GF:C_diff, PEND2:PENT5
            ) %>% 
     arrange(Team, game_id) %>% 
+    mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+    mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
     data.frame()
   
   return(games)
@@ -7962,7 +7968,7 @@ fun.team_games_all_sit <- function(data) {
   }
 
 ## Even-Strength
-fun.team_games_EV <- function(data, strength) {
+fun.team_games_EV <- function(data, strength, scr_adj_list) {
   
   # In-function filter for strength state
   if (strength == "EV") {
@@ -7999,25 +8005,47 @@ fun.team_games_EV <- function(data, strength) {
               TOI_3v3 = sum((game_strength_state == "3v3") * event_length) / 60, 
               TOI = TOI_5v5 + TOI_4v4 + TOI_3v3, 
               
-              GF =  sum((event_type == "GOAL" & event_team == home_team) * score_adj_EV$home_goal_adj[home_lead_state]), 
-              GA =  sum((event_type == "GOAL" & event_team == away_team) * score_adj_EV$away_goal_adj[home_lead_state]), 
+              # Unadjusted
+              GF =  sum(event_type == "GOAL" & event_team == home_team), 
+              GA =  sum(event_type == "GOAL" & event_team == away_team), 
               G_diff = GF - GA, 
               
-              xGF = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal * score_adj_EV$home_xG_adj[home_lead_state])),
-              xGA = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal * score_adj_EV$away_xG_adj[home_lead_state])), 
+              xGF = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal)),
+              xGA = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal)), 
               xG_diff = xGF - xGA, 
               
-              SF =  sum((event_type %in% st.shot_events & event_team == home_team) * score_adj_EV$home_shots_adj[home_lead]), 
-              SA =  sum((event_type %in% st.shot_events & event_team == away_team) * score_adj_EV$away_shots_adj[home_lead]), 
+              SF =  sum(event_type %in% st.shot_events & event_team == home_team), 
+              SA =  sum(event_type %in% st.shot_events & event_team == away_team), 
               S_diff = SF - SA, 
               
-              FF =  sum((event_type %in% st.fenwick_events & event_team == home_team) * score_adj_EV$home_fenwick_adj[home_lead]), 
-              FA =  sum((event_type %in% st.fenwick_events & event_team == away_team) * score_adj_EV$away_fenwick_adj[home_lead]),
+              FF =  sum(event_type %in% st.fenwick_events & event_team == home_team), 
+              FA =  sum(event_type %in% st.fenwick_events & event_team == away_team),
               F_diff = FF - FA, 
               
-              CF =  sum((event_type %in% st.corsi_events & event_team == home_team) * score_adj_EV$home_corsi_adj[home_lead]), 
-              CA =  sum((event_type %in% st.corsi_events & event_team == away_team) * score_adj_EV$away_corsi_adj[home_lead]),
+              CF =  sum(event_type %in% st.corsi_events & event_team == home_team), 
+              CA =  sum(event_type %in% st.corsi_events & event_team == away_team),
               C_diff = CF - CA, 
+              
+              # Score & Venue Adjusted
+              GF_adj =  sum((event_type == "GOAL" & event_team == home_team) * scr_adj_list$home_goal_adj[home_lead_state]), 
+              GA_adj =  sum((event_type == "GOAL" & event_team == away_team) * scr_adj_list$away_goal_adj[home_lead_state]), 
+              G_diff_adj = GF_adj - GA_adj, 
+              
+              xGF_adj = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal * scr_adj_list$home_xG_adj[home_lead_state])),
+              xGA_adj = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal * scr_adj_list$away_xG_adj[home_lead_state])), 
+              xG_diff_adj = xGF_adj - xGA_adj, 
+              
+              SF_adj =  sum((event_type %in% st.shot_events & event_team == home_team) * scr_adj_list$home_shots_adj[home_lead]), 
+              SA_adj =  sum((event_type %in% st.shot_events & event_team == away_team) * scr_adj_list$away_shots_adj[home_lead]), 
+              S_diff_adj = SF_adj - SA_adj, 
+              
+              FF_adj =  sum((event_type %in% st.fenwick_events & event_team == home_team) * scr_adj_list$home_fenwick_adj[home_lead]), 
+              FA_adj =  sum((event_type %in% st.fenwick_events & event_team == away_team) * scr_adj_list$away_fenwick_adj[home_lead]),
+              F_diff_adj = FF_adj - FA_adj, 
+              
+              CF_adj =  sum((event_type %in% st.corsi_events & event_team == home_team) * scr_adj_list$home_corsi_adj[home_lead]), 
+              CA_adj =  sum((event_type %in% st.corsi_events & event_team == away_team) * scr_adj_list$away_corsi_adj[home_lead]),
+              C_diff_adj = CF_adj - CA_adj, 
               
               PEND2 = sum(na.omit(1 * (event_type == "PENL" & event_team == away_team) +
                                     1 * (event_type == "PENL" & event_team == away_team & grepl("double minor", tolower(event_detail))) -
@@ -8049,25 +8077,47 @@ fun.team_games_EV <- function(data, strength) {
               TOI_3v3 = sum((game_strength_state == "3v3") * event_length) / 60, 
               TOI = TOI_5v5 + TOI_4v4 + TOI_3v3, 
               
-              GF =  sum((event_type == "GOAL" & event_team == away_team) * score_adj_EV$away_goal_adj[home_lead_state]), 
-              GA =  sum((event_type == "GOAL" & event_team == home_team) * score_adj_EV$home_goal_adj[home_lead_state]), 
+              # Unadjusted
+              GF =  sum(event_type == "GOAL" & event_team == away_team), 
+              GA =  sum(event_type == "GOAL" & event_team == home_team), 
               G_diff = GF - GA, 
               
-              xGF = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal * score_adj_EV$away_xG_adj[home_lead_state])),
-              xGA = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal * score_adj_EV$home_xG_adj[home_lead_state])), 
+              xGF = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal)),
+              xGA = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal)), 
               xG_diff = xGF - xGA, 
               
-              SF =  sum((event_type %in% st.shot_events & event_team == away_team) * score_adj_EV$away_shots_adj[home_lead]), 
-              SA =  sum((event_type %in% st.shot_events & event_team == home_team) * score_adj_EV$home_shots_adj[home_lead]), 
+              SF =  sum(event_type %in% st.shot_events & event_team == away_team), 
+              SA =  sum(event_type %in% st.shot_events & event_team == home_team), 
               S_diff = SF - SA, 
               
-              FF =  sum((event_type %in% st.fenwick_events & event_team == away_team) * score_adj_EV$away_fenwick_adj[home_lead]), 
-              FA =  sum((event_type %in% st.fenwick_events & event_team == home_team) * score_adj_EV$home_fenwick_adj[home_lead]),
+              FF =  sum(event_type %in% st.fenwick_events & event_team == away_team), 
+              FA =  sum(event_type %in% st.fenwick_events & event_team == home_team),
               F_diff = FF - FA, 
               
-              CF =  sum((event_type %in% st.corsi_events & event_team == away_team) * score_adj_EV$away_corsi_adj[home_lead]), 
-              CA =  sum((event_type %in% st.corsi_events & event_team == home_team) * score_adj_EV$home_corsi_adj[home_lead]),
+              CF =  sum(event_type %in% st.corsi_events & event_team == away_team), 
+              CA =  sum(event_type %in% st.corsi_events & event_team == home_team),
               C_diff = CF - CA, 
+              
+              # Score & Venue Adjusted
+              GF_adj =  sum((event_type == "GOAL" & event_team == away_team) * scr_adj_list$away_goal_adj[home_lead_state]), 
+              GA_adj =  sum((event_type == "GOAL" & event_team == home_team) * scr_adj_list$home_goal_adj[home_lead_state]), 
+              G_diff_adj = GF_adj - GA_adj, 
+              
+              xGF_adj = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal * scr_adj_list$away_xG_adj[home_lead_state])),
+              xGA_adj = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal * scr_adj_list$home_xG_adj[home_lead_state])), 
+              xG_diff_adj = xGF_adj - xGA_adj, 
+              
+              SF_adj =  sum((event_type %in% st.shot_events & event_team == away_team) * scr_adj_list$away_shots_adj[home_lead]), 
+              SA_adj =  sum((event_type %in% st.shot_events & event_team == home_team) * scr_adj_list$home_shots_adj[home_lead]), 
+              S_diff_adj = SF_adj - SA_adj, 
+              
+              FF_adj =  sum((event_type %in% st.fenwick_events & event_team == away_team) * scr_adj_list$away_fenwick_adj[home_lead]), 
+              FA_adj =  sum((event_type %in% st.fenwick_events & event_team == home_team) * scr_adj_list$home_fenwick_adj[home_lead]),
+              F_diff_adj = FF_adj - FA_adj, 
+              
+              CF_adj =  sum((event_type %in% st.corsi_events & event_team == away_team) * scr_adj_list$away_corsi_adj[home_lead]), 
+              CA_adj =  sum((event_type %in% st.corsi_events & event_team == home_team) * scr_adj_list$home_corsi_adj[home_lead]),
+              C_diff_adj = CF_adj - CA_adj, 
               
               
               PEND2 = sum(na.omit(1 * (event_type == "PENL" & event_team == home_team) +
@@ -8098,14 +8148,20 @@ fun.team_games_EV <- function(data, strength) {
     group_by(Team, Opponent, game_id, game_date, season, is_home) %>% 
     summarise_all(funs(sum)) %>% 
     select(Team, Opponent, game_id, game_date, season, is_home, 
-           TOI, TOI_5v5:TOI_3v3, GF:C_diff, PEND2:PENT5
+           TOI, TOI_5v5:TOI_3v3, GF:C_diff, GF_adj:C_diff_adj, PEND2:PENT5
            ) %>% 
     arrange(Team, game_id) %>% 
+    mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+    mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
     data.frame()
   
   
   # Remove columns not used in below strength states
-  if (strength != "EV") { 
+  if (strength == "EV") { 
+    games <- games %>% select(-c(GF_adj:C_diff_adj))
+    
+    }
+  else if (strength != "EV") { 
     games <- games %>% select(-c(TOI_5v5:TOI_3v3))
     
     }
@@ -8115,7 +8171,7 @@ fun.team_games_EV <- function(data, strength) {
   }
 
 ## Powerplay
-fun.team_games_PP <- function(data, strength) {
+fun.team_games_PP <- function(data, strength, scr_adj_list) {
   
   # In-function filter for strength state: pbp data
   if (strength == "PP") {
@@ -8167,16 +8223,22 @@ fun.team_games_PP <- function(data, strength) {
               TOI_4v3 = sum((game_strength_state == "4v3") * event_length) / 60, 
               TOI = TOI_5v4 + TOI_5v3 + TOI_4v3, 
               
-              GF = sum((event_type == "GOAL" & event_team == home_team) * score_adj_PP$home_goal_adj[home_lead_state]) , 
-              GA = sum(event_type == "GOAL" & event_team == away_team),
-              xGF = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal * score_adj_PP$home_xG_adj[home_lead_state])),
+              GF =  sum(event_type == "GOAL" & event_team == home_team), 
+              GA =  sum(event_type == "GOAL" & event_team == away_team),
+              xGF = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal)),
               xGA = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal)), 
-              SF = sum((event_type %in% st.shot_events & event_team == home_team) * score_adj_PP$home_shot_adj[home_lead_state]), 
-              SA = sum(event_type %in% st.shot_events & event_team == away_team), 
-              FF = sum((event_type %in% st.fenwick_events & event_team == home_team) * score_adj_PP$home_fenwick_adj[home_lead_state]), 
-              FA = sum(event_type %in% st.fenwick_events & event_team == away_team),
-              CF = sum((event_type %in% st.corsi_events & event_team == home_team) * score_adj_PP$home_corsi_adj[home_lead_state]), 
-              CA = sum(event_type %in% st.corsi_events & event_team == away_team),
+              SF =  sum(event_type %in% st.shot_events & event_team == home_team), 
+              SA =  sum(event_type %in% st.shot_events & event_team == away_team), 
+              FF =  sum(event_type %in% st.fenwick_events & event_team == home_team), 
+              FA =  sum(event_type %in% st.fenwick_events & event_team == away_team),
+              CF =  sum(event_type %in% st.corsi_events & event_team == home_team), 
+              CA =  sum(event_type %in% st.corsi_events & event_team == away_team),
+              
+              GF_adj =  sum((event_type == "GOAL" & event_team == home_team) * scr_adj_list$home_goal_adj[home_lead_state]), 
+              xGF_adj = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal * scr_adj_list$home_xG_adj[home_lead_state])),
+              SF_adj =  sum((event_type %in% st.shot_events & event_team == home_team) * scr_adj_list$home_shot_adj[home_lead_state]), 
+              FF_adj =  sum((event_type %in% st.fenwick_events & event_team == home_team) * scr_adj_list$home_fenwick_adj[home_lead_state]), 
+              CF_adj =  sum((event_type %in% st.corsi_events & event_team == home_team) * scr_adj_list$home_corsi_adj[home_lead_state]), 
               
               
               PEND2 = sum(na.omit(1 * (event_type == "PENL" & event_team == away_team) +
@@ -8209,16 +8271,23 @@ fun.team_games_PP <- function(data, strength) {
               TOI_4v3 = sum((game_strength_state == "3v4") * event_length) / 60, 
               TOI = TOI_5v4 + TOI_5v3 + TOI_4v3, 
               
-              GF = sum((event_type == "GOAL" & event_team == away_team) * score_adj_PP$away_goal_adj[home_lead_state]) , 
-              GA = sum(event_type == "GOAL" & event_team == home_team),
-              xGF = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal * score_adj_PP$away_xG_adj[home_lead_state])),
+              GF =  sum(event_type == "GOAL" & event_team == away_team), 
+              GA =  sum(event_type == "GOAL" & event_team == home_team),
+              xGF = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal)),
               xGA = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal)), 
-              SF = sum((event_type %in% st.shot_events & event_team == away_team) * score_adj_PP$away_shot_adj[home_lead_state]), 
-              SA = sum(event_type %in% st.shot_events & event_team == home_team), 
-              FF = sum((event_type %in% st.fenwick_events & event_team == away_team) * score_adj_PP$away_fenwick_adj[home_lead_state]), 
-              FA = sum(event_type %in% st.fenwick_events & event_team == home_team),
-              CF = sum((event_type %in% st.corsi_events & event_team == away_team) * score_adj_PP$away_corsi_adj[home_lead_state]), 
-              CA = sum(event_type %in% st.corsi_events & event_team == home_team),
+              SF =  sum(event_type %in% st.shot_events & event_team == away_team), 
+              SA =  sum(event_type %in% st.shot_events & event_team == home_team), 
+              FF =  sum(event_type %in% st.fenwick_events & event_team == away_team), 
+              FA =  sum(event_type %in% st.fenwick_events & event_team == home_team),
+              CF =  sum(event_type %in% st.corsi_events & event_team == away_team), 
+              CA =  sum(event_type %in% st.corsi_events & event_team == home_team),
+              
+              GF_adj =  sum((event_type == "GOAL" & event_team == away_team) * scr_adj_list$away_goal_adj[home_lead_state]), 
+              xGF_adj = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal * scr_adj_list$away_xG_adj[home_lead_state])),
+              SF_adj =  sum((event_type %in% st.shot_events & event_team == away_team) * scr_adj_list$away_shot_adj[home_lead_state]), 
+              FF_adj =  sum((event_type %in% st.fenwick_events & event_team == away_team) * scr_adj_list$away_fenwick_adj[home_lead_state]), 
+              CF_adj =  sum((event_type %in% st.corsi_events & event_team == away_team) * scr_adj_list$away_corsi_adj[home_lead_state]), 
+              
               
               PEND2 = sum(na.omit(1 * (event_type == "PENL" & event_team == home_team) +
                                     1 * (event_type == "PENL" & event_team == home_team & grepl("double minor", tolower(event_detail))) -
@@ -8247,25 +8316,30 @@ fun.team_games_PP <- function(data, strength) {
     group_by(Team, Opponent, game_id, game_date, season, is_home) %>% 
     summarise_all(funs(sum)) %>% 
     select(Team, Opponent, game_id, game_date, season, is_home, 
-           TOI, TOI_5v4:TOI_4v3, GF:CA, PEND2:PENT5
+           TOI, TOI_5v4:TOI_4v3, GF:CA, GF_adj:CF_adj, PEND2:PENT5
            ) %>% 
     arrange(Team, game_id) %>% 
+    mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+    mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
     data.frame()
   
   
   # Remove columns not used in below strength states
-  if (strength != "PP") { 
+  if (strength == "PP") { 
+    games <- games %>% select(-c(GF_adj:CF_adj))
+    
+    }
+  else if (strength != "PP") { 
     games <- games %>% select(-c(TOI_5v4:TOI_4v3))
     
     }
-  
   
   return(games)
   
   }
 
 ## Shorthanded   
-fun.team_games_SH <- function(data, strength) {
+fun.team_games_SH <- function(data, strength, scr_adj_list) {
   
   # In-function filter for strength state: pbp data
   if (strength == "SH") {
@@ -8317,16 +8391,23 @@ fun.team_games_SH <- function(data, strength) {
               TOI_3v4 = sum((game_strength_state == "3v4") * event_length) / 60, 
               TOI = TOI_4v5 + TOI_3v5 + TOI_3v4, 
               
-              GF = sum(event_type == "GOAL" & event_team == home_team),
-              GA = sum((event_type == "GOAL" & event_team == away_team) * score_adj_PP$away_goal_adj[home_lead_state]) , 
+              GF =  sum(event_type == "GOAL" & event_team == home_team),
+              GA =  sum(event_type == "GOAL" & event_team == away_team), 
               xGF = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal)), 
-              xGA = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal * score_adj_PP$away_xG_adj[home_lead_state])), 
-              SF = sum(event_type %in% st.shot_events & event_team == home_team), 
-              SA = sum((event_type %in% st.shot_events & event_team == away_team) * score_adj_PP$away_shot_adj[home_lead_state]), 
-              FF = sum(event_type %in% st.fenwick_events & event_team == home_team),
-              FA = sum((event_type %in% st.fenwick_events & event_team == away_team) * score_adj_PP$away_fenwick_adj[home_lead_state]), 
-              CF = sum(event_type %in% st.corsi_events & event_team == home_team),
-              CA = sum((event_type %in% st.corsi_events & event_team == away_team) * score_adj_PP$away_corsi_adj[home_lead_state]), 
+              xGA = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal)), 
+              SF =  sum(event_type %in% st.shot_events & event_team == home_team), 
+              SA =  sum(event_type %in% st.shot_events & event_team == away_team), 
+              FF =  sum(event_type %in% st.fenwick_events & event_team == home_team),
+              FA =  sum(event_type %in% st.fenwick_events & event_team == away_team), 
+              CF =  sum(event_type %in% st.corsi_events & event_team == home_team),
+              CA =  sum(event_type %in% st.corsi_events & event_team == away_team), 
+              
+              GA_adj =  sum((event_type == "GOAL" & event_team == away_team) * scr_adj_list$away_goal_adj[home_lead_state]), 
+              xGA_adj = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal * scr_adj_list$away_xG_adj[home_lead_state])), 
+              SA_adj =  sum((event_type %in% st.shot_events & event_team == away_team) * scr_adj_list$away_shot_adj[home_lead_state]), 
+              FA_adj =  sum((event_type %in% st.fenwick_events & event_team == away_team) * scr_adj_list$away_fenwick_adj[home_lead_state]), 
+              CA_adj =  sum((event_type %in% st.corsi_events & event_team == away_team) * scr_adj_list$away_corsi_adj[home_lead_state]), 
+              
               
               PEND2 = sum(na.omit(1 * (event_type == "PENL" & event_team == away_team) +
                                     1 * (event_type == "PENL" & event_team == away_team & grepl("double minor", tolower(event_detail))) -
@@ -8358,16 +8439,23 @@ fun.team_games_SH <- function(data, strength) {
               TOI_3v4 = sum((game_strength_state == "4v3") * event_length) / 60, 
               TOI = TOI_4v5 + TOI_3v5 + TOI_3v4, 
               
-              GF = sum(event_type == "GOAL" & event_team == away_team),
-              GA = sum((event_type == "GOAL" & event_team == home_team) * score_adj_PP$home_goal_adj[home_lead_state]) , 
+              GF =  sum(event_type == "GOAL" & event_team == away_team),
+              GA =  sum(event_type == "GOAL" & event_team == home_team), 
               xGF = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal)), 
-              xGA = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal * score_adj_PP$home_xG_adj[home_lead_state])),
-              SF = sum(event_type %in% st.shot_events & event_team == away_team), 
-              SA = sum((event_type %in% st.shot_events & event_team == home_team) * score_adj_PP$home_shot_adj[home_lead_state]), 
-              FF = sum(event_type %in% st.fenwick_events & event_team == away_team),
-              FA = sum((event_type %in% st.fenwick_events & event_team == home_team) * score_adj_PP$home_fenwick_adj[home_lead_state]), 
-              CF = sum(event_type %in% st.corsi_events & event_team == away_team),
-              CA = sum((event_type %in% st.corsi_events & event_team == home_team) * score_adj_PP$home_corsi_adj[home_lead_state]), 
+              xGA = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal)),
+              SF =  sum(event_type %in% st.shot_events & event_team == away_team), 
+              SA =  sum(event_type %in% st.shot_events & event_team == home_team), 
+              FF =  sum(event_type %in% st.fenwick_events & event_team == away_team),
+              FA =  sum(event_type %in% st.fenwick_events & event_team == home_team), 
+              CF =  sum(event_type %in% st.corsi_events & event_team == away_team),
+              CA =  sum(event_type %in% st.corsi_events & event_team == home_team), 
+              
+              GA_adj =  sum((event_type == "GOAL" & event_team == home_team) * scr_adj_list$home_goal_adj[home_lead_state]), 
+              xGA_adj = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal * scr_adj_list$home_xG_adj[home_lead_state])),
+              SA_adj =  sum((event_type %in% st.shot_events & event_team == home_team) * scr_adj_list$home_shot_adj[home_lead_state]), 
+              FA_adj =  sum((event_type %in% st.fenwick_events & event_team == home_team) * scr_adj_list$home_fenwick_adj[home_lead_state]), 
+              CA_adj =  sum((event_type %in% st.corsi_events & event_team == home_team) * scr_adj_list$home_corsi_adj[home_lead_state]), 
+              
               
               PEND2 = sum(na.omit(1 * (event_type == "PENL" & event_team == home_team) +
                                     1 * (event_type == "PENL" & event_team == home_team & grepl("double minor", tolower(event_detail))) -
@@ -8397,14 +8485,20 @@ fun.team_games_SH <- function(data, strength) {
     group_by(Team, Opponent, game_id, game_date, season, is_home) %>% 
     summarise_all(funs(sum)) %>% 
     select(Team, Opponent, game_id, game_date, season, is_home, 
-           TOI, TOI_4v5:TOI_3v4, GF:CA, PEND2:PENT5
+           TOI, TOI_4v5:TOI_3v4, GF:CA, GA_adj:CA_adj, PEND2:PENT5
            ) %>% 
     arrange(Team, game_id) %>% 
+    mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+    mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
     data.frame()
   
   
   # Remove columns not used in below strength states
-  if (strength != "SH") { 
+  if (strength == "SH") { 
+    games <- games %>% select(-c(GA_adj:CA_adj))
+    
+    }
+  else if (strength != "SH") { 
     games <- games %>% select(-c(TOI_4v5:TOI_3v4))
     
     }
@@ -8466,9 +8560,47 @@ fun.team_game_labels <- function(pbp_data) {
 # *** only per team per season available in function
 
 # Count Calc Functions
-fun.playercounts_season_EV <- function(data, type, per_60) {
+fun.playercounts_season_all_sit <- function(data, position_data) { 
   
-  if (type == "per_team") {
+  games_sum <- data %>% 
+    filter(TOI > 0) %>% 
+    mutate(GP = 1) %>% 
+    group_by(player, season, Team) %>% 
+    summarise_at(vars(GP, TOI:t_TOI), funs(sum)) %>% 
+    mutate(TOI_GP = TOI / GP, 
+           TOI_perc = 100 * TOI / t_TOI, 
+           FO_diff = FOW - FOL,
+           
+           Sh_perc =   ifelse(G > 0 & iSF > 0, 100 * (G / iSF), 0), 
+           F_Sh_perc = ifelse(G > 0 & iFF > 0, 100 * (G / iFF), 0), 
+           C_Sh_perc = ifelse(G > 0 & iCF > 0, 100 * (G / iCF), 0), 
+           xFSH_perc = ifelse(ixG > 0 & iFF > 0, 100 * (ixG / iFF), 0), 
+           
+           OZS_perc = 100 * OZS / (OZS + NZS + DZS),
+           NZS_perc = 100 * NZS / (OZS + NZS + DZS), 
+           DZS_perc = 100 * DZS / (OZS + NZS + DZS), 
+           ZS_rate =  100 * OZS / (OZS + DZS)
+           ) %>% 
+    left_join(., position_data, by = "player") %>% 
+    select(player, position, season, Team, 
+           GP, TOI, TOI_GP, TOI_perc, 
+           G, A1, A2, Points,
+           iSF, iFF, iCF, ixG,
+           Sh_perc, F_Sh_perc, C_Sh_perc, xFSH_perc, 
+           iBLK, GIVE, TAKE, iHF, iHA, 
+           FOW, FOL, FO_diff, 
+           iPENT2:iPEND5, 
+           OZS, NZS, DZS, OZS_perc, DZS_perc, NZS_perc, ZS_rate, t_TOI
+           ) %>% 
+    mutate_if(is.numeric, funs(round(., 2))) %>% 
+    data.frame()
+  
+  }
+
+fun.playercounts_season_EV <- function(data, strength, per_60) {
+  
+  # Determine strength state
+  if (strength == "EV") {
     
     GP_hold <- data %>% 
       filter(TOI > 0) %>% 
@@ -8558,10 +8690,100 @@ fun.playercounts_season_EV <- function(data, type, per_60) {
       
       }
     
-    } 
+    }
+  else if (strength != "EV") {
+    
+    GP_hold <- data %>% 
+      filter(TOI > 0) %>% 
+      group_by(player, season, Team) %>% 
+      mutate(GP = n()) %>% 
+      summarise(GP = first(GP)) %>% 
+      data.frame()
+    
+    hold <- data %>% 
+      group_by(player, season, Team) %>% 
+      mutate(offTOI = t_TOI - TOI, 
+             
+             offGF =  t_GF - onGF, 
+             offGA =  t_GA - onGA, 
+             offSF =  t_SF - onSF, 
+             offSA =  t_SA - onSA, 
+             offFF =  t_FF - onFF, 
+             offFA =  t_FA - onFA, 
+             offCF =  t_CF - onCF, 
+             offCA =  t_CA - onCA, 
+             offxGF = t_xGF - onxGF, 
+             offxGA = t_xGA - onxGA, 
+             
+             offGF_adj =  t_GF_adj - onGF_adj, 
+             offGA_adj =  t_GA_adj - onGA_adj, 
+             offSF_adj =  t_SF_adj - onSF_adj, 
+             offSA_adj =  t_SA_adj - onSA_adj, 
+             offFF_adj =  t_FF_adj - onFF_adj, 
+             offFA_adj =  t_FA_adj - onFA_adj, 
+             offCF_adj =  t_CF_adj - onCF_adj, 
+             offCA_adj =  t_CA_adj - onCA_adj, 
+             offxGF_adj = t_xGF_adj - onxGF_adj, 
+             offxGA_adj = t_xGA_adj - onxGA_adj, 
+             
+             Tango = iCF - G
+             ) %>% 
+      summarise_at(vars(TOI:Tango), funs(sum)) %>% 
+      left_join(., GP_hold, by = c("player", "season", "Team")) %>% 
+      data.frame()
+    
+    position <- left_join(hold, player_position, by = c("player"))
+    
+    summed <- position %>% 
+      mutate(TOI_GP =   TOI / GP, 
+             TOI_perc = 100 * TOI / t_TOI, 
+             FO_diff =  FOW - FOL,
+             
+             Sh_perc =   ifelse(G > 0 & iSF > 0, 100 * (G / iSF), 0), 
+             F_Sh_perc = ifelse(G > 0 & iFF > 0, 100 * (G / iFF), 0), 
+             C_Sh_perc = ifelse(G > 0 & iCF > 0, 100 * (G / iCF), 0), 
+             xFSH_perc = ifelse(ixG > 0 & iFF > 0, 100 * (ixG / iFF), 0), 
+             
+             OZS_perc = 100 * OZS / (OZS + NZS + DZS),
+             NZS_perc = 100 * NZS / (OZS + NZS + DZS), 
+             DZS_perc = 100 * DZS / (OZS + NZS + DZS), 
+             ZS_rate =  100 * OZS / (OZS + DZS), 
+             
+             GIVE =     GIVE_o + GIVE_n + GIVE_d, 
+             TAKE =     TAKE_o + TAKE_n + TAKE_d, 
+             iHF =      iHF_o + iHF_n + iHF_d, 
+             iHA =      iHA_o + iHA_n + iHA_d, 
+             
+             G_diff =   onGF - onGA
+             ) %>% 
+      mutate_at(vars(GP, TOI_GP), funs(ifelse(is.na(.), 0, .))) %>% 
+      mutate_if(is.numeric, funs(replace(., is.nan(.), 0))) %>% 
+      mutate_if(is.numeric, funs(round(., 2))) %>% 
+      select(player, position, season, Team, 
+             GP, TOI, TOI_GP, TOI_perc, 
+             G, A1, A2, Points, 
+             iSF, iFF, iCF, ixG, Tango, 
+             Sh_perc, F_Sh_perc, C_Sh_perc, xFSH_perc, 
+             iBLK, 
+             GIVE_o:TAKE_d, GIVE, TAKE, 
+             iHF_o:iHA_d, iHF, iHA, 
+             FOW, FOL, FO_diff, 
+             iPENT2:iPEND5, 
+             OZS, NZS, DZS, OZS_perc, DZS_perc, NZS_perc, ZS_rate, 
+             onGF:offxGA_adj
+             ) %>% 
+      arrange(player, season) %>% 
+      data.frame()
+    
+    if (per_60 %in% c("F", "FALSE")) { 
+      return(summed)
+      
+      }
+    
+    }
   
   # Convert to Per 60
-  if (per_60 %in% c("T", "TRUE")) { 
+  if (per_60 %in% c("T", "TRUE") & strength == "EV") { 
     
     return_df <- summed %>% 
       mutate_at(vars(G:ixG_adj, iBLK:iHA_adj, iPENT2:iPEND5, onGF:onxGA_state), 
@@ -8580,9 +8802,10 @@ fun.playercounts_season_EV <- function(data, type, per_60) {
   
   }
 
-fun.playercounts_season_PP <- function(data, type, per_60) {
+fun.playercounts_season_PP <- function(data, strength, per_60) {
   
-  if (type == "per_team") {
+  # Determine strength state
+  if (strength == "PP") {
     
     GP_hold <- data %>% 
       group_by(player, season, Team) %>% 
@@ -8654,7 +8877,6 @@ fun.playercounts_season_PP <- function(data, type, per_60) {
              G, A1, A2, Points, G_adj, A1_adj, A2_adj, Points_adj, 
              iSF, iFF, iCF, ixG, Tango, iCF_adj, ixG_adj, 
              Sh_perc, F_Sh_perc, C_Sh_perc, xFSH_perc, 
-             #iBLK, iBLK_adj, 
              GIVE_o:TAKE_d, GIVE, TAKE, GIVE_adj, TAKE_adj, 
              iHF_o:iHA_d, iHF, iHA, iHF_adj, iHA_adj,  
              FOW, FOL, FO_diff, 
@@ -8669,10 +8891,92 @@ fun.playercounts_season_PP <- function(data, type, per_60) {
       return(summed)
       }
     
-    } 
+    }
+  else if (strength != "PP") {
+    
+    GP_hold <- data %>% 
+      group_by(player, season, Team) %>% 
+      mutate(GP = n()) %>% 
+      summarise(GP = first(GP)) %>% 
+      data.frame()
+    
+    hold <- data %>% 
+      group_by(player, season, Team) %>% 
+      mutate(offTOI = t_TOI - TOI, 
+             
+             offGF =  t_GF - onGF, 
+             offGA =  t_GA - onGA, 
+             offSF =  t_SF - onSF, 
+             offSA =  t_SA - onSA, 
+             offFF =  t_FF - onFF, 
+             offFA =  t_FA - onFA, 
+             offCF =  t_CF - onCF, 
+             offCA =  t_CA - onCA, 
+             offxGF = t_xGF - onxGF, 
+             offxGA = t_xGA - onxGA, 
+             
+             offGF_adj =  t_GF_adj - onGF_adj, 
+             offSF_adj =  t_SF_adj - onSF_adj, 
+             offFF_adj =  t_FF_adj - onFF_adj, 
+             offCF_adj =  t_CF_adj - onCF_adj, 
+             offxGF_adj = t_xGF_adj - onxGF_adj, 
+             
+             Tango = iCF - G
+             ) %>% 
+      summarise_at(vars(TOI:Tango), funs(sum)) %>% 
+      left_join(., GP_hold, by = c("player", "season", "Team")) %>% 
+      data.frame()
+    
+    position <- left_join(hold, player_position, by = c("player"))
+    
+    summed <- position %>% 
+      mutate(TOI_GP = TOI/GP, 
+             TOI_perc = 100 * TOI / t_TOI, 
+             FO_diff = FOW - FOL,
+             
+             Sh_perc = ifelse(G > 0 & iSF > 0, 100 * (G / iSF), 0), 
+             F_Sh_perc = ifelse(G > 0 & iFF > 0, 100 * (G / iFF), 0), 
+             C_Sh_perc = ifelse(G > 0 & iCF > 0, 100 * (G / iCF), 0), 
+             xFSH_perc = ifelse(ixG > 0 & iFF > 0, 100 * (ixG / iFF), 0), 
+             
+             OZS_perc = 100 * OZS / (OZS + NZS + DZS),
+             NZS_perc = 100 * NZS / (OZS + NZS + DZS), 
+             DZS_perc = 100 * DZS / (OZS + NZS + DZS), 
+             ZS_rate =  100 * OZS / (OZS + DZS), 
+             
+             GIVE =     GIVE_o + GIVE_n + GIVE_d, 
+             TAKE =     TAKE_o + TAKE_n + TAKE_d, 
+             iHF =      iHF_o + iHF_n + iHF_d, 
+             iHA =      iHA_o + iHA_n + iHA_d, 
+             
+             G_diff =   onGF - onGA
+             ) %>% 
+      mutate_at(vars(GP, TOI_GP), funs(ifelse(is.na(.), 0, .))) %>% 
+      mutate_if(is.numeric, funs(replace(., is.nan(.), 0))) %>% 
+      mutate_if(is.numeric, funs(round(., 2))) %>% 
+      select(player, position, season, Team, 
+             GP, TOI, TOI_GP, TOI_perc, 
+             G, A1, A2, Points, 
+             iSF, iFF, iCF, ixG, Tango, 
+             Sh_perc, F_Sh_perc, C_Sh_perc, xFSH_perc, 
+             GIVE_o:TAKE_d, GIVE, TAKE, 
+             iHF_o:iHA_d, iHF, iHA, 
+             FOW, FOL, FO_diff, 
+             iPENT2:iPEND5, 
+             OZS, NZS, DZS, OZS_perc, DZS_perc, NZS_perc, ZS_rate, 
+             onGF:offxGF_adj
+             ) %>% 
+      arrange(player, season) %>% 
+      data.frame()
+    
+    if (per_60 %in% c("F", "FALSE")) { 
+      return(summed)
+      }
+    
+    }
   
   # Convert to Per 60
-  if (per_60 %in% c("T", "TRUE")) { 
+  if (per_60 %in% c("T", "TRUE") & strength == "PP") { 
     
     return_df <- summed %>% 
       mutate_at(vars(G:ixG_adj, GIVE_o:iHA_adj, iPENT2:iPEND5, onGF:onxGA_state), 
@@ -8691,9 +8995,10 @@ fun.playercounts_season_PP <- function(data, type, per_60) {
   
   }
 
-fun.playercounts_season_SH <- function(data, type, per_60) {
+fun.playercounts_season_SH <- function(data, strength, per_60) {
   
-  if (type == "per_team") {
+  # Determine strength state
+  if (strength == "SH") {
     
     GP_hold <- data %>% 
       group_by(player, season, Team) %>% 
@@ -8781,9 +9086,92 @@ fun.playercounts_season_SH <- function(data, type, per_60) {
       }
     
     } 
+  else if (strength != "SH") {
+    
+    GP_hold <- data %>% 
+      group_by(player, season, Team) %>% 
+      mutate(GP = n()) %>% 
+      summarise(GP = first(GP)) %>% 
+      data.frame()
+    
+    hold <- data %>% 
+      group_by(player, season, Team) %>% 
+      mutate(offTOI = t_TOI - TOI, 
+             
+             offGF =  t_GF - onGF, 
+             offGA =  t_GA - onGA, 
+             offSF =  t_SF - onSF, 
+             offSA =  t_SA - onSA, 
+             offFF =  t_FF - onFF, 
+             offFA =  t_FA - onFA, 
+             offCF =  t_CF - onCF, 
+             offCA =  t_CA - onCA, 
+             offxGF = t_xGF - onxGF, 
+             offxGA = t_xGA - onxGA, 
+             
+             offGA_adj =  t_GA_adj - onGA_adj, 
+             offSA_adj =  t_SA_adj - onSA_adj, 
+             offFA_adj =  t_FA_adj - onFA_adj, 
+             offCA_adj =  t_CA_adj - onCA_adj, 
+             offxGA_adj = t_xGA_adj - onxGA_adj, 
+             
+             Tango = iCF - G
+             ) %>% 
+      summarise_at(vars(TOI:Tango), funs(sum)) %>% 
+      left_join(., GP_hold, by = c("player", "season", "Team")) %>% 
+      data.frame()
+    
+    position <- left_join(hold, player_position, by = c("player"))
+    
+    summed <- position %>% 
+      mutate(TOI_GP = TOI/GP, 
+             TOI_perc = 100 * TOI / t_TOI, 
+             FO_diff = FOW - FOL,
+             
+             Sh_perc = ifelse(G > 0 & iSF > 0, 100 * (G / iSF), 0), 
+             F_Sh_perc = ifelse(G > 0 & iFF > 0, 100 * (G / iFF), 0), 
+             C_Sh_perc = ifelse(G > 0 & iCF > 0, 100 * (G / iCF), 0), 
+             xFSH_perc = ifelse(ixG > 0 & iFF > 0, 100 * (ixG / iFF), 0), 
+             
+             OZS_perc = 100 * OZS / (OZS + NZS + DZS),
+             NZS_perc = 100 * NZS / (OZS + NZS + DZS), 
+             DZS_perc = 100 * DZS / (OZS + NZS + DZS), 
+             ZS_rate =  100 * OZS / (OZS + DZS), 
+             
+             GIVE =     GIVE_o + GIVE_n + GIVE_d, 
+             TAKE =     TAKE_o + TAKE_n + TAKE_d, 
+             iHF =      iHF_o + iHF_n + iHF_d, 
+             iHA =      iHA_o + iHA_n + iHA_d, 
+             
+             G_diff =   onGF - onGA
+             ) %>% 
+      mutate_at(vars(GP, TOI_GP), funs(ifelse(is.na(.), 0, .))) %>% 
+      mutate_if(is.numeric, funs(replace(., is.nan(.), 0))) %>% 
+      mutate_if(is.numeric, funs(round(., 2))) %>% 
+      select(player, position, season, Team, 
+             GP, TOI, TOI_GP, TOI_perc, 
+             G, A1, A2, Points, 
+             iSF, iFF, iCF, ixG, Tango, 
+             Sh_perc, F_Sh_perc, C_Sh_perc, xFSH_perc, 
+             iBLK, 
+             GIVE_o:TAKE_d, GIVE, TAKE, 
+             iHF_o:iHA_d, iHF, iHA, 
+             FOW, FOL, FO_diff, 
+             iPENT2:iPEND5, 
+             OZS, NZS, DZS, OZS_perc, DZS_perc, NZS_perc, ZS_rate, 
+             onGF:offxGA_adj
+             ) %>% 
+      arrange(player, season) %>% 
+      data.frame()
+    
+    if (per_60 %in% c("F", "FALSE")) { 
+      return(summed)
+      }
+    
+    }
   
   # Convert to Per 60
-  if (per_60 %in% c("T", "TRUE")) { 
+  if (per_60 %in% c("T", "TRUE") & strength == "SH") { 
     
     return_df <- summed %>% 
       mutate_at(vars(G:Tango, iBLK:iHA_adj, iPENT2:iPEND5, onGF:onxGA_state), 
@@ -8802,43 +9190,6 @@ fun.playercounts_season_SH <- function(data, type, per_60) {
   
   }
 
-fun.playercounts_season_all_sit <- function(data, position_data) { 
-  
-  games_sum <- data %>% 
-    filter(TOI > 0) %>% 
-    mutate(GP = 1) %>% 
-    group_by(player, season, Team) %>% 
-    summarise_at(vars(GP, TOI:t_TOI), funs(sum)) %>% 
-    mutate(TOI_GP = TOI / GP, 
-           TOI_perc = 100 * TOI / t_TOI, 
-           FO_diff = FOW - FOL,
-           
-           Sh_perc =   ifelse(G > 0 & iSF > 0, 100 * (G / iSF), 0), 
-           F_Sh_perc = ifelse(G > 0 & iFF > 0, 100 * (G / iFF), 0), 
-           C_Sh_perc = ifelse(G > 0 & iCF > 0, 100 * (G / iCF), 0), 
-           xFSH_perc = ifelse(ixG > 0 & iFF > 0, 100 * (ixG / iFF), 0), 
-           
-           OZS_perc = 100 * OZS / (OZS + NZS + DZS),
-           NZS_perc = 100 * NZS / (OZS + NZS + DZS), 
-           DZS_perc = 100 * DZS / (OZS + NZS + DZS), 
-           ZS_rate =  100 * OZS / (OZS + DZS)
-           ) %>% 
-    left_join(., position_data, by = "player") %>% 
-    select(player, position, season, Team, 
-           GP, TOI, TOI_GP, TOI_perc, 
-           G, A1, A2, Points,
-           iSF, iFF, iCF, ixG,
-           Sh_perc, F_Sh_perc, C_Sh_perc, xFSH_perc, 
-           iBLK, GIVE, TAKE, iHF, iHA, 
-           FOW, FOL, FO_diff, 
-           iPENT2:iPEND5, 
-           OZS, NZS, DZS, OZS_perc, DZS_perc, NZS_perc, ZS_rate, t_TOI
-           ) %>% 
-    mutate_if(is.numeric, funs(round(., 2))) %>% 
-    data.frame()
-  
-  }
-
 
 ########################
 
@@ -8849,631 +9200,611 @@ fun.playercounts_season_all_sit <- function(data, position_data) {
 
 ##################################
 
-# *** only per team per season available in function
-
 # Function
-fun.relative_teammate <- function(TM_data, games_data, position_data, strength, sum_type) { 
+fun.relative_teammate <- function(TM_data, games_data, position_data, strength) { 
   
   if (strength == "even") { 
     
-    if (sum_type == "per_team") {    # removed other summing types
+    # Player on-ice raw and per 60 numbers
+    player_metrics_EV <- games_data %>% 
+      group_by(player, season, Team) %>% 
+      mutate(GP = 1) %>% 
+      summarise_at(vars(TOI, GP, onGF:onxGA, onGF_state:onxGA_state), 
+                   funs(sum)
+                   ) %>% 
+      mutate(onSH.perc = ifelse(onGF > 0 & onSF > 0, 100 * (onGF / onSF), 0)) %>% # on-ice shooting % relative to teammate
+      mutate_at(vars(onGF:onxGA, onGF_state:onxGA_state), # convert columns to per 60
+                funs((. / TOI) * 60)
+                ) %>% 
+      ungroup() %>% 
       
-      # Player on-ice raw and per 60 numbers
-      player_metrics_EV <- games_data %>% 
-        group_by(player, season, Team) %>% 
-        mutate(GP = 1) %>% 
-        summarise_at(vars(TOI, GP, onGF:onxGA, onGF_state:onxGA_state), 
-                     funs(sum)
-                     ) %>% 
-        mutate(onSH.perc = ifelse(onGF > 0 & onSF > 0, 100 * (onGF / onSF), 0)) %>% # on-ice shooting % relative to teammate
-        mutate_at(vars(onGF:onxGA, onGF_state:onxGA_state), # convert columns to per 60
-                  funs((. / TOI) * 60)
-                  ) %>% 
-        ungroup() %>% 
-        
-        rename_at(vars(onGF:onxGA, onGF_state:onxGA_state), # rename to per 60
-                  funs(paste0(gsub("on", "",.), "60"))
-                  ) %>% 
-        left_join(., position_data, by = "player") %>% 
-        data.frame()
-      
-      # Teammate on-ice raw and per 60 numbers
-      teammate_metrics_EV <- player_metrics_EV %>% 
-        rename(teammate = player)
-      
-      # Calculate WOWY data
-      WOWY_df <- TM_data %>% 
-        rename(TOI_tog = TOI) %>% 
-        group_by(player, teammate, season, Team) %>% 
-        summarise(TOI_tog = sum(TOI_tog)) %>% 
-        ungroup() %>% 
-        left_join(., player_metrics_EV, by = c("player", "season", "Team")) %>% # join player metrics
-        left_join(., teammate_metrics_EV, by = c("teammate", "season", "Team"), suffix = c("_p", "_t")) %>% # join teammate metrics
-        mutate(player_TOI_perc_w = TOI_tog / TOI_p) %>% 
-        mutate_at(vars(ends_with("_t")), # add "weighted raw" columns 
-                  .funs = funs(weighted = . * player_TOI_perc_w)
-                  ) %>% 
-        data.frame()
-      
-      # Calculate relative to teammate metrics
-      joined_df_EV <- WOWY_df %>% 
-        group_by_at(vars(player, position_p, season, Team, TOI_p, GF60_p:xGA60_p, onSH.perc_p, GF_state60_p:xGA_state60_p)) %>% 
-        summarise_at(vars(player_TOI_perc_w, GF60_t_weighted:xGA60_t_weighted, onSH.perc_t_weighted, GF_state60_t_weighted:xGA_state60_t_weighted), # sum "weighted raw" columns
-                     funs(sum)
-                     ) %>% 
-        ungroup() %>% 
-        mutate_at(vars(GF60_t_weighted:xGA60_t_weighted, onSH.perc_t_weighted, GF_state60_t_weighted:xGA_state60_t_weighted), # finalzie weighted avg of teammates
-                  funs(. / player_TOI_perc_w)
-                  ) %>% 
-        rename_at(vars(GF60_p:xGA60_p, onSH.perc_p, GF_state60_p:xGA_state60_p), # rename players
-                  funs(gsub("_p", "",.))
-                  ) %>% 
-        rename_at(vars(GF60_t_weighted:xGA60_t_weighted, onSH.perc_t_weighted, GF_state60_t_weighted:xGA_state60_t_weighted), # rename teammates
-                  funs(paste0("w_TM_", gsub("_t_weighted", "",.)))
-                  ) %>% 
-        rename_at(vars(contains("_state")), # fix state adj names
-                  funs(gsub("_state60", "60_state", .))
-                  ) %>% 
-        mutate(rel_TM_GF60 =  GF60 - w_TM_GF60, 
-               rel_TM_GA60 =  GA60 - w_TM_GA60, 
-               rel_TM_SF60 =  SF60 - w_TM_SF60, 
-               rel_TM_SA60 =  SA60 - w_TM_SA60, 
-               rel_TM_FF60 =  FF60 - w_TM_FF60, 
-               rel_TM_FA60 =  FA60 - w_TM_FA60, 
-               rel_TM_CF60 =  CF60 - w_TM_CF60, 
-               rel_TM_CA60 =  CA60 - w_TM_CA60, 
-               rel_TM_xGF60 = xGF60 - w_TM_xGF60, 
-               rel_TM_xGA60 = xGA60 - w_TM_xGA60, 
-               
-               rel_TM_SH_perc = onSH.perc - w_TM_onSH.perc, 
-               
-               rel_TM_GF60_state =  GF60_state - w_TM_GF60_state, 
-               rel_TM_GA60_state =  GA60_state - w_TM_GA60_state, 
-               rel_TM_SF60_state =  SF60_state - w_TM_SF60_state, 
-               rel_TM_SA60_state =  SA60_state - w_TM_SA60_state, 
-               rel_TM_FF60_state =  FF60_state - w_TM_FF60_state, 
-               rel_TM_FA60_state =  FA60_state - w_TM_FA60_state, 
-               rel_TM_CF60_state =  CF60_state - w_TM_CF60_state, 
-               rel_TM_CA60_state =  CA60_state - w_TM_CA60_state, 
-               rel_TM_xGF60_state = xGF60_state - w_TM_xGF60_state, 
-               rel_TM_xGA60_state = xGA60_state - w_TM_xGA60_state
-               ) %>% 
-        data.frame()
-      
-      # Create impact numbers and clean up
-      rel_impact_EV <- joined_df_EV %>% 
-        mutate_at(vars(contains("rel_TM_")), # create expanded "impact" columns
-                  .funs = funs(impact = round((. / 60) * TOI_p, 2))
-                  ) %>% 
-        rename_at(vars(rel_TM_GF60_impact:rel_TM_xGA60_impact, rel_TM_GF60_state_impact:rel_TM_xGA60_state_impact), 
-                  funs(gsub("60", "", .))
-                  ) %>% 
-        select(player, position_p, season, Team, TOI_p, 
-               GF60:xGA60,
-               GF60_state:xGA60_state,
-               
-               rel_TM_GF60:rel_TM_xGA60,
-               rel_TM_SH_perc, 
-               rel_TM_GF60_state:rel_TM_xGA60_state,
-               
-               rel_TM_GF_impact:rel_TM_xGA_impact, 
-               rel_TM_GF_state_impact:rel_TM_xGA_state_impact
-               ) %>% 
-        rename(position = position_p, 
-               TOI = TOI_p
-               ) %>% 
-        mutate_if(is.numeric, funs(round(., 3))) %>% 
-        mutate(TOI = round(TOI, 2)) %>% 
-        data.frame()
-      
-      
-      return_list <- list(WOWY_data =   WOWY_df, 
-                          rel_TM_data = rel_impact_EV)
-      
-      return(return_list)
-      
-      }
+      rename_at(vars(onGF:onxGA, onGF_state:onxGA_state), # rename to per 60
+                funs(paste0(gsub("on", "",.), "60"))
+                ) %>% 
+      left_join(., position_data, by = "player") %>% 
+      data.frame()
+    
+    # Teammate on-ice raw and per 60 numbers
+    teammate_metrics_EV <- player_metrics_EV %>% 
+      rename(teammate = player)
+    
+    # Calculate WOWY data
+    WOWY_df <- TM_data %>% 
+      rename(TOI_tog = TOI) %>% 
+      group_by(player, teammate, season, Team) %>% 
+      summarise(TOI_tog = sum(TOI_tog)) %>% 
+      ungroup() %>% 
+      left_join(., player_metrics_EV, by = c("player", "season", "Team")) %>% # join player metrics
+      left_join(., teammate_metrics_EV, by = c("teammate", "season", "Team"), suffix = c("_p", "_t")) %>% # join teammate metrics
+      mutate(player_TOI_perc_w = TOI_tog / TOI_p) %>% 
+      mutate_at(vars(ends_with("_t")), # add "weighted raw" columns 
+                .funs = funs(weighted = . * player_TOI_perc_w)
+                ) %>% 
+      data.frame()
+    
+    # Calculate relative to teammate metrics
+    joined_df_EV <- WOWY_df %>% 
+      group_by_at(vars(player, position_p, season, Team, TOI_p, GF60_p:xGA60_p, onSH.perc_p, GF_state60_p:xGA_state60_p)) %>% 
+      summarise_at(vars(player_TOI_perc_w, GF60_t_weighted:xGA60_t_weighted, onSH.perc_t_weighted, GF_state60_t_weighted:xGA_state60_t_weighted), # sum "weighted raw" columns
+                   funs(sum)
+                   ) %>% 
+      ungroup() %>% 
+      mutate_at(vars(GF60_t_weighted:xGA60_t_weighted, onSH.perc_t_weighted, GF_state60_t_weighted:xGA_state60_t_weighted), # finalzie weighted avg of teammates
+                funs(. / player_TOI_perc_w)
+                ) %>% 
+      rename_at(vars(GF60_p:xGA60_p, onSH.perc_p, GF_state60_p:xGA_state60_p), # rename players
+                funs(gsub("_p", "",.))
+                ) %>% 
+      rename_at(vars(GF60_t_weighted:xGA60_t_weighted, onSH.perc_t_weighted, GF_state60_t_weighted:xGA_state60_t_weighted), # rename teammates
+                funs(paste0("w_TM_", gsub("_t_weighted", "",.)))
+                ) %>% 
+      rename_at(vars(contains("_state")), # fix state adj names
+                funs(gsub("_state60", "60_state", .))
+                ) %>% 
+      mutate(rel_TM_GF60 =  GF60 - w_TM_GF60, 
+             rel_TM_GA60 =  GA60 - w_TM_GA60, 
+             rel_TM_SF60 =  SF60 - w_TM_SF60, 
+             rel_TM_SA60 =  SA60 - w_TM_SA60, 
+             rel_TM_FF60 =  FF60 - w_TM_FF60, 
+             rel_TM_FA60 =  FA60 - w_TM_FA60, 
+             rel_TM_CF60 =  CF60 - w_TM_CF60, 
+             rel_TM_CA60 =  CA60 - w_TM_CA60, 
+             rel_TM_xGF60 = xGF60 - w_TM_xGF60, 
+             rel_TM_xGA60 = xGA60 - w_TM_xGA60, 
+             
+             rel_TM_SH_perc = onSH.perc - w_TM_onSH.perc, 
+             
+             rel_TM_GF60_state =  GF60_state - w_TM_GF60_state, 
+             rel_TM_GA60_state =  GA60_state - w_TM_GA60_state, 
+             rel_TM_SF60_state =  SF60_state - w_TM_SF60_state, 
+             rel_TM_SA60_state =  SA60_state - w_TM_SA60_state, 
+             rel_TM_FF60_state =  FF60_state - w_TM_FF60_state, 
+             rel_TM_FA60_state =  FA60_state - w_TM_FA60_state, 
+             rel_TM_CF60_state =  CF60_state - w_TM_CF60_state, 
+             rel_TM_CA60_state =  CA60_state - w_TM_CA60_state, 
+             rel_TM_xGF60_state = xGF60_state - w_TM_xGF60_state, 
+             rel_TM_xGA60_state = xGA60_state - w_TM_xGA60_state
+             ) %>% 
+      data.frame()
+    
+    # Create impact numbers and clean up
+    rel_impact_EV <- joined_df_EV %>% 
+      mutate_at(vars(contains("rel_TM_")), # create expanded "impact" columns
+                .funs = funs(impact = round((. / 60) * TOI_p, 2))
+                ) %>% 
+      rename_at(vars(rel_TM_GF60_impact:rel_TM_xGA60_impact, rel_TM_GF60_state_impact:rel_TM_xGA60_state_impact), 
+                funs(gsub("60", "", .))
+                ) %>% 
+      select(player, position_p, season, Team, TOI_p, 
+             GF60:xGA60,
+             GF60_state:xGA60_state,
+             
+             rel_TM_GF60:rel_TM_xGA60,
+             rel_TM_SH_perc, 
+             rel_TM_GF60_state:rel_TM_xGA60_state,
+             
+             rel_TM_GF_impact:rel_TM_xGA_impact, 
+             rel_TM_GF_state_impact:rel_TM_xGA_state_impact
+             ) %>% 
+      rename(position = position_p, 
+             TOI = TOI_p
+             ) %>% 
+      mutate_if(is.numeric, funs(round(., 3))) %>% 
+      mutate(TOI = round(TOI, 2)) %>% 
+      data.frame()
+    
+    
+    return_list <- list(WOWY_data =   WOWY_df, 
+                        rel_TM_data = rel_impact_EV)
+    
+    return(return_list)
     
     }
   
   if (strength == "powerplay") { 
+  
+    # Calculate relative to teammate
+    player_metrics_PP <- games_data %>% 
+      filter(TOI > 0) %>% 
+      group_by(player, season, Team) %>% 
+      mutate(GP = 1) %>% 
+      summarise_at(vars(TOI, GP, onGF, onSF, onFF, onCF, onxGF, onGF_state, onSF_state, onFF_state, onCF_state, onxGF_state), 
+                   funs(sum)
+                   ) %>% 
+      mutate(onSH.perc = ifelse(onGF > 0 & onSF > 0, 100 * (onGF / onSF), 0)) %>% # for on-ice shooting % relative to teammate
+      mutate_at(vars(onGF, onSF, onFF, onCF, onxGF, onGF_state, onSF_state, onFF_state, onCF_state, onxGF_state), # convert columns to per 60
+                funs((. / TOI) * 60)
+                ) %>% 
+      ungroup() %>% 
+      rename_at(vars(onGF, onSF, onFF, onCF, onxGF, onGF_state, onSF_state, onFF_state, onCF_state, onxGF_state), # rename to per 60
+                funs(paste0(gsub("on", "",.), "60"))
+                ) %>% 
+      left_join(., position_data, by = "player") %>% 
+      data.frame()
     
-    if (sum_type == "per_team") {    # removed other summing types
-      
-      # Calculate relative to teammate
-      player_metrics_PP <- games_data %>% 
-        filter(TOI > 0) %>% 
-        group_by(player, season, Team) %>% 
-        mutate(GP = 1) %>% 
-        summarise_at(vars(TOI, GP, onGF, onSF, onFF, onCF, onxGF, onGF_state, onSF_state, onFF_state, onCF_state, onxGF_state), 
-                     funs(sum)
-                     ) %>% 
-        mutate(onSH.perc = ifelse(onGF > 0 & onSF > 0, 100 * (onGF / onSF), 0)) %>% # for on-ice shooting % relative to teammate
-        mutate_at(vars(onGF, onSF, onFF, onCF, onxGF, onGF_state, onSF_state, onFF_state, onCF_state, onxGF_state), # convert columns to per 60
-                  funs((. / TOI) * 60)
-                  ) %>% 
-        ungroup() %>% 
-        rename_at(vars(onGF, onSF, onFF, onCF, onxGF, onGF_state, onSF_state, onFF_state, onCF_state, onxGF_state), # rename to per 60
-                  funs(paste0(gsub("on", "",.), "60"))
-                  ) %>% 
-        left_join(., position_data, by = "player") %>% 
-        data.frame()
-      
-      # Teammate on-ice raw and per 60 numbers
-      teammate_metrics_PP <- player_metrics_PP %>% 
-        #select(-c(position, GP, TOI)) %>% 
-        rename(teammate = player)
-      
-      # Calculate relative to teammate numbers
-      WOWY_df <- TM_data %>% 
-        rename(TOI_tog = TOI) %>% 
-        group_by(player, teammate, season, Team) %>% 
-        summarise(TOI_tog = sum(TOI_tog)) %>% 
-        ungroup() %>% 
-        left_join(., player_metrics_PP, by = c("player", "season", "Team")) %>% # join player metrics
-        left_join(., teammate_metrics_PP, by = c("teammate", "season", "Team"), suffix = c("_p", "_t")) %>% # join teammate metrics
-        mutate(player_TOI_perc_w = TOI_tog / TOI_p) %>% 
-        mutate_at(vars(ends_with("_t")), # add "weighted raw" columns 
-                  .funs = funs(weighted = . * player_TOI_perc_w)
-                  ) %>% 
-        data.frame()
-      
-      joined_df_PP <- WOWY_df %>% 
-        group_by_at(vars(player, position_p, season, Team, TOI_p, GF60_p:xGF60_p, GF_state60_p:xGF_state60_p, onSH.perc_p)) %>% 
-        summarise_at(vars(player_TOI_perc_w, GF60_t_weighted:xGF60_t_weighted, GF_state60_t_weighted:xGF_state60_t_weighted, onSH.perc_t_weighted), 
-                     funs(sum)
-                     ) %>% 
-        ungroup() %>% 
-        mutate_at(vars(GF60_t_weighted:xGF60_t_weighted, GF_state60_t_weighted:xGF_state60_t_weighted, onSH.perc_t_weighted), # finalzie weighted avg of teammates
-                  funs(. / player_TOI_perc_w)
-                  ) %>% 
-        rename_at(vars(GF60_p:xGF60_p, GF_state60_p:xGF_state60_p, onSH.perc_p), 
-                  funs(gsub("_p", "",.))
-                  ) %>% 
-        rename_at(vars(GF60_t_weighted:xGF60_t_weighted, GF_state60_t_weighted:xGF_state60_t_weighted, onSH.perc_t_weighted), 
-                  funs(paste0("w_TM_", gsub("_t_weighted", "",.)))
-                  ) %>% 
-        rename_at(vars(contains("_state")), # fix state adj names
-                  funs(gsub("_state60", "60_state", .))
-                  ) %>% 
-        mutate(rel_TM_GF60 =  GF60 - w_TM_GF60, 
-               rel_TM_SF60 =  SF60 - w_TM_SF60, 
-               rel_TM_FF60 =  FF60 - w_TM_FF60, 
-               rel_TM_CF60 =  CF60 - w_TM_CF60, 
-               rel_TM_xGF60 = xGF60 - w_TM_xGF60, 
-               rel_TM_GF60_state =  GF60_state - w_TM_GF60_state, 
-               rel_TM_SF60_state =  SF60_state - w_TM_SF60_state, 
-               rel_TM_FF60_state =  FF60_state - w_TM_FF60_state, 
-               rel_TM_CF60_state =  CF60_state - w_TM_CF60_state, 
-               rel_TM_xGF60_state = xGF60_state - w_TM_xGF60_state, 
-               
-               rel_TM_SH_perc = onSH.perc - w_TM_onSH.perc
-               ) %>% 
-        data.frame()
-      
-      # Create impact numbers and clean up
-      rel_impact_PP <- joined_df_PP %>% 
-        mutate_at(vars(contains("rel_TM_")), # create expanded "impact" columns
-                  .funs = funs(impact = round((. / 60) * TOI_p, 2))
-                  ) %>% 
-        rename_at(vars(rel_TM_GF60_impact:rel_TM_xGF60_impact, rel_TM_GF60_state_impact:rel_TM_xGF60_state_impact), 
-                  funs(gsub("60", "", .))
-                  ) %>% 
-        select(player, position_p, season, Team, TOI_p, 
-               GF60:xGF60, 
-               GF60_state:xGF60_state, 
-               rel_TM_GF60:rel_TM_xGF60, rel_TM_GF60_state:rel_TM_xGF60_state, 
-               rel_TM_GF_impact:rel_TM_xGF_impact, rel_TM_GF_state_impact:rel_TM_xGF_state_impact
-               ) %>% 
-        mutate_if(is.numeric, funs(round(., 2))) %>% 
-        rename(position = position_p, 
-               TOI = TOI_p
-               ) %>% 
-        data.frame()
-      
-      return_list <- list(WOWY_data =   WOWY_df, 
-                          rel_TM_data = rel_impact_PP)
-      
-      return(return_list)
-      
-      }
+    # Teammate on-ice raw and per 60 numbers
+    teammate_metrics_PP <- player_metrics_PP %>% 
+      #select(-c(position, GP, TOI)) %>% 
+      rename(teammate = player)
+    
+    # Calculate relative to teammate numbers
+    WOWY_df <- TM_data %>% 
+      rename(TOI_tog = TOI) %>% 
+      group_by(player, teammate, season, Team) %>% 
+      summarise(TOI_tog = sum(TOI_tog)) %>% 
+      ungroup() %>% 
+      left_join(., player_metrics_PP, by = c("player", "season", "Team")) %>% # join player metrics
+      left_join(., teammate_metrics_PP, by = c("teammate", "season", "Team"), suffix = c("_p", "_t")) %>% # join teammate metrics
+      mutate(player_TOI_perc_w = TOI_tog / TOI_p) %>% 
+      mutate_at(vars(ends_with("_t")), # add "weighted raw" columns 
+                .funs = funs(weighted = . * player_TOI_perc_w)
+                ) %>% 
+      data.frame()
+    
+    joined_df_PP <- WOWY_df %>% 
+      group_by_at(vars(player, position_p, season, Team, TOI_p, GF60_p:xGF60_p, GF_state60_p:xGF_state60_p, onSH.perc_p)) %>% 
+      summarise_at(vars(player_TOI_perc_w, GF60_t_weighted:xGF60_t_weighted, GF_state60_t_weighted:xGF_state60_t_weighted, onSH.perc_t_weighted), 
+                   funs(sum)
+                   ) %>% 
+      ungroup() %>% 
+      mutate_at(vars(GF60_t_weighted:xGF60_t_weighted, GF_state60_t_weighted:xGF_state60_t_weighted, onSH.perc_t_weighted), # finalzie weighted avg of teammates
+                funs(. / player_TOI_perc_w)
+                ) %>% 
+      rename_at(vars(GF60_p:xGF60_p, GF_state60_p:xGF_state60_p, onSH.perc_p), 
+                funs(gsub("_p", "",.))
+                ) %>% 
+      rename_at(vars(GF60_t_weighted:xGF60_t_weighted, GF_state60_t_weighted:xGF_state60_t_weighted, onSH.perc_t_weighted), 
+                funs(paste0("w_TM_", gsub("_t_weighted", "",.)))
+                ) %>% 
+      rename_at(vars(contains("_state")), # fix state adj names
+                funs(gsub("_state60", "60_state", .))
+                ) %>% 
+      mutate(rel_TM_GF60 =  GF60 - w_TM_GF60, 
+             rel_TM_SF60 =  SF60 - w_TM_SF60, 
+             rel_TM_FF60 =  FF60 - w_TM_FF60, 
+             rel_TM_CF60 =  CF60 - w_TM_CF60, 
+             rel_TM_xGF60 = xGF60 - w_TM_xGF60, 
+             rel_TM_GF60_state =  GF60_state - w_TM_GF60_state, 
+             rel_TM_SF60_state =  SF60_state - w_TM_SF60_state, 
+             rel_TM_FF60_state =  FF60_state - w_TM_FF60_state, 
+             rel_TM_CF60_state =  CF60_state - w_TM_CF60_state, 
+             rel_TM_xGF60_state = xGF60_state - w_TM_xGF60_state, 
+             
+             rel_TM_SH_perc = onSH.perc - w_TM_onSH.perc
+             ) %>% 
+      data.frame()
+    
+    # Create impact numbers and clean up
+    rel_impact_PP <- joined_df_PP %>% 
+      mutate_at(vars(contains("rel_TM_")), # create expanded "impact" columns
+                .funs = funs(impact = round((. / 60) * TOI_p, 2))
+                ) %>% 
+      rename_at(vars(rel_TM_GF60_impact:rel_TM_xGF60_impact, rel_TM_GF60_state_impact:rel_TM_xGF60_state_impact), 
+                funs(gsub("60", "", .))
+                ) %>% 
+      select(player, position_p, season, Team, TOI_p, 
+             GF60:xGF60, 
+             GF60_state:xGF60_state, 
+             rel_TM_GF60:rel_TM_xGF60, rel_TM_GF60_state:rel_TM_xGF60_state, 
+             rel_TM_GF_impact:rel_TM_xGF_impact, rel_TM_GF_state_impact:rel_TM_xGF_state_impact
+             ) %>% 
+      mutate_if(is.numeric, funs(round(., 2))) %>% 
+      rename(position = position_p, 
+             TOI = TOI_p
+             ) %>% 
+      data.frame()
+    
+    return_list <- list(WOWY_data =   WOWY_df, 
+                        rel_TM_data = rel_impact_PP)
+    
+    return(return_list)
     
     }
   
   if (strength == "shorthanded") { 
+  
+    # SH - Relative to Teammate "New"
+    player_metrics_SH <- games_data %>% 
+      filter(TOI > 0) %>% 
+      group_by(player, season, Team) %>% 
+      mutate(GP = 1) %>% 
+      summarise_at(vars(TOI, GP, onGA, onSA, onFA, onCA, onxGA, onGA_state, onSA_state, onFA_state, onCA_state, onxGA_state), 
+                   funs(sum)
+                   ) %>% 
+      mutate_at(vars(onGA, onSA, onFA, onCA, onxGA, onGA_state, onSA_state, onFA_state, onCA_state, onxGA_state), # convert columns to per 60
+                funs((. / TOI) * 60)
+                ) %>% 
+      ungroup() %>% 
+      rename_at(vars(onGA, onSA, onFA, onCA, onxGA, onGA_state, onSA_state, onFA_state, onCA_state, onxGA_state), # rename to per 60
+                funs(paste0(gsub("on", "",.), "60"))
+                ) %>% 
+      left_join(., position_data, by = "player") %>% 
+      data.frame()
     
-    if (sum_type == "per_team") {    # removed other summing types
-      
-      # SH - Relative to Teammate "New"
-      player_metrics_SH <- games_data %>% 
-        filter(TOI > 0) %>% 
-        group_by(player, season, Team) %>% 
-        mutate(GP = 1) %>% 
-        summarise_at(vars(TOI, GP, onGA, onSA, onFA, onCA, onxGA, onGA_state, onSA_state, onFA_state, onCA_state, onxGA_state), 
-                     funs(sum)
-                     ) %>% 
-        mutate_at(vars(onGA, onSA, onFA, onCA, onxGA, onGA_state, onSA_state, onFA_state, onCA_state, onxGA_state), # convert columns to per 60
-                  funs((. / TOI) * 60)
-                  ) %>% 
-        ungroup() %>% 
-        rename_at(vars(onGA, onSA, onFA, onCA, onxGA, onGA_state, onSA_state, onFA_state, onCA_state, onxGA_state), # rename to per 60
-                  funs(paste0(gsub("on", "",.), "60"))
-                  ) %>% 
-        left_join(., position_data, by = "player") %>% 
-        data.frame()
-      
-      # Teammate on-ice raw and per 60 numbers
-      teammate_metrics_SH <- player_metrics_SH %>% 
-        #select(-c(position, GP, TOI)) %>% 
-        rename(teammate = player)
-      
-      # Calculate relative to teammate numbers
-      WOWY_df <- TM_data %>% 
-        rename(TOI_tog = TOI) %>% 
-        group_by(player, teammate, season, Team) %>% 
-        summarise(TOI_tog = sum(TOI_tog)) %>% 
-        ungroup() %>% 
-        left_join(., player_metrics_SH, by = c("player", "season", "Team")) %>% # join player metrics
-        left_join(., teammate_metrics_SH, by = c("teammate", "season", "Team"), suffix = c("_p", "_t")) %>% # join teammate metrics
-        mutate(player_TOI_perc_w = TOI_tog / TOI_p) %>% 
-        mutate_at(vars(ends_with("_t")), # add "weighted raw" columns 
-                  .funs = funs(weighted = . * player_TOI_perc_w)
-                  ) %>% 
-        data.frame()
-      
-      joined_df_SH <- WOWY_df %>% 
-        group_by_at(vars(player, position_p, season, Team, TOI_p, GA60_p:xGA60_p, GA_state60_p:xGA_state60_p)) %>% 
-        summarise_at(vars(player_TOI_perc_w, GA60_t_weighted:xGA60_t_weighted, GA_state60_t_weighted:xGA_state60_t_weighted), 
-                     funs(sum)
-                     ) %>% 
-        ungroup() %>% 
-        mutate_at(vars(GA60_t_weighted:xGA60_t_weighted, GA_state60_t_weighted:xGA_state60_t_weighted), # finalzie weighted avg of teammates
-                  funs(. / player_TOI_perc_w)
-                  ) %>% 
-        rename_at(vars(GA60_p:xGA60_p, GA_state60_p:xGA_state60_p), 
-                  funs(gsub("_p", "",.))
-                  ) %>% 
-        rename_at(vars(GA60_t_weighted:xGA60_t_weighted, GA_state60_t_weighted:xGA_state60_t_weighted), 
-                  funs(paste0("w_TM_", gsub("_t_weighted", "",.)))
-                  ) %>% 
-        rename_at(vars(contains("_state")), # fix state adj names
-                  funs(gsub("_state60", "60_state", .))
-                  ) %>% 
-        mutate(rel_TM_GA60 =  GA60 - w_TM_GA60, 
-               rel_TM_SA60 =  SA60 - w_TM_SA60, 
-               rel_TM_FA60 =  FA60 - w_TM_FA60, 
-               rel_TM_CA60 =  CA60 - w_TM_CA60, 
-               rel_TM_xGA60 = xGA60 - w_TM_xGA60, 
-               
-               rel_TM_GA60_state =  GA60_state - w_TM_GA60_state, 
-               rel_TM_SA60_state =  SA60_state - w_TM_SA60_state, 
-               rel_TM_FA60_state =  FA60_state - w_TM_FA60_state, 
-               rel_TM_CA60_state =  CA60_state - w_TM_CA60_state, 
-               rel_TM_xGA60_state = xGA60_state - w_TM_xGA60_state
-               ) %>% 
-        data.frame()
-      
-      # Create impact numbers and clean up
-      rel_impact_SH <- joined_df_SH %>% 
-        mutate_at(vars(contains("rel_TM_")), # create expanded "impact" columns
-                  .funs = funs(impact = round((. / 60) * TOI_p, 2))
-                  ) %>%  
-        rename_at(vars(rel_TM_GA60_impact:rel_TM_xGA60_impact, rel_TM_GA60_state_impact:rel_TM_xGA60_state_impact), 
-                  funs(gsub("60", "", .))
-                  ) %>% 
-        select(player, position_p, season, Team, TOI_p, 
-               GA60:xGA60, 
-               GA60_state:xGA60_state, 
-               rel_TM_GA60:rel_TM_xGA60, rel_TM_GA60_state:rel_TM_xGA60_state, 
-               rel_TM_GA_impact:rel_TM_xGA_impact, rel_TM_GA_state_impact:rel_TM_xGA_state_impact
-               ) %>% 
-        mutate_if(is.numeric, funs(round(., 2))) %>% 
-        rename(position = position_p, 
-               TOI = TOI_p
-               ) %>% 
-        data.frame()
-      
-      # Return list
-      return_list <- list(WOWY_data =   WOWY_df, 
-                          rel_TM_data = rel_impact_SH)
-      
-      return(return_list)
-      
-      }
+    # Teammate on-ice raw and per 60 numbers
+    teammate_metrics_SH <- player_metrics_SH %>% 
+      #select(-c(position, GP, TOI)) %>% 
+      rename(teammate = player)
+    
+    # Calculate relative to teammate numbers
+    WOWY_df <- TM_data %>% 
+      rename(TOI_tog = TOI) %>% 
+      group_by(player, teammate, season, Team) %>% 
+      summarise(TOI_tog = sum(TOI_tog)) %>% 
+      ungroup() %>% 
+      left_join(., player_metrics_SH, by = c("player", "season", "Team")) %>% # join player metrics
+      left_join(., teammate_metrics_SH, by = c("teammate", "season", "Team"), suffix = c("_p", "_t")) %>% # join teammate metrics
+      mutate(player_TOI_perc_w = TOI_tog / TOI_p) %>% 
+      mutate_at(vars(ends_with("_t")), # add "weighted raw" columns 
+                .funs = funs(weighted = . * player_TOI_perc_w)
+                ) %>% 
+      data.frame()
+    
+    joined_df_SH <- WOWY_df %>% 
+      group_by_at(vars(player, position_p, season, Team, TOI_p, GA60_p:xGA60_p, GA_state60_p:xGA_state60_p)) %>% 
+      summarise_at(vars(player_TOI_perc_w, GA60_t_weighted:xGA60_t_weighted, GA_state60_t_weighted:xGA_state60_t_weighted), 
+                   funs(sum)
+                   ) %>% 
+      ungroup() %>% 
+      mutate_at(vars(GA60_t_weighted:xGA60_t_weighted, GA_state60_t_weighted:xGA_state60_t_weighted), # finalzie weighted avg of teammates
+                funs(. / player_TOI_perc_w)
+                ) %>% 
+      rename_at(vars(GA60_p:xGA60_p, GA_state60_p:xGA_state60_p), 
+                funs(gsub("_p", "",.))
+                ) %>% 
+      rename_at(vars(GA60_t_weighted:xGA60_t_weighted, GA_state60_t_weighted:xGA_state60_t_weighted), 
+                funs(paste0("w_TM_", gsub("_t_weighted", "",.)))
+                ) %>% 
+      rename_at(vars(contains("_state")), # fix state adj names
+                funs(gsub("_state60", "60_state", .))
+                ) %>% 
+      mutate(rel_TM_GA60 =  GA60 - w_TM_GA60, 
+             rel_TM_SA60 =  SA60 - w_TM_SA60, 
+             rel_TM_FA60 =  FA60 - w_TM_FA60, 
+             rel_TM_CA60 =  CA60 - w_TM_CA60, 
+             rel_TM_xGA60 = xGA60 - w_TM_xGA60, 
+             
+             rel_TM_GA60_state =  GA60_state - w_TM_GA60_state, 
+             rel_TM_SA60_state =  SA60_state - w_TM_SA60_state, 
+             rel_TM_FA60_state =  FA60_state - w_TM_FA60_state, 
+             rel_TM_CA60_state =  CA60_state - w_TM_CA60_state, 
+             rel_TM_xGA60_state = xGA60_state - w_TM_xGA60_state
+             ) %>% 
+      data.frame()
+    
+    # Create impact numbers and clean up
+    rel_impact_SH <- joined_df_SH %>% 
+      mutate_at(vars(contains("rel_TM_")), # create expanded "impact" columns
+                .funs = funs(impact = round((. / 60) * TOI_p, 2))
+                ) %>%  
+      rename_at(vars(rel_TM_GA60_impact:rel_TM_xGA60_impact, rel_TM_GA60_state_impact:rel_TM_xGA60_state_impact), 
+                funs(gsub("60", "", .))
+                ) %>% 
+      select(player, position_p, season, Team, TOI_p, 
+             GA60:xGA60, 
+             GA60_state:xGA60_state, 
+             rel_TM_GA60:rel_TM_xGA60, rel_TM_GA60_state:rel_TM_xGA60_state, 
+             rel_TM_GA_impact:rel_TM_xGA_impact, rel_TM_GA_state_impact:rel_TM_xGA_state_impact
+             ) %>% 
+      mutate_if(is.numeric, funs(round(., 2))) %>% 
+      rename(position = position_p, 
+             TOI = TOI_p
+             ) %>% 
+      data.frame()
+    
+    # Return list
+    return_list <- list(WOWY_data =   WOWY_df, 
+                        rel_TM_data = rel_impact_SH)
+    
+    return(return_list)
     
     }
   
   if (strength == "5v5") { 
     
-    if (sum_type == "per_team") {    # removed other summing types
+    # Player on-ice raw and per 60 numbers
+    player_metrics_EV <- games_data %>% 
+      select(-c(onGF:onxGA)) %>% 
+      rename_at(vars(onGF_adj:onxGA_adj), funs(gsub("_adj", "", .))) %>% 
+      group_by(player, season, Team) %>% 
+      mutate(GP = 1) %>% 
+      summarise_at(vars(TOI, GP, onGF:onxGA), 
+                   funs(sum)
+                   ) %>% 
+      mutate(onSH.perc = ifelse(onGF > 0 & onSF > 0, 100 * (onGF / onSF), 0)) %>% # on-ice shooting % relative to teammate
+      mutate_at(vars(onGF:onxGA), # convert columns to per 60
+                funs((. / TOI) * 60)
+                ) %>% 
+      ungroup() %>% 
       
-      # Player on-ice raw and per 60 numbers
-      player_metrics_EV <- games_data %>% 
-        group_by(player, season, Team) %>% 
-        mutate(GP = 1) %>% 
-        summarise_at(vars(TOI, GP, onGF:onxGA), 
-                     funs(sum)
-                     ) %>% 
-        mutate(onSH.perc = ifelse(onGF > 0 & onSF > 0, 100 * (onGF / onSF), 0)) %>% # on-ice shooting % relative to teammate
-        mutate_at(vars(onGF:onxGA), # convert columns to per 60
-                  funs((. / TOI) * 60)
-                  ) %>% 
-        ungroup() %>% 
-        
-        rename_at(vars(onGF:onxGA), # rename to per 60
-                  funs(paste0(gsub("on", "",.), "60"))
-                  ) %>% 
-        left_join(., position_data, by = "player") %>% 
-        data.frame()
-      
-      # Teammate on-ice raw and per 60 numbers
-      teammate_metrics_EV <- player_metrics_EV %>% 
-        rename(teammate = player)
-      
-      # Calculate WOWY data
-      WOWY_df <- TM_data %>% 
-        rename(TOI_tog = TOI) %>% 
-        group_by(player, teammate, season, Team) %>% 
-        summarise(TOI_tog = sum(TOI_tog)) %>% 
-        ungroup() %>% 
-        left_join(., player_metrics_EV, by = c("player", "season", "Team")) %>% # join player metrics
-        left_join(., teammate_metrics_EV, by = c("teammate", "season", "Team"), suffix = c("_p", "_t")) %>% # join teammate metrics
-        mutate(player_TOI_perc_w = TOI_tog / TOI_p) %>% 
-        mutate_at(vars(ends_with("_t")), # add "weighted raw" columns 
-                  .funs = funs(weighted = . * player_TOI_perc_w)
-                  ) %>% 
-        data.frame()
-      
-      # Calculate relative to teammate metrics
-      joined_df_EV <- WOWY_df %>% 
-        group_by_at(vars(player, position_p, season, Team, TOI_p, GF60_p:xGA60_p, onSH.perc_p)) %>% 
-        summarise_at(vars(player_TOI_perc_w, GF60_t_weighted:xGA60_t_weighted, onSH.perc_t_weighted), # sum "weighted raw" columns
-                     funs(sum)
-                     ) %>% 
-        ungroup() %>% 
-        mutate_at(vars(GF60_t_weighted:xGA60_t_weighted, onSH.perc_t_weighted), # finalzie weighted avg of teammates
-                  funs(. / player_TOI_perc_w)
-                  ) %>% 
-        rename_at(vars(GF60_p:xGA60_p, onSH.perc_p), # rename players
-                  funs(gsub("_p", "",.))
-                  ) %>% 
-        rename_at(vars(GF60_t_weighted:xGA60_t_weighted, onSH.perc_t_weighted), # rename teammates
-                  funs(paste0("w_TM_", gsub("_t_weighted", "",.)))
-                  ) %>% 
-        mutate(rel_TM_GF60 =  GF60 - w_TM_GF60, 
-               rel_TM_GA60 =  GA60 - w_TM_GA60, 
-               rel_TM_SF60 =  SF60 - w_TM_SF60, 
-               rel_TM_SA60 =  SA60 - w_TM_SA60, 
-               rel_TM_FF60 =  FF60 - w_TM_FF60, 
-               rel_TM_FA60 =  FA60 - w_TM_FA60, 
-               rel_TM_CF60 =  CF60 - w_TM_CF60, 
-               rel_TM_CA60 =  CA60 - w_TM_CA60, 
-               rel_TM_xGF60 = xGF60 - w_TM_xGF60, 
-               rel_TM_xGA60 = xGA60 - w_TM_xGA60, 
-               
-               rel_TM_SH_perc = onSH.perc - w_TM_onSH.perc
-               ) %>% 
-        data.frame()
-      
-      # Create impact numbers and clean up
-      rel_impact_EV <- joined_df_EV %>% 
-        mutate_at(vars(contains("rel_TM_")), # create expanded "impact" columns
-                  .funs = funs(impact = round((. / 60) * TOI_p, 2))
-                  ) %>% 
-        rename_at(vars(rel_TM_GF60_impact:rel_TM_xGA60_impact), 
-                  funs(gsub("60", "", .))
-                  ) %>% 
-        select(player, position_p, season, Team, TOI_p, 
-               GF60:xGA60,
-               
-               rel_TM_GF60:rel_TM_xGA60,
-               rel_TM_SH_perc, 
-               
-               rel_TM_GF_impact:rel_TM_xGA_impact
-               ) %>% 
-        rename(position = position_p, 
-               TOI = TOI_p
-               ) %>% 
-        mutate_if(is.numeric, funs(round(., 3))) %>% 
-        mutate(TOI = round(TOI, 2)) %>% 
-        data.frame()
-      
-      
-      return_list <- list(WOWY_data =   WOWY_df, 
-                          rel_TM_data = rel_impact_EV)
-      
-      return(return_list)
-      
-      }
+      rename_at(vars(onGF:onxGA), # rename to per 60
+                funs(paste0(gsub("on", "",.), "60"))
+                ) %>% 
+      left_join(., position_data, by = "player") %>% 
+      data.frame()
+    
+    # Teammate on-ice raw and per 60 numbers
+    teammate_metrics_EV <- player_metrics_EV %>% 
+      rename(teammate = player)
+    
+    # Calculate WOWY data
+    WOWY_df <- TM_data %>% 
+      rename(TOI_tog = TOI) %>% 
+      group_by(player, teammate, season, Team) %>% 
+      summarise(TOI_tog = sum(TOI_tog)) %>% 
+      ungroup() %>% 
+      left_join(., player_metrics_EV, by = c("player", "season", "Team")) %>% # join player metrics
+      left_join(., teammate_metrics_EV, by = c("teammate", "season", "Team"), suffix = c("_p", "_t")) %>% # join teammate metrics
+      mutate(player_TOI_perc_w = TOI_tog / TOI_p) %>% 
+      mutate_at(vars(ends_with("_t")), # add "weighted raw" columns 
+                .funs = funs(weighted = . * player_TOI_perc_w)
+                ) %>% 
+      data.frame()
+    
+    # Calculate relative to teammate metrics
+    joined_df_EV <- WOWY_df %>% 
+      group_by_at(vars(player, position_p, season, Team, TOI_p, GF60_p:xGA60_p, onSH.perc_p)) %>% 
+      summarise_at(vars(player_TOI_perc_w, GF60_t_weighted:xGA60_t_weighted, onSH.perc_t_weighted), # sum "weighted raw" columns
+                   funs(sum)
+                   ) %>% 
+      ungroup() %>% 
+      mutate_at(vars(GF60_t_weighted:xGA60_t_weighted, onSH.perc_t_weighted), # finalzie weighted avg of teammates
+                funs(. / player_TOI_perc_w)
+                ) %>% 
+      rename_at(vars(GF60_p:xGA60_p, onSH.perc_p), # rename players
+                funs(gsub("_p", "",.))
+                ) %>% 
+      rename_at(vars(GF60_t_weighted:xGA60_t_weighted, onSH.perc_t_weighted), # rename teammates
+                funs(paste0("w_TM_", gsub("_t_weighted", "",.)))
+                ) %>% 
+      mutate(rel_TM_GF60 =  GF60 - w_TM_GF60, 
+             rel_TM_GA60 =  GA60 - w_TM_GA60, 
+             rel_TM_SF60 =  SF60 - w_TM_SF60, 
+             rel_TM_SA60 =  SA60 - w_TM_SA60, 
+             rel_TM_FF60 =  FF60 - w_TM_FF60, 
+             rel_TM_FA60 =  FA60 - w_TM_FA60, 
+             rel_TM_CF60 =  CF60 - w_TM_CF60, 
+             rel_TM_CA60 =  CA60 - w_TM_CA60, 
+             rel_TM_xGF60 = xGF60 - w_TM_xGF60, 
+             rel_TM_xGA60 = xGA60 - w_TM_xGA60, 
+             
+             rel_TM_SH_perc = onSH.perc - w_TM_onSH.perc
+             ) %>% 
+      data.frame()
+    
+    # Create impact numbers and clean up
+    rel_impact_EV <- joined_df_EV %>% 
+      mutate_at(vars(contains("rel_TM_")), # create expanded "impact" columns
+                .funs = funs(impact = round((. / 60) * TOI_p, 2))
+                ) %>% 
+      rename_at(vars(rel_TM_GF60_impact:rel_TM_xGA60_impact), 
+                funs(gsub("60", "", .))
+                ) %>% 
+      select(player, position_p, season, Team, TOI_p, 
+             GF60:xGA60,
+             
+             rel_TM_GF60:rel_TM_xGA60,
+             rel_TM_SH_perc, 
+             
+             rel_TM_GF_impact:rel_TM_xGA_impact
+             ) %>% 
+      rename(position = position_p, 
+             TOI = TOI_p
+             ) %>% 
+      mutate_if(is.numeric, funs(round(., 3))) %>% 
+      mutate(TOI = round(TOI, 2)) %>% 
+      data.frame()
+    
+    
+    return_list <- list(WOWY_data =   WOWY_df, 
+                        rel_TM_data = rel_impact_EV)
+    
+    return(return_list)
     
     }
   
   if (strength == "5v4") { 
     
-    if (sum_type == "per_team") {    # removed other summing types
-      
-      # Calculate relative to teammate
-      player_metrics_PP <- games_data %>% 
-        filter(TOI > 0) %>% 
-        group_by(player, season, Team) %>% 
-        mutate(GP = 1) %>% 
-        summarise_at(vars(TOI, GP, onGF, onSF, onFF, onCF, onxGF), 
-                     funs(sum)
-                     ) %>% 
-        mutate(onSH.perc = ifelse(onGF > 0 & onSF > 0, 100 * (onGF / onSF), 0)) %>% # for on-ice shooting % relative to teammate
-        mutate_at(vars(onGF, onSF, onFF, onCF, onxGF), # convert columns to per 60
-                  funs((. / TOI) * 60)
-                  ) %>% 
-        ungroup() %>% 
-        rename_at(vars(onGF, onSF, onFF, onCF, onxGF), # rename to per 60
-                  funs(paste0(gsub("on", "",.), "60"))
-                  ) %>% 
-        left_join(., position_data, by = "player") %>% 
-        data.frame()
-      
-      # Teammate on-ice raw and per 60 numbers
-      teammate_metrics_PP <- player_metrics_PP %>% 
-        rename(teammate = player)
-      
-      # Calculate relative to teammate numbers
-      WOWY_df <- TM_data %>% 
-        rename(TOI_tog = TOI) %>% 
-        group_by(player, teammate, season, Team) %>% 
-        summarise(TOI_tog = sum(TOI_tog)) %>% 
-        ungroup() %>% 
-        left_join(., player_metrics_PP, by = c("player", "season", "Team")) %>% # join player metrics
-        left_join(., teammate_metrics_PP, by = c("teammate", "season", "Team"), suffix = c("_p", "_t")) %>% # join teammate metrics
-        mutate(player_TOI_perc_w = TOI_tog / TOI_p) %>% 
-        mutate_at(vars(ends_with("_t")), # add "weighted raw" columns 
-                  .funs = funs(weighted = . * player_TOI_perc_w)
-                  ) %>% 
-        data.frame()
-      
-      joined_df_PP <- WOWY_df %>% 
-        group_by_at(vars(player, position_p, season, Team, TOI_p, GF60_p:xGF60_p, onSH.perc_p)) %>% 
-        summarise_at(vars(player_TOI_perc_w, GF60_t_weighted:xGF60_t_weighted, onSH.perc_t_weighted), 
-                     funs(sum)
-                     ) %>% 
-        ungroup() %>% 
-        mutate_at(vars(GF60_t_weighted:xGF60_t_weighted, onSH.perc_t_weighted), # finalzie weighted avg of teammates
-                  funs(. / player_TOI_perc_w)
-                  ) %>% 
-        rename_at(vars(GF60_p:xGF60_p, onSH.perc_p), 
-                  funs(gsub("_p", "",.))
-                  ) %>% 
-        rename_at(vars(GF60_t_weighted:xGF60_t_weighted, onSH.perc_t_weighted), 
-                  funs(paste0("w_TM_", gsub("_t_weighted", "",.)))
-                  ) %>% 
-        mutate(rel_TM_GF60 =    GF60 - w_TM_GF60, 
-               rel_TM_SF60 =    SF60 - w_TM_SF60, 
-               rel_TM_FF60 =    FF60 - w_TM_FF60, 
-               rel_TM_CF60 =    CF60 - w_TM_CF60, 
-               rel_TM_xGF60 =   xGF60 - w_TM_xGF60, 
-               rel_TM_SH_perc = onSH.perc - w_TM_onSH.perc
-               ) %>% 
-        data.frame()
-      
-      # Create impact numbers and clean up
-      rel_impact_PP <- joined_df_PP %>% 
-        mutate_at(vars(contains("rel_TM_")), # create expanded "impact" columns
-                  .funs = funs(impact = round((. / 60) * TOI_p, 2))
-                  ) %>% 
-        rename_at(vars(rel_TM_GF60_impact:rel_TM_xGF60_impact), 
-                  funs(gsub("60", "", .))
-                  ) %>% 
-        select(player, position_p, season, Team, TOI_p, 
-               GF60:xGF60, 
-               rel_TM_GF60:rel_TM_xGF60, 
-               rel_TM_GF_impact:rel_TM_xGF_impact
-               ) %>% 
-        mutate_if(is.numeric, funs(round(., 2))) %>% 
-        rename(position = position_p, 
-               TOI = TOI_p
-               ) %>% 
-        data.frame()
-      
-      return_list <- list(WOWY_data =   WOWY_df, 
-                          rel_TM_data = rel_impact_PP)
-      
-      return(return_list)
-      
-      }
+    # Calculate relative to teammate
+    player_metrics_PP <- games_data %>% 
+      select(-c(onGF:onxGA)) %>% 
+      rename_at(vars(onGF_adj:onxGF_adj), funs(gsub("_adj", "", .))) %>% 
+      filter(TOI > 0) %>% 
+      group_by(player, season, Team) %>% 
+      mutate(GP = 1) %>% 
+      summarise_at(vars(TOI, GP, onGF, onSF, onFF, onCF, onxGF), 
+                   funs(sum)
+                   ) %>% 
+      mutate(onSH.perc = ifelse(onGF > 0 & onSF > 0, 100 * (onGF / onSF), 0)) %>% # for on-ice shooting % relative to teammate
+      mutate_at(vars(onGF, onSF, onFF, onCF, onxGF), # convert columns to per 60
+                funs((. / TOI) * 60)
+                ) %>% 
+      ungroup() %>% 
+      rename_at(vars(onGF, onSF, onFF, onCF, onxGF), # rename to per 60
+                funs(paste0(gsub("on", "",.), "60"))
+                ) %>% 
+      left_join(., position_data, by = "player") %>% 
+      data.frame()
     
+    # Teammate on-ice raw and per 60 numbers
+    teammate_metrics_PP <- player_metrics_PP %>% 
+      rename(teammate = player)
+    
+    # Calculate relative to teammate numbers
+    WOWY_df <- TM_data %>% 
+      rename(TOI_tog = TOI) %>% 
+      group_by(player, teammate, season, Team) %>% 
+      summarise(TOI_tog = sum(TOI_tog)) %>% 
+      ungroup() %>% 
+      left_join(., player_metrics_PP, by = c("player", "season", "Team")) %>% # join player metrics
+      left_join(., teammate_metrics_PP, by = c("teammate", "season", "Team"), suffix = c("_p", "_t")) %>% # join teammate metrics
+      mutate(player_TOI_perc_w = TOI_tog / TOI_p) %>% 
+      mutate_at(vars(ends_with("_t")), # add "weighted raw" columns 
+                .funs = funs(weighted = . * player_TOI_perc_w)
+                ) %>% 
+      data.frame()
+    
+    joined_df_PP <- WOWY_df %>% 
+      group_by_at(vars(player, position_p, season, Team, TOI_p, GF60_p:xGF60_p, onSH.perc_p)) %>% 
+      summarise_at(vars(player_TOI_perc_w, GF60_t_weighted:xGF60_t_weighted, onSH.perc_t_weighted), 
+                   funs(sum)
+                   ) %>% 
+      ungroup() %>% 
+      mutate_at(vars(GF60_t_weighted:xGF60_t_weighted, onSH.perc_t_weighted), # finalzie weighted avg of teammates
+                funs(. / player_TOI_perc_w)
+                ) %>% 
+      rename_at(vars(GF60_p:xGF60_p, onSH.perc_p), 
+                funs(gsub("_p", "",.))
+                ) %>% 
+      rename_at(vars(GF60_t_weighted:xGF60_t_weighted, onSH.perc_t_weighted), 
+                funs(paste0("w_TM_", gsub("_t_weighted", "",.)))
+                ) %>% 
+      mutate(rel_TM_GF60 =    GF60 - w_TM_GF60, 
+             rel_TM_SF60 =    SF60 - w_TM_SF60, 
+             rel_TM_FF60 =    FF60 - w_TM_FF60, 
+             rel_TM_CF60 =    CF60 - w_TM_CF60, 
+             rel_TM_xGF60 =   xGF60 - w_TM_xGF60, 
+             rel_TM_SH_perc = onSH.perc - w_TM_onSH.perc
+             ) %>% 
+      data.frame()
+    
+    # Create impact numbers and clean up
+    rel_impact_PP <- joined_df_PP %>% 
+      mutate_at(vars(contains("rel_TM_")), # create expanded "impact" columns
+                .funs = funs(impact = round((. / 60) * TOI_p, 2))
+                ) %>% 
+      rename_at(vars(rel_TM_GF60_impact:rel_TM_xGF60_impact), 
+                funs(gsub("60", "", .))
+                ) %>% 
+      select(player, position_p, season, Team, TOI_p, 
+             GF60:xGF60, 
+             rel_TM_GF60:rel_TM_xGF60, 
+             rel_TM_GF_impact:rel_TM_xGF_impact
+             ) %>% 
+      mutate_if(is.numeric, funs(round(., 2))) %>% 
+      rename(position = position_p, 
+             TOI = TOI_p
+             ) %>% 
+      data.frame()
+    
+    return_list <- list(WOWY_data =   WOWY_df, 
+                        rel_TM_data = rel_impact_PP)
+    
+    return(return_list)
+      
     }
   
   if (strength == "4v5") { 
     
-    if (sum_type == "per_team") {    # removed other summing types
-      
-      # SH - Relative to Teammate "New"
-      player_metrics_SH <- games_data %>% 
-        filter(TOI > 0) %>% 
-        group_by(player, season, Team) %>% 
-        mutate(GP = 1) %>% 
-        summarise_at(vars(TOI, GP, onGA, onSA, onFA, onCA, onxGA), 
-                     funs(sum)
-                     ) %>% 
-        mutate_at(vars(onGA, onSA, onFA, onCA, onxGA), # convert columns to per 60
-                  funs((. / TOI) * 60)
-                  ) %>% 
-        ungroup() %>% 
-        rename_at(vars(onGA, onSA, onFA, onCA, onxGA), # rename to per 60
-                  funs(paste0(gsub("on", "",.), "60"))
-                  ) %>% 
-        left_join(., position_data, by = "player") %>% 
-        data.frame()
-      
-      # Teammate on-ice raw and per 60 numbers
-      teammate_metrics_SH <- player_metrics_SH %>% 
-        rename(teammate = player)
-      
-      # Calculate relative to teammate numbers
-      WOWY_df <- TM_data %>% 
-        rename(TOI_tog = TOI) %>% 
-        group_by(player, teammate, season, Team) %>% 
-        summarise(TOI_tog = sum(TOI_tog)) %>% 
-        ungroup() %>% 
-        left_join(., player_metrics_SH, by = c("player", "season", "Team")) %>% # join player metrics
-        left_join(., teammate_metrics_SH, by = c("teammate", "season", "Team"), suffix = c("_p", "_t")) %>% # join teammate metrics
-        mutate(player_TOI_perc_w = TOI_tog / TOI_p) %>% 
-        mutate_at(vars(ends_with("_t")), # add "weighted raw" columns 
-                  .funs = funs(weighted = . * player_TOI_perc_w)
-                  ) %>% 
-        data.frame()
-      
-      joined_df_SH <- WOWY_df %>% 
-        group_by_at(vars(player, position_p, season, Team, TOI_p, GA60_p:xGA60_p)) %>% 
-        summarise_at(vars(player_TOI_perc_w, GA60_t_weighted:xGA60_t_weighted), 
-                     funs(sum)
-                     ) %>% 
-        ungroup() %>% 
-        mutate_at(vars(GA60_t_weighted:xGA60_t_weighted), # finalzie weighted avg of teammates
-                  funs(. / player_TOI_perc_w)
-                  ) %>% 
-        rename_at(vars(GA60_p:xGA60_p), 
-                  funs(gsub("_p", "",.))
-                  ) %>% 
-        rename_at(vars(GA60_t_weighted:xGA60_t_weighted), 
-                  funs(paste0("w_TM_", gsub("_t_weighted", "",.)))
-                  ) %>% 
-        rename_at(vars(contains("_state")), # fix state adj names
-                  funs(gsub("_state60", "60_state", .))
-                  ) %>% 
-        mutate(rel_TM_GA60 =  GA60 - w_TM_GA60, 
-               rel_TM_SA60 =  SA60 - w_TM_SA60, 
-               rel_TM_FA60 =  FA60 - w_TM_FA60, 
-               rel_TM_CA60 =  CA60 - w_TM_CA60, 
-               rel_TM_xGA60 = xGA60 - w_TM_xGA60
-               ) %>% 
-        data.frame()
-      
-      # Create impact numbers and clean up
-      rel_impact_SH <- joined_df_SH %>% 
-        mutate_at(vars(contains("rel_TM_")), # create expanded "impact" columns
-                  .funs = funs(impact = round((. / 60) * TOI_p, 2))
-                  ) %>%  
-        rename_at(vars(rel_TM_GA60_impact:rel_TM_xGA60_impact), 
-                  funs(gsub("60", "", .))
-                  ) %>% 
-        select(player, position_p, season, Team, TOI_p, 
-               GA60:xGA60, 
-               rel_TM_GA60:rel_TM_xGA60, 
-               rel_TM_GA_impact:rel_TM_xGA_impact
-               ) %>% 
-        mutate_if(is.numeric, funs(round(., 2))) %>% 
-        rename(position = position_p, 
-               TOI = TOI_p
-               ) %>% 
-        data.frame()
-      
-      # Return list
-      return_list <- list(WOWY_data =   WOWY_df, 
-                          rel_TM_data = rel_impact_SH)
-      
-      return(return_list)
-      
-      }
+    # SH - Relative to Teammate "New"
+    player_metrics_SH <- games_data %>% 
+      select(-c(onGF:onxGA)) %>% 
+      rename_at(vars(onGA_adj:onxGA_adj), funs(gsub("_adj", "", .))) %>% 
+      filter(TOI > 0) %>% 
+      group_by(player, season, Team) %>% 
+      mutate(GP = 1) %>% 
+      summarise_at(vars(TOI, GP, onGA, onSA, onFA, onCA, onxGA), 
+                   funs(sum)
+                   ) %>% 
+      mutate_at(vars(onGA, onSA, onFA, onCA, onxGA), # convert columns to per 60
+                funs((. / TOI) * 60)
+                ) %>% 
+      ungroup() %>% 
+      rename_at(vars(onGA, onSA, onFA, onCA, onxGA), # rename to per 60
+                funs(paste0(gsub("on", "",.), "60"))
+                ) %>% 
+      left_join(., position_data, by = "player") %>% 
+      data.frame()
     
+    # Teammate on-ice raw and per 60 numbers
+    teammate_metrics_SH <- player_metrics_SH %>% 
+      rename(teammate = player)
+    
+    # Calculate relative to teammate numbers
+    WOWY_df <- TM_data %>% 
+      rename(TOI_tog = TOI) %>% 
+      group_by(player, teammate, season, Team) %>% 
+      summarise(TOI_tog = sum(TOI_tog)) %>% 
+      ungroup() %>% 
+      left_join(., player_metrics_SH, by = c("player", "season", "Team")) %>% # join player metrics
+      left_join(., teammate_metrics_SH, by = c("teammate", "season", "Team"), suffix = c("_p", "_t")) %>% # join teammate metrics
+      mutate(player_TOI_perc_w = TOI_tog / TOI_p) %>% 
+      mutate_at(vars(ends_with("_t")), # add "weighted raw" columns 
+                .funs = funs(weighted = . * player_TOI_perc_w)
+                ) %>% 
+      data.frame()
+    
+    joined_df_SH <- WOWY_df %>% 
+      group_by_at(vars(player, position_p, season, Team, TOI_p, GA60_p:xGA60_p)) %>% 
+      summarise_at(vars(player_TOI_perc_w, GA60_t_weighted:xGA60_t_weighted), 
+                   funs(sum)
+                   ) %>% 
+      ungroup() %>% 
+      mutate_at(vars(GA60_t_weighted:xGA60_t_weighted), # finalzie weighted avg of teammates
+                funs(. / player_TOI_perc_w)
+                ) %>% 
+      rename_at(vars(GA60_p:xGA60_p), 
+                funs(gsub("_p", "",.))
+                ) %>% 
+      rename_at(vars(GA60_t_weighted:xGA60_t_weighted), 
+                funs(paste0("w_TM_", gsub("_t_weighted", "",.)))
+                ) %>% 
+      rename_at(vars(contains("_state")), # fix state adj names
+                funs(gsub("_state60", "60_state", .))
+                ) %>% 
+      mutate(rel_TM_GA60 =  GA60 - w_TM_GA60, 
+             rel_TM_SA60 =  SA60 - w_TM_SA60, 
+             rel_TM_FA60 =  FA60 - w_TM_FA60, 
+             rel_TM_CA60 =  CA60 - w_TM_CA60, 
+             rel_TM_xGA60 = xGA60 - w_TM_xGA60
+             ) %>% 
+      data.frame()
+    
+    # Create impact numbers and clean up
+    rel_impact_SH <- joined_df_SH %>% 
+      mutate_at(vars(contains("rel_TM_")), # create expanded "impact" columns
+                .funs = funs(impact = round((. / 60) * TOI_p, 2))
+                ) %>%  
+      rename_at(vars(rel_TM_GA60_impact:rel_TM_xGA60_impact), 
+                funs(gsub("60", "", .))
+                ) %>% 
+      select(player, position_p, season, Team, TOI_p, 
+             GA60:xGA60, 
+             rel_TM_GA60:rel_TM_xGA60, 
+             rel_TM_GA_impact:rel_TM_xGA_impact
+             ) %>% 
+      mutate_if(is.numeric, funs(round(., 2))) %>% 
+      rename(position = position_p, 
+             TOI = TOI_p
+             ) %>% 
+      data.frame()
+    
+    # Return list
+    return_list <- list(WOWY_data =   WOWY_df, 
+                        rel_TM_data = rel_impact_SH)
+    
+    return(return_list)
+      
     }
   
   }
@@ -9482,10 +9813,43 @@ fun.relative_teammate <- function(TM_data, games_data, position_data, strength, 
 ##################################
 
 
-##  Goalie Stats - No Functions
+## -------------------- ##
+##   Sum Goalie Stats   ##
+## -------------------- ##
+
+##########################
+
+fun.goalie_sum_all_sit <- function(data) { 
+  
+  return_df <- data %>% 
+    group_by(player, season, Team) %>% 
+    summarise_at(vars(TOI, GA, SA, GA_, FA, xGA), funs(sum)) %>% 
+    ungroup() %>% 
+    arrange(desc(TOI)) %>% 
+    mutate(n = row_number(),  
+           qual = 1 * (n <= 60), 
+           SV_perc = 100 * (1 - (GA / SA)), 
+           FSV_perc = 100 * (1 - (GA_ / FA)), 
+           xFSV_perc = 100 * (1 - (xGA / FA)), 
+           d_FSV_perc = FSV_perc - xFSV_perc, 
+           GSAA = ((sum(GA) / sum(SA)) * SA) - GA, 
+           GSAx = xGA - GA_
+           ) %>% 
+    mutate_if(is.numeric, funs(round(., 2))) %>% 
+    select(player:Team, TOI, 
+           qual, 
+           GA, SA, 
+           SV_perc, 
+           GA_, FA, xGA, 
+           FSV_perc, xFSV_perc, d_FSV_perc, GSAA, GSAx
+           ) %>% 
+    arrange(player) %>% 
+    data.frame()
+  
+  }
 
 
-##  Team Stats - No Functions
+##########################
 
 
 ## ------------------ ##
@@ -9493,6 +9857,10 @@ fun.relative_teammate <- function(TM_data, games_data, position_data, strength, 
 ## ------------------ ##
 
 ########################
+
+
+## *** UPDATE TO SUM NEW FUNCTIONS CORRECTLY ***
+
 
 # All Sit Function
 fun.team_sum_all_sit <- function(data) { 
@@ -9516,91 +9884,187 @@ fun.team_sum_all_sit <- function(data) {
   }
 
 # EV Function
-fun.team_sum_EV <- function(data) { 
+fun.team_sum_EV <- function(data, strength) { 
   
-  # Calculate games played
-  GP_count <- data %>% 
-    group_by(Team, game_id, season) %>% 
-    summarise() %>% 
-    group_by(Team, season) %>% 
-    mutate(GP = row_number()) %>% 
-    summarise(GP = max(GP)) %>% 
-    filter(!is.na(Team)) %>% 
-    data.frame()
-  
-  # Summed for season
-  sum <- data %>% 
-    select(-c(Opponent, game_id, game_date, is_home)) %>% 
-    group_by(Team, season) %>% 
-    summarise_all(funs(sum)) %>% 
-    mutate(GF_perc =  100 * round(GF / (GF + GA), 4), 
-           xGF_perc = 100 * round(xGF / (xGF + xGA), 4), 
-           SF_perc =  100 * round(SF / (SF + SA), 4), 
-           FF_perc =  100 * round(FF / (FF + FA), 4), 
-           CF_perc =  100 * round(CF / (CF + CA), 4), 
-           skaters =  5 * (TOI_5v5 / TOI) + 4 * (TOI_4v4 / TOI) + 3 * (TOI_3v3 / TOI)
-           ) %>% 
-    mutate_if(is.numeric, funs(round(., 2))) %>% 
-    right_join(GP_count, ., by = c("Team", "season")) %>% 
-    select(Team:TOI_3v3, skaters, GF:C_diff, GF_perc:CF_perc, PEND2:PENT5) %>% 
-    mutate(PEN2_diff = PEND2 - PENT2) %>% 
-    data.frame()
-  
+  if (strength == "EV") { 
+    
+    # Calculate games played
+    GP_count <- data %>% 
+      group_by(Team, game_id, season) %>% 
+      summarise() %>% 
+      group_by(Team, season) %>% 
+      mutate(GP = row_number()) %>% 
+      summarise(GP = max(GP)) %>% 
+      filter(!is.na(Team)) %>% 
+      data.frame()
+    
+    # Summed for season
+    sum <- data %>% 
+      select(-c(Opponent, game_id, game_date, is_home)) %>% 
+      group_by(Team, season) %>% 
+      summarise_all(funs(sum)) %>% 
+      mutate(GF_perc =  100 * round(GF / (GF + GA), 4), 
+             xGF_perc = 100 * round(xGF / (xGF + xGA), 4), 
+             SF_perc =  100 * round(SF / (SF + SA), 4), 
+             FF_perc =  100 * round(FF / (FF + FA), 4), 
+             CF_perc =  100 * round(CF / (CF + CA), 4), 
+             skaters =  5 * (TOI_5v5 / TOI) + 4 * (TOI_4v4 / TOI) + 3 * (TOI_3v3 / TOI)
+             ) %>% 
+      mutate_if(is.numeric, funs(round(., 2))) %>% 
+      right_join(GP_count, ., by = c("Team", "season")) %>% 
+      select(Team:TOI_3v3, skaters, GF:C_diff, GF_perc:CF_perc, PEND2:PENT5) %>% 
+      mutate(PEN2_diff = PEND2 - PENT2) %>% 
+      data.frame()
+    
     }
+  else if (strength != "EV") { 
+    
+    # Calculate games played
+    GP_count <- data %>% 
+      group_by(Team, game_id, season) %>% 
+      summarise() %>% 
+      group_by(Team, season) %>% 
+      mutate(GP = row_number()) %>% 
+      summarise(GP = max(GP)) %>% 
+      filter(!is.na(Team)) %>% 
+      data.frame()
+    
+    # Summed for season
+    sum <- data %>% 
+      select(-c(Opponent, game_id, game_date, is_home)) %>% 
+      group_by(Team, season) %>% 
+      summarise_all(funs(sum)) %>% 
+      mutate(GF_perc =  100 * round(GF / (GF + GA), 4), 
+             xGF_perc = 100 * round(xGF / (xGF + xGA), 4), 
+             SF_perc =  100 * round(SF / (SF + SA), 4), 
+             FF_perc =  100 * round(FF / (FF + FA), 4), 
+             CF_perc =  100 * round(CF / (CF + CA), 4), 
+             
+             GF_perc_adj =  100 * round(GF / (GF + GA), 4), 
+             xGF_perc_adj = 100 * round(xGF / (xGF + xGA), 4), 
+             SF_perc_adj =  100 * round(SF / (SF + SA), 4), 
+             FF_perc_adj =  100 * round(FF / (FF + FA), 4), 
+             CF_perc_adj =  100 * round(CF / (CF + CA), 4)
+             ) %>% 
+      mutate_if(is.numeric, funs(round(., 2))) %>% 
+      right_join(GP_count, ., by = c("Team", "season")) %>% 
+      select(Team:TOI, GF:C_diff, GF_adj:C_diff_adj, GF_perc:CF_perc, GF_perc_adj:CF_perc_adj, PEND2:PENT5) %>% 
+      mutate(PEN2_diff = PEND2 - PENT2) %>% 
+      data.frame()
+    
+    }
+  
+  }
 
 # PP Function
-fun.team_sum_PP <- function(data) { 
+fun.team_sum_PP <- function(data, strength) { 
   
-  # Calculate games played
-  GP_count <- data %>% 
-    group_by(Team, game_id, season) %>% 
-    summarise() %>% 
-    group_by(Team, season) %>% 
-    mutate(GP = row_number()) %>% 
-    summarise(GP = max(GP)) %>% 
-    filter(!is.na(Team)) %>% 
-    data.frame()
-  
-  # Summed for season
-  sum <- data %>% 
-    select(-c(Opponent, game_id, game_date, is_home)) %>% 
-    group_by(Team, season) %>% 
-    summarise_all(funs(sum)) %>% 
-    mutate(skaters =  5 * (TOI_5v4 / TOI) + 5 * (TOI_5v3 / TOI) + 4 * (TOI_4v3 / TOI)) %>% 
-    mutate_if(is.numeric, funs(round(., 2))) %>% 
-    right_join(GP_count, ., by = c("Team", "season")) %>% 
-    select(Team:TOI_4v3, skaters, GF:CA, PEND2:PENT5) %>% 
-    mutate(PEN2_diff = PEND2 - PENT2) %>% 
-    data.frame()
-  
+  if (strength == "PP") { 
+    
+    # Calculate games played
+    GP_count <- data %>% 
+      group_by(Team, game_id, season) %>% 
+      summarise() %>% 
+      group_by(Team, season) %>% 
+      mutate(GP = row_number()) %>% 
+      summarise(GP = max(GP)) %>% 
+      filter(!is.na(Team)) %>% 
+      data.frame()
+    
+    # Summed for season
+    sum <- data %>% 
+      select(-c(Opponent, game_id, game_date, is_home)) %>% 
+      group_by(Team, season) %>% 
+      summarise_all(funs(sum)) %>% 
+      mutate(skaters =  5 * (TOI_5v4 / TOI) + 5 * (TOI_5v3 / TOI) + 4 * (TOI_4v3 / TOI)) %>% 
+      mutate_if(is.numeric, funs(round(., 2))) %>% 
+      right_join(GP_count, ., by = c("Team", "season")) %>% 
+      select(Team:TOI_4v3, skaters, GF:CA, PEND2:PENT5) %>% 
+      mutate(PEN2_diff = PEND2 - PENT2) %>% 
+      data.frame()
+    
     }
+  else if (strength != "PP") { 
+    
+    # Calculate games played
+    GP_count <- data %>% 
+      group_by(Team, game_id, season) %>% 
+      summarise() %>% 
+      group_by(Team, season) %>% 
+      mutate(GP = row_number()) %>% 
+      summarise(GP = max(GP)) %>% 
+      filter(!is.na(Team)) %>% 
+      data.frame()
+    
+    # Summed for season
+    sum <- data %>% 
+      select(-c(Opponent, game_id, game_date, is_home)) %>% 
+      group_by(Team, season) %>% 
+      summarise_all(funs(sum)) %>% 
+      mutate_if(is.numeric, funs(round(., 2))) %>% 
+      right_join(GP_count, ., by = c("Team", "season")) %>% 
+      select(Team:TOI, GF:CA, GF_adj:CF_adj, PEND2:PENT5) %>% 
+      mutate(PEN2_diff = PEND2 - PENT2) %>% 
+      data.frame()
+    
+    }
+  
+  }
 
 # SH Function
-fun.team_sum_SH <- function(data) { 
+fun.team_sum_SH <- function(data, strength) { 
   
-  # Calculate games played
-  GP_count <- data %>% 
-    group_by(Team, game_id, season) %>% 
-    summarise() %>% 
-    group_by(Team, season) %>% 
-    mutate(GP = row_number()) %>% 
-    summarise(GP = max(GP)) %>% 
-    filter(!is.na(Team)) %>% 
-    data.frame()
-  
-  # Summed for season
-  sum <- data %>% 
-    select(-c(Opponent, game_id, game_date, is_home)) %>% 
-    group_by(Team, season) %>% 
-    summarise_all(funs(sum)) %>% 
-    mutate(skaters =  4 * (TOI_4v5 / TOI) + 3 * (TOI_3v5 / TOI) + 3 * (TOI_3v4 / TOI)) %>% 
-    mutate_if(is.numeric, funs(round(., 2))) %>% 
-    right_join(GP_count, ., by = c("Team", "season")) %>% 
-    select(Team:TOI_3v4, skaters, GF:CA, PEND2:PENT5) %>% 
-    mutate(PEN2_diff = PEND2 - PENT2) %>% 
-    data.frame()
-  
+  if (strength == "SH") { 
+    
+    # Calculate games played
+    GP_count <- data %>% 
+      group_by(Team, game_id, season) %>% 
+      summarise() %>% 
+      group_by(Team, season) %>% 
+      mutate(GP = row_number()) %>% 
+      summarise(GP = max(GP)) %>% 
+      filter(!is.na(Team)) %>% 
+      data.frame()
+    
+    # Summed for season
+    sum <- data %>% 
+      select(-c(Opponent, game_id, game_date, is_home)) %>% 
+      group_by(Team, season) %>% 
+      summarise_all(funs(sum)) %>% 
+      mutate(skaters =  4 * (TOI_4v5 / TOI) + 3 * (TOI_3v5 / TOI) + 3 * (TOI_3v4 / TOI)) %>% 
+      mutate_if(is.numeric, funs(round(., 2))) %>% 
+      right_join(GP_count, ., by = c("Team", "season")) %>% 
+      select(Team:TOI_3v4, skaters, GF:CA, PEND2:PENT5) %>% 
+      mutate(PEN2_diff = PEND2 - PENT2) %>% 
+      data.frame()
+    
     }
+  else if (strength != "SH") { 
+    
+    # Calculate games played
+    GP_count <- data %>% 
+      group_by(Team, game_id, season) %>% 
+      summarise() %>% 
+      group_by(Team, season) %>% 
+      mutate(GP = row_number()) %>% 
+      summarise(GP = max(GP)) %>% 
+      filter(!is.na(Team)) %>% 
+      data.frame()
+    
+    # Summed for season
+    sum <- data %>% 
+      select(-c(Opponent, game_id, game_date, is_home)) %>% 
+      group_by(Team, season) %>% 
+      summarise_all(funs(sum)) %>% 
+      mutate_if(is.numeric, funs(round(., 2))) %>% 
+      right_join(GP_count, ., by = c("Team", "season")) %>% 
+      select(Team:TOI, GF:CA, GA_adj:CA_adj, PEND2:PENT5) %>% 
+      mutate(PEN2_diff = PEND2 - PENT2) %>% 
+      data.frame()
+    
+    }
+  
+  }
 
 
 ########################

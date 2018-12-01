@@ -184,9 +184,9 @@ st.empty_net <- c("5vE", "Ev5", "4vE", "Ev4", "3vE", "Ev3") %>% as.factor()
 #####################################
 
 
-# Source ALLSCRAPE.R & Shiny_All_Functions.R Scripts
-source("ALLSCRAPE.R")
+# Source Shiny_All_Functions.R & ALLSCRAPE.R Scripts
 source("Shiny_All_Functions.R")
+source("ALLSCRAPE.R")
 
 
 
@@ -259,14 +259,20 @@ fun.schedule <- function(start, end) {
 schedule_current <- fun.schedule(Sys.Date() - 1,
                                  Sys.Date() - 1)
 
+schedule_current <- fun.schedule("2018-11-25",
+                                 "2018-11-29")
+
+schedule_current <- schedule_current %>% filter(game_date == "2018-11-26" | game_date == "2018-11-29")
+
 print(schedule_current)
 
 
 # Scrape pbp data
 fun.scrape_pbp <- function(year) { 
   
-  scrape <- as.character(unique(schedule_current$game_id))
-  scrape <- gsub(paste0(substr(year, 1, 4), 0), "", scrape)
+  #scrape <- as.character(unique(schedule_current$game_id))
+  #scrape <- gsub(paste0(substr(year, 1, 4), 0), "", scrape)
+  scrape <- gsub(paste0(substr(year, 1, 4), 0), "", as.character(unique(schedule_current$game_id)))
   
   Year <- year
   hold_running <- data.frame()
@@ -277,7 +283,8 @@ fun.scrape_pbp <- function(year) {
     
     tryCatch({
       
-      game_num <- (as.numeric(scrape[1]) - 1) + i
+      #game_num <- (as.numeric(scrape[1]) - 1) + i
+      game_num <- scrape[i]
       
       pbp_list <- ds.compile_games(games = as.character(game_num),
                                    season = Year,
@@ -803,21 +810,21 @@ adj_pen_games_new <- fun.pen_value_sum_add(pen_data = adj_pen_games, skater_data
 
 team_games_all_sit_new <- fun.team_games_all_sit(data = pbp_df)
 
-team_games_EV_new <- fun.team_games_EV(data = pbp_df, strength = "EV")
-team_games_PP_new <- fun.team_games_PP(data = pbp_df, strength = "PP")
-team_games_SH_new <- fun.team_games_SH(data = pbp_df, strength = "SH")
+team_games_EV_new <- fun.team_games_EV(data = pbp_df, strength = "EV", scr_adj_list = score_adj_EV)
+team_games_PP_new <- fun.team_games_PP(data = pbp_df, strength = "PP", scr_adj_list = score_adj_PP)
+team_games_SH_new <- fun.team_games_SH(data = pbp_df, strength = "SH", scr_adj_list = score_adj_SH)
 
-team_games_5v5_new <- fun.team_games_EV(data = pbp_df, strength = "5v5")
-team_games_4v4_new <- fun.team_games_EV(data = pbp_df, strength = "4v4")
-team_games_3v3_new <- fun.team_games_EV(data = pbp_df, strength = "3v3")
+team_games_5v5_new <- fun.team_games_EV(data = pbp_df, strength = "5v5", scr_adj_list = score_adj_5v5)
+team_games_4v4_new <- fun.team_games_EV(data = pbp_df, strength = "4v4", scr_adj_list = score_adj_4v4)
+team_games_3v3_new <- fun.team_games_EV(data = pbp_df, strength = "3v3", scr_adj_list = score_adj_3v3)
 
-team_games_5v4_new <- fun.team_games_PP(data = pbp_df, strength = "5v4")
-team_games_5v3_new <- fun.team_games_PP(data = pbp_df, strength = "5v3")
-team_games_4v3_new <- fun.team_games_PP(data = pbp_df, strength = "4v3")
+team_games_5v4_new <- fun.team_games_PP(data = pbp_df, strength = "5v4", scr_adj_list = score_adj_5v4)
+team_games_5v3_new <- fun.team_games_PP(data = pbp_df, strength = "5v3", scr_adj_list = score_adj_5v3)
+team_games_4v3_new <- fun.team_games_PP(data = pbp_df, strength = "4v3", scr_adj_list = score_adj_4v3)
 
-team_games_4v5_new <- fun.team_games_SH(data = pbp_df, strength = "4v5")
-team_games_3v5_new <- fun.team_games_SH(data = pbp_df, strength = "3v5")
-team_games_3v4_new <- fun.team_games_SH(data = pbp_df, strength = "3v4")
+team_games_4v5_new <- fun.team_games_SH(data = pbp_df, strength = "4v5", scr_adj_list = score_adj_5v4)
+team_games_3v5_new <- fun.team_games_SH(data = pbp_df, strength = "3v5", scr_adj_list = score_adj_5v3)
+team_games_3v4_new <- fun.team_games_SH(data = pbp_df, strength = "3v4", scr_adj_list = score_adj_4v3)
 
 
 
@@ -840,19 +847,40 @@ fun.check_new_games <- function() {
     shifts =   sort(unique(shifts_new$game_id)),
     rosters =  sort(unique(rosters_new$game_id)),
     
-    games_all = sort(unique(games_all_sit_new$game_id)), 
-    games_EV =  sort(unique(games_EV_new$game_id)), 
-    games_PP =  sort(unique(games_PP_new$game_id)), 
-    games_SH =  sort(unique(games_SH_new$game_id)), 
+    games_all =  sort(unique(games_all_sit_new$game_id)), 
+    games_EV =   sort(unique(games_EV_new$game_id)), 
+    games_PP =   sort(unique(games_PP_new$game_id)), 
+    games_SH =   sort(unique(games_SH_new$game_id)), 
+    games_5v5 =  sort(unique(games_5v5_new$game_id)), 
+    games_4v4 =  sort(unique(games_4v4_new$game_id)), 
+    games_3v3 =  sort(unique(games_3v3_new$game_id)), 
+    games_5v4 =  sort(unique(games_5v4_new$game_id)), 
+    games_5v3 =  sort(unique(games_5v3_new$game_id)), 
+    games_4v3 =  sort(unique(games_4v3_new$game_id)), 
+    games_4v5 =  sort(unique(games_4v5_new$game_id)), 
+    games_3v5 =  sort(unique(games_3v5_new$game_id)), 
+    games_3v4 =  sort(unique(games_3v4_new$game_id)), 
     
-    TOI_tog_EV = sort(unique(teammate_TOI_EV_new$game_id)), 
-    TOI_tog_PP = sort(unique(teammate_TOI_PP_new$game_id)), 
-    TOI_tog_SH = sort(unique(teammate_TOI_SH_new$game_id)), 
+    TOI_tog_EV =  sort(unique(teammate_TOI_EV_new$game_id)), 
+    TOI_tog_PP =  sort(unique(teammate_TOI_PP_new$game_id)), 
+    TOI_tog_SH =  sort(unique(teammate_TOI_SH_new$game_id)), 
+    TOI_tog_5v5 = sort(unique(teammate_TOI_5v5_new$game_id)), 
+    TOI_tog_5v4 = sort(unique(teammate_TOI_5v4_new$game_id)), 
+    TOI_tog_4v5 = sort(unique(teammate_TOI_4v5_new$game_id)), 
     
     teams_all = sort(unique(team_games_all_sit_new$game_id)), 
     teams_EV =  sort(unique(team_games_EV_new$game_id)), 
     teams_PP =  sort(unique(team_games_PP_new$game_id)), 
     teams_SH =  sort(unique(team_games_SH_new$game_id)), 
+    teams_5v5 =  sort(unique(team_games_5v5_new$game_id)), 
+    teams_4v4 =  sort(unique(team_games_4v4_new$game_id)), 
+    teams_3v3 =  sort(unique(team_games_3v3_new$game_id)), 
+    teams_5v4 =  sort(unique(team_games_5v4_new$game_id)), 
+    teams_5v3 =  sort(unique(team_games_5v3_new$game_id)), 
+    teams_4v3 =  sort(unique(team_games_4v3_new$game_id)), 
+    teams_4v5 =  sort(unique(team_games_4v5_new$game_id)), 
+    teams_3v5 =  sort(unique(team_games_3v5_new$game_id)), 
+    teams_3v4 =  sort(unique(team_games_3v4_new$game_id)), 
     
     pen_goals =       sort(unique(adj_pen_games_new$game_id)), 
     goalies_all_sit = sort(unique(goalie_games_all_sit_new$game_id))
@@ -860,8 +888,31 @@ fun.check_new_games <- function() {
   
   NA_check <- c(0, 0, 0, 0, 
                 sum(is.na(games_all_sit_new)), sum(is.na(games_EV_new)), sum(is.na(games_PP_new)), sum(is.na(games_SH_new)), 
+                sum(is.na(games_5v5_new)),
+                sum(is.na(games_4v4_new)),
+                sum(is.na(games_3v3_new)),
+                sum(is.na(games_5v4_new)),
+                sum(is.na(games_5v3_new)),
+                sum(is.na(games_4v3_new)),
+                sum(is.na(games_4v5_new)),
+                sum(is.na(games_3v5_new)),
+                sum(is.na(games_3v4_new)),
+                
                 sum(is.na(teammate_TOI_EV_new)), sum(is.na(teammate_TOI_PP_new)), sum(is.na(teammate_TOI_SH_new)), 
+                sum(is.na(teammate_TOI_5v5_new)), 
+                sum(is.na(teammate_TOI_5v4_new)), 
+                sum(is.na(teammate_TOI_4v5_new)), 
                 sum(is.na(team_games_all_sit_new)), sum(is.na(team_games_EV_new)), sum(is.na(team_games_PP_new)), sum(is.na(team_games_SH_new)), 
+                sum(is.na(team_games_5v5_new)),
+                sum(is.na(team_games_4v4_new)),
+                sum(is.na(team_games_3v3_new)),
+                sum(is.na(team_games_5v4_new)),
+                sum(is.na(team_games_5v3_new)),
+                sum(is.na(team_games_4v3_new)),
+                sum(is.na(team_games_4v5_new)),
+                sum(is.na(team_games_3v5_new)),
+                sum(is.na(team_games_3v4_new)),
+                
                 sum(is.na(adj_pen_games_new)), 
                 sum(is.na(goalie_games_all_sit_new))
                 )
@@ -907,8 +958,6 @@ check_new_games <- fun.check_new_games()
 
 
 ## ---------------- SAVE NEW DATA AND LOAD TOTAL DATA ---------------- ##
-
-
 
 
 # Save New Data
@@ -975,6 +1024,9 @@ dbDisconnect(db)
 #dbRemoveTable(db, "team_data_EV")
 #dbRemoveTable(db, "team_data_PP")
 #dbRemoveTable(db, "team_data_SH")
+#dbRemoveTable(db, "team_data_4v5")
+#dbRemoveTable(db, "team_data_3v5")
+#dbRemoveTable(db, "team_data_3v4")
 
 #dbRemoveTable(db, "TOI_together_data_EV")
 #dbRemoveTable(db, "TOI_together_data_PP")
@@ -987,11 +1039,30 @@ dbDisconnect(db)
 
 #dbDisconnect(db)
 
+#dbRemoveTable(db, "team_data_all_sit")
+#dbRemoveTable(db, "team_data_EV")
+#dbRemoveTable(db, "team_data_PP")
+#dbRemoveTable(db, "team_data_SH")
+
+#dbRemoveTable(db, "team_data_5v5")
+#dbRemoveTable(db, "team_data_4v4")
+#dbRemoveTable(db, "team_data_3v3")
+
+#dbRemoveTable(db, "team_data_5v4")
+#dbRemoveTable(db, "team_data_5v3")
+#dbRemoveTable(db, "team_data_4v3")
+
+#dbRemoveTable(db, "team_data_4v5")
+#dbRemoveTable(db, "team_data_3v5")
+#dbRemoveTable(db, "team_data_3v4")
+
+
 
 
 # PIT v ??? 20180xxxxx - Only Offsetting Penalties
 # TOR v CBJ 2018020308 - No Penalties
 # TOR v PHI 2018020348 - No Penalties
+
 
 # Check game_id counts in database
 fun.check_db_games <- function(db_name) { 
@@ -1055,8 +1126,10 @@ check_db_games <- fun.check_db_games(db_name = "data/NHL_db_1819.sqlite") # NEW 
 # Remove New Data
 rm(pbp_new, shifts_new, rosters_new,
    games_EV_new, games_PP_new, games_SH_new, games_all_sit_new, 
-   teammate_TOI_EV_new, teammate_TOI_PP_new, teammate_TOI_SH_new, 
+   games_5v5_new, games_4v4_new, games_3v3_new, games_5v4_new, games_5v3_new, games_4v3_new, games_4v5_new, games_3v5_new, games_3v4_new, 
+   teammate_TOI_EV_new, teammate_TOI_PP_new, teammate_TOI_SH_new, teammate_TOI_5v5_new, teammate_TOI_5v4_new, teammate_TOI_4v5_new, 
    team_games_EV_new, team_games_PP_new, team_games_SH_new, team_games_all_sit_new, 
+   team_games_3v3_new, team_games_3v4_new, team_games_3v5_new, team_games_4v3_new, team_games_4v4_new, team_games_4v5_new, team_games_5v3_new, team_games_5v4_new, team_games_5v5_new, 
    goalie_games_all_sit_new, adj_pen_games_new, 
    pen_source, pen_enhanced, pen_calc_main, pen_calc_xtras, adj_pen_games, 
    xG_model_XGB_7_EV, xG_model_XGB_7_UE, xG_model_XGB_10_SH, xG_model_XGB_10_EN)
@@ -1075,6 +1148,8 @@ gc()
 # Load Full Joined Data
 db <- DBI::dbConnect(SQLite(), dbname = "data/NHL_db_1819.sqlite") # NEW DATABASE NAME
 
+db <- DBI::dbConnect(SQLite(), dbname = "data/NHL_db_full.sqlite") # NEW DATABASE NAME
+
 pbp_joined <-     db %>% tbl("pbp_full") %>% data.frame()
 #shifts_joined <-      db %>% tbl("shifts_full") %>% data.frame()         # not needed here
 #rosters_joined <-     db %>% tbl("rosters_full") %>% data.frame()        # not needed here
@@ -1084,15 +1159,36 @@ games_all_sit_joined <- db %>% tbl("games_data_all_sit") %>% data.frame()
 games_EV_joined <-      db %>% tbl("games_data_EV") %>% data.frame()
 games_PP_joined <-      db %>% tbl("games_data_PP") %>% data.frame()
 games_SH_joined <-      db %>% tbl("games_data_SH") %>% data.frame()
+games_5v5_joined <-     db %>% tbl("games_data_5v5") %>% data.frame()
+games_4v4_joined <-     db %>% tbl("games_data_4v4") %>% data.frame()
+games_3v3_joined <-     db %>% tbl("games_data_3v3") %>% data.frame()
+games_5v4_joined <-     db %>% tbl("games_data_5v4") %>% data.frame()
+games_5v3_joined <-     db %>% tbl("games_data_5v3") %>% data.frame()
+games_4v3_joined <-     db %>% tbl("games_data_4v3") %>% data.frame()
+games_4v5_joined <-     db %>% tbl("games_data_4v5") %>% data.frame()
+games_3v5_joined <-     db %>% tbl("games_data_3v5") %>% data.frame()
+games_3v4_joined <-     db %>% tbl("games_data_3v4") %>% data.frame()
 
 team_games_all_sit_joined <- db %>% tbl("team_data_all_sit") %>% data.frame()
 team_games_EV_joined <-      db %>% tbl("team_data_EV") %>% data.frame()
 team_games_PP_joined <-      db %>% tbl("team_data_PP") %>% data.frame()
 team_games_SH_joined <-      db %>% tbl("team_data_SH") %>% data.frame()
+team_games_5v5_joined <-     db %>% tbl("team_data_5v5") %>% data.frame()
+team_games_4v4_joined <-     db %>% tbl("team_data_4v4") %>% data.frame()
+team_games_3v3_joined <-     db %>% tbl("team_data_3v3") %>% data.frame()
+team_games_5v4_joined <-     db %>% tbl("team_data_5v4") %>% data.frame()
+team_games_5v3_joined <-     db %>% tbl("team_data_5v3") %>% data.frame()
+team_games_4v3_joined <-     db %>% tbl("team_data_4v3") %>% data.frame()
+team_games_4v5_joined <-     db %>% tbl("team_data_4v5") %>% data.frame()
+team_games_3v5_joined <-     db %>% tbl("team_data_3v5") %>% data.frame()
+team_games_3v4_joined <-     db %>% tbl("team_data_3v4") %>% data.frame()
 
-TOI_together_EV_joined <- db %>% tbl("TOI_together_data_EV") %>% data.frame()
-TOI_together_PP_joined <- db %>% tbl("TOI_together_data_PP") %>% data.frame()
-TOI_together_SH_joined <- db %>% tbl("TOI_together_data_SH") %>% data.frame()
+TOI_together_EV_joined <-  db %>% tbl("TOI_together_data_EV") %>% data.frame()
+TOI_together_PP_joined <-  db %>% tbl("TOI_together_data_PP") %>% data.frame()
+TOI_together_SH_joined <-  db %>% tbl("TOI_together_data_SH") %>% data.frame()
+TOI_together_5v5_joined <- db %>% tbl("TOI_together_data_5v5") %>% data.frame()
+TOI_together_5v4_joined <- db %>% tbl("TOI_together_data_5v4") %>% data.frame()
+TOI_together_4v5_joined <- db %>% tbl("TOI_together_data_4v5") %>% data.frame()
 
 goalie_games_all_sit_joined <- db %>% tbl("goalie_games_all_sit") %>% data.frame()
 adj_pen_games_joined <-        db %>% tbl("adj_pen_games_all_sit") %>% data.frame()
@@ -1116,16 +1212,29 @@ dbDisconnect(db)
 ########################
 
 # Run Functions - Totals
-counts_EV_season <-      fun.playercounts_season_EV(data = games_EV_joined, type = "per_team", per_60 = "F")
-counts_PP_season <-      fun.playercounts_season_PP(data = games_PP_joined, type = "per_team", per_60 = "F")
-counts_SH_season <-      fun.playercounts_season_SH(data = games_SH_joined, type = "per_team", per_60 = "F")
 counts_all_sit_season <- fun.playercounts_season_all_sit(data = games_all_sit_joined, position_data = player_position)
 
+counts_EV_season <-      fun.playercounts_season_EV(data = games_EV_joined, strength = "EV", per_60 = "F")
+counts_PP_season <-      fun.playercounts_season_PP(data = games_PP_joined, strength = "PP", per_60 = "F")
+counts_SH_season <-      fun.playercounts_season_SH(data = games_SH_joined, strength = "SH", per_60 = "F")
 
-# Run Functions - per 60 (for GAR calculations)
-counts_EV_season_60 <- fun.playercounts_season_EV(data = games_EV_joined, type = "per_team", per_60 = "T")
-counts_PP_season_60 <- fun.playercounts_season_PP(data = games_PP_joined, type = "per_team", per_60 = "T")
-counts_SH_season_60 <- fun.playercounts_season_SH(data = games_SH_joined, type = "per_team", per_60 = "T")
+counts_5v5_season <-     fun.playercounts_season_EV(data = games_5v5_joined, strength = "5v5", per_60 = "F")
+counts_4v4_season <-     fun.playercounts_season_EV(data = games_4v4_joined, strength = "4v4", per_60 = "F")
+counts_3v3_season <-     fun.playercounts_season_EV(data = games_3v3_joined, strength = "3v3", per_60 = "F")
+
+counts_5v4_season <-     fun.playercounts_season_PP(data = games_5v4_joined, strength = "5v4", per_60 = "F")
+counts_5v3_season <-     fun.playercounts_season_PP(data = games_5v3_joined, strength = "5v3", per_60 = "F")
+counts_4v3_season <-     fun.playercounts_season_PP(data = games_4v3_joined, strength = "4v3", per_60 = "F")
+
+counts_4v5_season <-     fun.playercounts_season_SH(data = games_4v5_joined, strength = "4v5", per_60 = "F")
+counts_3v5_season <-     fun.playercounts_season_SH(data = games_3v5_joined, strength = "3v5", per_60 = "F")
+counts_3v4_season <-     fun.playercounts_season_SH(data = games_3v4_joined, strength = "3v4", per_60 = "F")
+
+
+# Run Functions - per 60 (for SPM calculations)
+counts_EV_season_60 <- fun.playercounts_season_EV(data = games_EV_joined, strength = "EV", per_60 = "T")
+counts_PP_season_60 <- fun.playercounts_season_PP(data = games_PP_joined, strength = "PP", per_60 = "T")
+counts_SH_season_60 <- fun.playercounts_season_SH(data = games_SH_joined, strength = "SH", per_60 = "T")
 
 
 ########################
@@ -1141,26 +1250,43 @@ counts_SH_season_60 <- fun.playercounts_season_SH(data = games_SH_joined, type =
 rel_TM_player_EV_list <- fun.relative_teammate(TM_data = TOI_together_EV_joined, 
                                                games_data = games_EV_joined, 
                                                position_data = player_position, 
-                                               strength = "even", 
-                                               sum_type = "per_team") # "per_team", "per_season", "multiple_seasons"
+                                               strength = "even")
 
 rel_TM_player_PP_list <- fun.relative_teammate(TM_data = TOI_together_PP_joined, 
                                                games_data = games_PP_joined, 
                                                position_data = player_position, 
-                                               strength = "powerplay", 
-                                               sum_type = "per_team") # "per_team", "per_season", "multiple_seasons"
+                                               strength = "powerplay")
 
 rel_TM_player_SH_list <- fun.relative_teammate(TM_data = TOI_together_SH_joined, 
                                                games_data = games_SH_joined, 
                                                position_data = player_position, 
-                                               strength = "shorthanded", 
-                                               sum_type = "per_team") # "per_team", "per_season", "multiple_seasons"
+                                               strength = "shorthanded")
+
+
+rel_TM_player_5v5_list <- fun.relative_teammate(TM_data = TOI_together_5v5_joined, 
+                                               games_data = games_5v5_joined, 
+                                               position_data = player_position, 
+                                               strength = "5v5")
+
+rel_TM_player_5v4_list <- fun.relative_teammate(TM_data = TOI_together_5v4_joined, 
+                                               games_data = games_5v4_joined, 
+                                               position_data = player_position, 
+                                               strength = "5v4")
+
+rel_TM_player_4v5_list <- fun.relative_teammate(TM_data = TOI_together_4v5_joined, 
+                                               games_data = games_4v5_joined, 
+                                               position_data = player_position, 
+                                               strength = "4v5")
 
 
 # Pull out rel_TM data
 rel_TM_player_EV_season <- rel_TM_player_EV_list$rel_TM_data
 rel_TM_player_PP_season <- rel_TM_player_PP_list$rel_TM_data
 rel_TM_player_SH_season <- rel_TM_player_SH_list$rel_TM_data
+
+rel_TM_player_5v5_season <- rel_TM_player_5v5_list$rel_TM_data
+rel_TM_player_5v4_season <- rel_TM_player_5v4_list$rel_TM_data
+rel_TM_player_4v5_season <- rel_TM_player_4v5_list$rel_TM_data
 
 
 # Pull out WOWY data and reorder / rename - EV
@@ -1185,6 +1311,36 @@ WOWY_PP_season <- rel_TM_player_PP_list$WOWY_data %>%
 
 # Pull out WOWY data and reorder / rename - SH
 WOWY_SH_season <- rel_TM_player_SH_list$WOWY_data %>% 
+  select(player, teammate, 
+         season, 
+         Team, position_p, position_t, 
+         TOI_p, TOI_t, TOI_tog, player_TOI_perc_w, GA60_p:xGA60_p, GA60_t:xGA60_t) %>% 
+  mutate(player_TOI_perc_w = player_TOI_perc_w * 100) %>% 
+  mutate_if(is.numeric, funs(round(., 2))) %>% 
+  data.frame()
+
+# Pull out WOWY data and reorder / rename - 5v5
+WOWY_5v5_season <- rel_TM_player_5v5_list$WOWY_data %>% 
+  select(player, teammate, 
+         season, 
+         Team, position_p, position_t, 
+         GP_p, TOI_p, GP_t, TOI_t, TOI_tog, player_TOI_perc_w, GF60_p:xGA60_p, GF60_t:xGA60_t) %>% 
+  mutate(player_TOI_perc_w = player_TOI_perc_w * 100) %>% 
+  mutate_if(is.numeric, funs(round(., 2))) %>% 
+  data.frame()
+
+# Pull out WOWY data and reorder / rename - 5v4
+WOWY_5v4_season <- rel_TM_player_5v4_list$WOWY_data %>% 
+  select(player, teammate, 
+         season, 
+         Team, position_p, position_t, 
+         TOI_p, TOI_t, TOI_tog, player_TOI_perc_w, GF60_p:xGF60_p, GF60_t:xGF60_t) %>% 
+  mutate(player_TOI_perc_w = player_TOI_perc_w * 100) %>% 
+  mutate_if(is.numeric, funs(round(., 2))) %>% 
+  data.frame()
+
+# Pull out WOWY data and reorder / rename - 4v5
+WOWY_4v5_season <- rel_TM_player_4v5_list$WOWY_data %>% 
   select(player, teammate, 
          season, 
          Team, position_p, position_t, 
@@ -1243,30 +1399,8 @@ adj_pen_season <- adj_pen_games_joined %>%
 
 ##########################
 
-goalie_season <- goalie_games_all_sit_joined %>% 
-  group_by(player, season, Team) %>% 
-  summarise_at(vars(TOI, GA, SA, GA_, FA, xGA), funs(sum)) %>% 
-  ungroup() %>% 
-  arrange(desc(TOI)) %>% 
-  mutate(n = row_number(),  
-         qual = 1 * (n <= 60), 
-         SV_perc = 100 * (1 - (GA / SA)), 
-         FSV_perc = 100 * (1 - (GA_ / FA)), 
-         xFSV_perc = 100 * (1 - (xGA / FA)), 
-         d_FSV_perc = FSV_perc - xFSV_perc, 
-         GSAA = ((sum(GA) / sum(SA)) * SA) - GA, 
-         GSAx = xGA - GA_
-         ) %>% 
-  mutate_if(is.numeric, funs(round(., 2))) %>% 
-  select(player:Team, TOI, 
-         qual, 
-         GA, SA, 
-         SV_perc, 
-         GA_, FA, xGA, 
-         FSV_perc, xFSV_perc, d_FSV_perc, GSAA, GSAx
-         ) %>% 
-  arrange(player) %>% 
-  data.frame()
+# Run Function
+goalie_season <- fun.goalie_sum_all_sit(data = goalie_games_all_sit_joined)
 
 
 ##########################
@@ -1280,9 +1414,22 @@ goalie_season <- goalie_games_all_sit_joined %>%
 
 # Run Functions
 team_games_sum_all_sit_season <- fun.team_sum_all_sit(data = team_games_all_sit_joined)
-team_sum_EV_season <- fun.team_sum_EV(data = team_games_EV_joined)
-team_sum_PP_season <- fun.team_sum_PP(data = team_games_PP_joined)
-team_sum_SH_season <- fun.team_sum_SH(data = team_games_SH_joined)
+
+team_sum_EV_season <- fun.team_sum_EV(data = team_games_EV_joined, strength = "EV")
+team_sum_PP_season <- fun.team_sum_PP(data = team_games_PP_joined, strength = "PP")
+team_sum_SH_season <- fun.team_sum_SH(data = team_games_SH_joined, strength = "SH")
+
+team_sum_5v5_season <- fun.team_sum_EV(data = team_games_5v5_joined, strength = "5v5")
+team_sum_4v4_season <- fun.team_sum_EV(data = team_games_4v4_joined, strength = "4v4")
+team_sum_3v3_season <- fun.team_sum_EV(data = team_games_3v3_joined, strength = "3v3")
+
+team_sum_5v4_season <- fun.team_sum_PP(data = team_games_5v4_joined, strength = "5v4")
+team_sum_5v3_season <- fun.team_sum_PP(data = team_games_5v3_joined, strength = "5v3")
+team_sum_4v3_season <- fun.team_sum_PP(data = team_games_4v3_joined, strength = "4v3")
+
+team_sum_4v5_season <- fun.team_sum_SH(data = team_games_4v5_joined, strength = "4v5")
+team_sum_3v5_season <- fun.team_sum_SH(data = team_games_3v5_joined, strength = "3v5")
+team_sum_3v4_season <- fun.team_sum_SH(data = team_games_3v4_joined, strength = "3v4")
 
 
 ########################
@@ -1832,27 +1979,51 @@ average_shots <- rbind(
 
 # Combine all summed data into list for saving / transfer
 
-in_season_sums_list <- list(# Counts Data 
+in_season_sums_list <- list(# Skater Standard Stats
                             counts_all_sit_season = counts_all_sit_season, 
-                            counts_EV_season = counts_EV_season, 
-                            counts_PP_season = counts_PP_season, 
-                            counts_SH_season = counts_SH_season, 
+                            counts_EV_season =  counts_EV_season, 
+                            counts_PP_season =  counts_PP_season, 
+                            counts_SH_season =  counts_SH_season, 
+                            counts_5v5_season = counts_5v5_season, 
+                            counts_4v4_season = counts_4v4_season, 
+                            counts_3v3_season = counts_3v3_season, 
+                            counts_5v4_season = counts_5v4_season, 
+                            counts_5v3_season = counts_5v3_season, 
+                            counts_4v3_season = counts_4v3_season, 
+                            counts_4v5_season = counts_4v5_season, 
+                            counts_3v5_season = counts_3v5_season, 
+                            counts_3v4_season = counts_3v4_season, 
                             
                             # Rel_TM Data
-                            rel_TM_player_EV_season = rel_TM_player_EV_season, 
-                            rel_TM_player_PP_season = rel_TM_player_PP_season, 
-                            rel_TM_player_SH_season = rel_TM_player_SH_season, 
+                            rel_TM_player_EV_season =  rel_TM_player_EV_season, 
+                            rel_TM_player_PP_season =  rel_TM_player_PP_season, 
+                            rel_TM_player_SH_season =  rel_TM_player_SH_season, 
+                            rel_TM_player_5v5_season = rel_TM_player_5v5_season, 
+                            rel_TM_player_5v4_season = rel_TM_player_5v4_season, 
+                            rel_TM_player_4v5_season = rel_TM_player_4v5_season, 
                             
                             # WOWY Data
-                            WOWY_EV_season = WOWY_EV_season, 
-                            WOWY_PP_season = WOWY_PP_season, 
-                            WOWY_SH_season = WOWY_SH_season, 
+                            WOWY_EV_season =  WOWY_EV_season, 
+                            WOWY_PP_season =  WOWY_PP_season, 
+                            WOWY_SH_season =  WOWY_SH_season, 
+                            WOWY_5v5_season = WOWY_5v5_season, 
+                            WOWY_5v4_season = WOWY_5v4_season, 
+                            WOWY_4v5_season = WOWY_4v5_season, 
                             
                             # Team Standard Stats
                             team_sum_all_sit_season = team_games_sum_all_sit_season, 
-                            team_sum_EV_season = team_sum_EV_season, 
-                            team_sum_PP_season = team_sum_PP_season, 
-                            team_sum_SH_season = team_sum_SH_season, 
+                            team_sum_EV_season =  team_sum_EV_season, 
+                            team_sum_PP_season =  team_sum_PP_season, 
+                            team_sum_SH_season =  team_sum_SH_season, 
+                            team_sum_5v5_season = team_sum_5v5_season, 
+                            team_sum_4v4_season = team_sum_4v4_season, 
+                            team_sum_3v3_season = team_sum_3v3_season, 
+                            team_sum_5v4_season = team_sum_5v4_season, 
+                            team_sum_5v3_season = team_sum_5v3_season, 
+                            team_sum_4v3_season = team_sum_4v3_season, 
+                            team_sum_4v5_season = team_sum_4v5_season, 
+                            team_sum_3v5_season = team_sum_3v5_season, 
+                            team_sum_3v4_season = team_sum_3v4_season, 
                             
                             # Team RAPMs
                             team_strength_RAPM_EV = team_strength_RAPM_EV, 
