@@ -259,11 +259,6 @@ fun.schedule <- function(start, end) {
 schedule_current <- fun.schedule(Sys.Date() - 1,
                                  Sys.Date() - 1)
 
-schedule_current <- fun.schedule("2018-11-25",
-                                 "2018-11-29")
-
-schedule_current <- schedule_current %>% filter(game_date == "2018-11-26" | game_date == "2018-11-29")
-
 print(schedule_current)
 
 
@@ -1147,8 +1142,6 @@ gc()
 
 # Load Full Joined Data
 db <- DBI::dbConnect(SQLite(), dbname = "data/NHL_db_1819.sqlite") # NEW DATABASE NAME
-
-db <- DBI::dbConnect(SQLite(), dbname = "data/NHL_db_full.sqlite") # NEW DATABASE NAME
 
 pbp_joined <-     db %>% tbl("pbp_full") %>% data.frame()
 #shifts_joined <-      db %>% tbl("shifts_full") %>% data.frame()         # not needed here
