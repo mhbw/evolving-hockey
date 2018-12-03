@@ -290,8 +290,8 @@ fun.draw_rink <- function() {
 rink <- fun.draw_rink() + coord_fixed()
 
 # Mock up location data
-df <- data.frame(x_coord = c(48, 85, 77, 85),  # 2018020253 / 339
-                 y_coord = c(-19, 6, 10, 1))    # 2018020253 / 346
+df <- data.frame(x_coord = c(58),
+                 y_coord = c(38))
 
 # Plot Data
 rink + geom_point(data = df, aes(x = x_coord, y = y_coord), size = 4)

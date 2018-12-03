@@ -5480,11 +5480,11 @@ fun.oniceTeamCorsiA_SH_strength <- function(data, strength, scr_adj_list) {
               xGF = sum(na.omit((event_type %in% st.fenwick_events & event_team == away_team) * pred_goal)), 
               xGA = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal)), 
               
-              GA =  sum((event_type == "GOAL" & event_team == home_team) * scr_adj_list$home_goal_adj[home_lead_state]), 
-              SA =  sum((event_type %in% st.shot_events & event_team == home_team) * scr_adj_list$home_shot_adj[home_lead_state]), 
-              FA =  sum((event_type %in% st.fenwick_events & event_team == home_team) * scr_adj_list$home_fenwick_adj[home_lead_state]), 
-              CA =  sum((event_type %in% st.corsi_events & event_team == home_team) * scr_adj_list$home_corsi_adj[home_lead_state]), 
-              xGA = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal * scr_adj_list$home_xG_adj[home_lead_state]))
+              GA_adj =  sum((event_type == "GOAL" & event_team == home_team) * scr_adj_list$home_goal_adj[home_lead_state]), 
+              SA_adj =  sum((event_type %in% st.shot_events & event_team == home_team) * scr_adj_list$home_shot_adj[home_lead_state]), 
+              FA_adj =  sum((event_type %in% st.fenwick_events & event_team == home_team) * scr_adj_list$home_fenwick_adj[home_lead_state]), 
+              CA_adj =  sum((event_type %in% st.corsi_events & event_team == home_team) * scr_adj_list$home_corsi_adj[home_lead_state]), 
+              xGA_adj = sum(na.omit((event_type %in% st.fenwick_events & event_team == home_team) * pred_goal * scr_adj_list$home_xG_adj[home_lead_state]))
               )
   
   return(hold)
