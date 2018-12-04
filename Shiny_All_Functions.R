@@ -8158,11 +8158,14 @@ fun.team_games_EV <- function(data, strength, scr_adj_list) {
   
   # Remove columns not used in below strength states
   if (strength == "EV") { 
-    games <- games %>% select(-c(GF_adj:C_diff_adj))
+    games <- games %>% 
+      select(-c(GF:C_diff)) %>% 
+      rename_at(vars(GF_adj:C_diff_adj), funs(gsub("_adj", "", .)))
     
     }
   else if (strength != "EV") { 
-    games <- games %>% select(-c(TOI_5v5:TOI_3v3))
+    games <- games %>% 
+      select(-c(TOI_5v5:TOI_3v3))
     
     }
   
@@ -8316,7 +8319,9 @@ fun.team_games_PP <- function(data, strength, scr_adj_list) {
     group_by(Team, Opponent, game_id, game_date, season, is_home) %>% 
     summarise_all(funs(sum)) %>% 
     select(Team, Opponent, game_id, game_date, season, is_home, 
-           TOI, TOI_5v4:TOI_4v3, GF:CA, GF_adj:CF_adj, PEND2:PENT5
+           TOI, TOI_5v4:TOI_4v3, 
+           GF:CA, GF_adj:CF_adj, 
+           PEND2:PENT5
            ) %>% 
     arrange(Team, game_id) %>% 
     mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
@@ -8326,11 +8331,18 @@ fun.team_games_PP <- function(data, strength, scr_adj_list) {
   
   # Remove columns not used in below strength states
   if (strength == "PP") { 
-    games <- games %>% select(-c(GF_adj:CF_adj))
+    games <- games %>% 
+      select(-c(GF, xGF, SF, FF, CF)) %>% 
+      rename_at(vars(GF_adj, xGF_adj, SF_adj, FF_adj, CF_adj), funs(gsub("_adj", "", .))) %>% 
+      select(Team, Opponent, game_id, game_date, season, is_home, 
+             TOI, TOI_5v4:TOI_4v3, 
+             GF, GA, xGF, xGA, SF, SA, FF, FA, CF, CA, 
+             PEND2:PENT5)
     
     }
   else if (strength != "PP") { 
-    games <- games %>% select(-c(TOI_5v4:TOI_4v3))
+    games <- games %>% 
+      select(-c(TOI_5v4:TOI_4v3))
     
     }
   
@@ -8495,11 +8507,18 @@ fun.team_games_SH <- function(data, strength, scr_adj_list) {
   
   # Remove columns not used in below strength states
   if (strength == "SH") { 
-    games <- games %>% select(-c(GA_adj:CA_adj))
+    games <- games %>% 
+      select(-c(GA, xGA, SA, FA, CA)) %>% 
+      rename_at(vars(GA_adj, xGA_adj, SA_adj, FA_adj, CA_adj), funs(gsub("_adj", "", .))) %>% 
+      select(Team, Opponent, game_id, game_date, season, is_home, 
+             TOI, TOI_4v5:TOI_3v4, 
+             GF, GA, xGF, xGA, SF, SA, FF, FA, CF, CA, 
+             PEND2:PENT5)
     
     }
   else if (strength != "SH") { 
-    games <- games %>% select(-c(TOI_4v5:TOI_3v4))
+    games <- games %>% 
+      select(-c(TOI_4v5:TOI_3v4))
     
     }
   

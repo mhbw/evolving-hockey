@@ -1008,7 +1008,7 @@ dbDisconnect(db)
 
 
 ## Remove a Table - *** if needed ***
-#db <- DBI::dbConnect(SQLite(), dbname = "data/NHL_db_1819.sqlite") # NEW DATABASE NAME (second time)
+db <- DBI::dbConnect(SQLite(), dbname = "data/NHL_db_1819.sqlite") # NEW DATABASE NAME (second time)
 
 #dbRemoveTable(db, "games_data_all_sit")
 #dbRemoveTable(db, "games_data_EV")
@@ -1044,7 +1044,7 @@ dbDisconnect(db)
 #dbRemoveTable(db, "adj_pen_games_all_sit")
 #dbRemoveTable(db, "game_charts_labels")
 
-#dbDisconnect(db)
+dbDisconnect(db)
 
 
 
@@ -1138,48 +1138,48 @@ gc()
 # Load Full Joined Data
 db <- DBI::dbConnect(SQLite(), dbname = "data/NHL_db_1819.sqlite") # NEW DATABASE NAME
 
-pbp_joined <-     dbReadTable(db, "pbp_full")
-#shifts_joined <-      dbReadTable(db, "shifts_full")         # not needed here
-#rosters_joined <-     dbReadTable(db, "rosters_full")        # not needed here
-#game_labels_joined <- dbReadTable(db, "game_charts_labels")  # not needed here
+pbp_joined <-          db %>% tbl("pbp_full") %>% data.frame()
+#shifts_joined <-      db %>% tbl("shifts_full") %>% data.frame()         # not needed here
+#rosters_joined <-     db %>% tbl("rosters_full") %>% data.frame()        # not needed here
+#game_labels_joined <- db %>% tbl("game_charts_labels") %>% data.frame()  # not needed here
 
-games_all_sit_joined <- dbReadTable(db, "games_data_all_sit")
-games_EV_joined <-      dbReadTable(db, "games_data_EV")
-games_PP_joined <-      dbReadTable(db, "games_data_PP")
-games_SH_joined <-      dbReadTable(db, "games_data_SH")
-games_5v5_joined <-     dbReadTable(db, "games_data_5v5")
-games_4v4_joined <-     dbReadTable(db, "games_data_4v4")
-games_3v3_joined <-     dbReadTable(db, "games_data_3v3")
-games_5v4_joined <-     dbReadTable(db, "games_data_5v4")
-games_5v3_joined <-     dbReadTable(db, "games_data_5v3")
-games_4v3_joined <-     dbReadTable(db, "games_data_4v3")
-games_4v5_joined <-     dbReadTable(db, "games_data_4v5")
-games_3v5_joined <-     dbReadTable(db, "games_data_3v5")
-games_3v4_joined <-     dbReadTable(db, "games_data_3v4")
+games_all_sit_joined <- db %>% tbl("games_data_all_sit") %>% data.frame()
+games_EV_joined <-      db %>% tbl("games_data_EV") %>% data.frame()
+games_PP_joined <-      db %>% tbl("games_data_PP") %>% data.frame()
+games_SH_joined <-      db %>% tbl("games_data_SH") %>% data.frame()
+games_5v5_joined <-     db %>% tbl("games_data_5v5") %>% data.frame()
+games_4v4_joined <-     db %>% tbl("games_data_4v4") %>% data.frame()
+games_3v3_joined <-     db %>% tbl("games_data_3v3") %>% data.frame()
+games_5v4_joined <-     db %>% tbl("games_data_5v4") %>% data.frame()
+games_5v3_joined <-     db %>% tbl("games_data_5v3") %>% data.frame()
+games_4v3_joined <-     db %>% tbl("games_data_4v3") %>% data.frame()
+games_4v5_joined <-     db %>% tbl("games_data_4v5") %>% data.frame()
+games_3v5_joined <-     db %>% tbl("games_data_3v5") %>% data.frame()
+games_3v4_joined <-     db %>% tbl("games_data_3v4") %>% data.frame()
 
-team_games_all_sit_joined <- dbReadTable(db, "team_data_all_sit")
-team_games_EV_joined <-      dbReadTable(db, "team_data_EV")
-team_games_PP_joined <-      dbReadTable(db, "team_data_PP")
-team_games_SH_joined <-      dbReadTable(db, "team_data_SH")
-team_games_5v5_joined <-     dbReadTable(db, "team_data_5v5")
-team_games_4v4_joined <-     dbReadTable(db, "team_data_4v4")
-team_games_3v3_joined <-     dbReadTable(db, "team_data_3v3")
-team_games_5v4_joined <-     dbReadTable(db, "team_data_5v4")
-team_games_5v3_joined <-     dbReadTable(db, "team_data_5v3")
-team_games_4v3_joined <-     dbReadTable(db, "team_data_4v3")
-team_games_4v5_joined <-     dbReadTable(db, "team_data_4v5")
-team_games_3v5_joined <-     dbReadTable(db, "team_data_3v5")
-team_games_3v4_joined <-     dbReadTable(db, "team_data_3v4")
+team_games_all_sit_joined <- db %>% tbl("team_data_all_sit") %>% data.frame()
+team_games_EV_joined <-      db %>% tbl("team_data_EV") %>% data.frame()
+team_games_PP_joined <-      db %>% tbl("team_data_PP") %>% data.frame()
+team_games_SH_joined <-      db %>% tbl("team_data_SH") %>% data.frame()
+team_games_5v5_joined <-     db %>% tbl("team_data_5v5") %>% data.frame()
+team_games_4v4_joined <-     db %>% tbl("team_data_4v4") %>% data.frame()
+team_games_3v3_joined <-     db %>% tbl("team_data_3v3") %>% data.frame()
+team_games_5v4_joined <-     db %>% tbl("team_data_5v4") %>% data.frame()
+team_games_5v3_joined <-     db %>% tbl("team_data_5v3") %>% data.frame()
+team_games_4v3_joined <-     db %>% tbl("team_data_4v3") %>% data.frame()
+team_games_4v5_joined <-     db %>% tbl("team_data_4v5") %>% data.frame()
+team_games_3v5_joined <-     db %>% tbl("team_data_3v5") %>% data.frame()
+team_games_3v4_joined <-     db %>% tbl("team_data_3v4") %>% data.frame()
 
-TOI_together_EV_joined <-  dbReadTable(db, "TOI_together_data_EV")
-TOI_together_PP_joined <-  dbReadTable(db, "TOI_together_data_PP")
-TOI_together_SH_joined <-  dbReadTable(db, "TOI_together_data_SH")
-TOI_together_5v5_joined <- dbReadTable(db, "TOI_together_data_5v5")
-TOI_together_5v4_joined <- dbReadTable(db, "TOI_together_data_5v4")
-TOI_together_4v5_joined <- dbReadTable(db, "TOI_together_data_4v5")
+TOI_together_EV_joined <-  db %>% tbl("TOI_together_data_EV") %>% data.frame()
+TOI_together_PP_joined <-  db %>% tbl("TOI_together_data_PP") %>% data.frame()
+TOI_together_SH_joined <-  db %>% tbl("TOI_together_data_SH") %>% data.frame()
+TOI_together_5v5_joined <- db %>% tbl("TOI_together_data_5v5") %>% data.frame()
+TOI_together_5v4_joined <- db %>% tbl("TOI_together_data_5v4") %>% data.frame()
+TOI_together_4v5_joined <- db %>% tbl("TOI_together_data_4v5") %>% data.frame()
 
-goalie_games_all_sit_joined <- dbReadTable(db, "goalie_games_all_sit")
-adj_pen_games_joined <-        dbReadTable(db, "adj_pen_games_all_sit")
+goalie_games_all_sit_joined <- db %>% tbl("goalie_games_all_sit") %>% data.frame()
+adj_pen_games_joined <-        db %>% tbl("adj_pen_games_all_sit") %>% data.frame()
 
 dbDisconnect(db)
 
