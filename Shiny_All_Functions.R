@@ -19,6 +19,7 @@ peek <- function(object, number) {
 ## ------------------------------------------------------ ##
 
 
+
 ## ------------ ##
 ##   xG Model   ##
 ## ------------ ##
@@ -9876,10 +9877,6 @@ fun.goalie_sum_all_sit <- function(data) {
 ## ------------------ ##
 
 ########################
-
-
-## *** UPDATE TO SUM NEW FUNCTIONS CORRECTLY ***
-
 
 # All Sit Function
 fun.team_sum_all_sit <- function(data) { 

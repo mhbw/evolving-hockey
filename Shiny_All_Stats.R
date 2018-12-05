@@ -958,6 +958,10 @@ check_new_games <- fun.check_new_games()
 # Save New Data
 db <- DBI::dbConnect(SQLite(), dbname = "data/NHL_db_1819.sqlite") # NEW DATABASE NAME (second time)
 
+# Remove game_id index before writing new data
+dbSendQuery(db, "DROP INDEX game_id_index")
+suppressWarnings(dbGetQuery(db, "PRAGMA INDEX_LIST(pbp_full)"))
+
 dbWriteTable(db, "pbp_full", pbp_df, overwrite = F, append = T)
 dbWriteTable(db, "shifts_full", shifts_new, overwrite = F, append = T)
 dbWriteTable(db, "rosters_full", rosters_new, overwrite = F, append = T)
@@ -1001,6 +1005,9 @@ dbWriteTable(db, "TOI_together_data_4v5", teammate_TOI_4v5_new, overwrite = F, a
 dbWriteTable(db, "goalie_games_all_sit", goalie_games_all_sit_new, overwrite = F, append = T)
 dbWriteTable(db, "adj_pen_games_all_sit", adj_pen_games_new, overwrite = F, append = T)
 
+# Re-add game_id index to pbp_full table
+dbSendQuery(db, "CREATE INDEX game_id_index ON pbp_full (game_id)")
+suppressWarnings(dbGetQuery(db, "PRAGMA INDEX_LIST(pbp_full)"))
 
 dbDisconnect(db)
 
@@ -1066,19 +1073,40 @@ fun.check_db_games <- function(db_name) {
     
     game_labels =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM game_charts_labels WHERE season == 20182019")$game_id),
     
-    games_all = sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_all_sit WHERE season == 20182019")$game_id), 
-    games_EV =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_EV WHERE season == 20182019")$game_id), 
-    games_PP =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_PP WHERE season == 20182019")$game_id), 
-    games_SH =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_SH WHERE season == 20182019")$game_id), 
+    games_all =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_all_sit WHERE season == 20182019")$game_id), 
+    games_EV =   sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_EV WHERE season == 20182019")$game_id), 
+    games_PP =   sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_PP WHERE season == 20182019")$game_id), 
+    games_SH =   sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_SH WHERE season == 20182019")$game_id), 
+    games_5v5 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_5v5 WHERE season == 20182019")$game_id), 
+    games_4v4 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_4v4 WHERE season == 20182019")$game_id), 
+    games_3v3 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_3v3 WHERE season == 20182019")$game_id), 
+    games_5v4 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_5v4 WHERE season == 20182019")$game_id), 
+    games_5v3 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_5v3 WHERE season == 20182019")$game_id), 
+    games_4v3 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_4v3 WHERE season == 20182019")$game_id), 
+    games_4v5 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_4v5 WHERE season == 20182019")$game_id), 
+    games_3v5 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_3v5 WHERE season == 20182019")$game_id), 
+    games_3v4 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_3v4 WHERE season == 20182019")$game_id), 
     
-    TOI_tog_EV = sort(dbGetQuery(db, "SELECT distinct(game_id) FROM TOI_together_data_EV WHERE season == 20182019")$game_id), 
-    TOI_tog_PP = sort(dbGetQuery(db, "SELECT distinct(game_id) FROM TOI_together_data_PP WHERE season == 20182019")$game_id), 
-    TOI_tog_SH = sort(dbGetQuery(db, "SELECT distinct(game_id) FROM TOI_together_data_SH WHERE season == 20182019")$game_id), 
+    TOI_tog_EV =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM TOI_together_data_EV WHERE season == 20182019")$game_id), 
+    TOI_tog_PP =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM TOI_together_data_PP WHERE season == 20182019")$game_id), 
+    TOI_tog_SH =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM TOI_together_data_SH WHERE season == 20182019")$game_id), 
+    TOI_tog_5v5 = sort(dbGetQuery(db, "SELECT distinct(game_id) FROM TOI_together_data_5v5 WHERE season == 20182019")$game_id), 
+    TOI_tog_5v4 = sort(dbGetQuery(db, "SELECT distinct(game_id) FROM TOI_together_data_5v4 WHERE season == 20182019")$game_id), 
+    TOI_tog_4v5 = sort(dbGetQuery(db, "SELECT distinct(game_id) FROM TOI_together_data_4v5 WHERE season == 20182019")$game_id), 
     
-    teams_all = sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_all_sit WHERE season == 20182019")$game_id), 
-    teams_EV = sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_EV WHERE season == 20182019")$game_id), 
-    teams_PP = sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_PP WHERE season == 20182019")$game_id), 
-    teams_SH = sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_SH WHERE season == 20182019")$game_id), 
+    teams_all =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_all_sit WHERE season == 20182019")$game_id), 
+    teams_EV =   sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_EV WHERE season == 20182019")$game_id), 
+    teams_PP =   sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_PP WHERE season == 20182019")$game_id), 
+    teams_SH =   sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_SH WHERE season == 20182019")$game_id), 
+    teams_5v5 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_5v5 WHERE season == 20182019")$game_id), 
+    teams_4v4 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_4v4 WHERE season == 20182019")$game_id), 
+    teams_3v3 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_3v3 WHERE season == 20182019")$game_id), 
+    teams_5v4 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_5v4 WHERE season == 20182019")$game_id), 
+    teams_5v3 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_5v3 WHERE season == 20182019")$game_id), 
+    teams_4v3 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_4v3 WHERE season == 20182019")$game_id), 
+    teams_4v5 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_4v5 WHERE season == 20182019")$game_id), 
+    teams_3v5 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_3v5 WHERE season == 20182019")$game_id), 
+    teams_3v4 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_3v4 WHERE season == 20182019")$game_id), 
     
     pen_goals =       sort(dbGetQuery(db, "SELECT distinct(game_id) FROM adj_pen_games_all_sit WHERE season == 20182019")$game_id), 
     goalies_all_sit = sort(dbGetQuery(db, "SELECT distinct(game_id) FROM goalie_games_all_sit WHERE season == 20182019")$game_id)
@@ -1102,7 +1130,7 @@ fun.check_db_games <- function(db_name) {
     
     } 
   else if (mean(check$test) != 1) { 
-    print("UH-OH!! - Games Don't Match! :(", quote = F)
+    print("Games Don't Match, Strength States Causing This... will fix this message", quote = F)
     
     }
   
