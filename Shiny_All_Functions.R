@@ -11950,8 +11950,6 @@ fun.ALL_EV_GAA <- function() {
               ) %>% 
     group_by(player, season) %>% 
     mutate(TOI_perc_tot =  TOI_player / TOI_team, 
-           #adj_off =       (1.6 * GF - (TOI_perc_tot * EVO_AA_60)) / skaters, 
-           #adj_def =       (1.4 * xGA - (TOI_perc_tot * EVD_AA_60)) / skaters, 
            adj_off =       (1.7 * GF - (TOI_perc_tot * EVO_AA_60)) / skaters, # new team adjustment 
            adj_def =       (1.45 * xGA - (TOI_perc_tot * EVD_AA_60)) / skaters, # new team adjustment 
            EVO_AA_60_adj = EVO_AA_60 + adj_off, 
@@ -11964,9 +11962,21 @@ fun.ALL_EV_GAA <- function() {
            ) %>% 
     rename(TOI = TOI_player) %>% 
     select(player:GP, 
-           EVO_AA, EVD_AA,
-           GF, xGA, 
-           off_diff, def_diff, 
+           TOI_perc_EV = TOI_perc_tot, 
+           SPM_EVO_60 = EVO_60, 
+           SPM_EVD_60 = EVD_60, 
+           SPM_EVO_AA_60 = EVO_AA_60, 
+           SPM_EVD_AA_60 = EVD_AA_60, 
+           team_TOI_EV = TOI_team, 
+           team_skaters_EV = skaters, 
+           team_EV_GF = GF, 
+           team_EV_xGA = xGA, 
+           adj_EVO_60 = adj_off, 
+           adj_EVD_60 = adj_def, 
+           SPM_EVO_AA = EVO_AA, 
+           SPM_EVD_AA = EVD_AA, 
+           adj_EVO_total = off_diff, 
+           adj_EVD_total = def_diff, 
            EVO_AA_adj, EVD_AA_adj
            ) %>% 
     data.frame()
@@ -12078,8 +12088,6 @@ fun.ALL_EV_GAA <- function() {
               ) %>% 
     group_by(player, season) %>% 
     mutate(TOI_perc_tot =  TOI_player / TOI_team, 
-           #adj_off =       (1.6 * GF - (TOI_perc_tot * EVO_AA_60)) / skaters, 
-           #adj_def =       (1.4 * xGA - (TOI_perc_tot * EVD_AA_60)) / skaters, 
            adj_off =       (1.7 * GF - (TOI_perc_tot * EVO_AA_60)) / skaters,    # new team adjustment
            adj_def =       (1.45 * xGA - (TOI_perc_tot * EVD_AA_60)) / skaters,  # new team adjustment
            EVO_AA_60_adj = EVO_AA_60 + adj_off, 
@@ -12092,9 +12100,21 @@ fun.ALL_EV_GAA <- function() {
            ) %>% 
     rename(TOI = TOI_player) %>% 
     select(player:GP, 
-           EVO_AA, EVD_AA,
-           GF, xGA, 
-           off_diff, def_diff, 
+           TOI_perc_EV = TOI_perc_tot, 
+           SPM_EVO_60 = EVO_60, 
+           SPM_EVD_60 = EVD_60, 
+           SPM_EVO_AA_60 = EVO_AA_60, 
+           SPM_EVD_AA_60 = EVD_AA_60, 
+           team_TOI_EV = TOI_team, 
+           team_skaters_EV = skaters, 
+           team_EV_GF = GF, 
+           team_EV_xGA = xGA, 
+           adj_EVO_60 = adj_off, 
+           adj_EVD_60 = adj_def, 
+           SPM_EVO_AA = EVO_AA, 
+           SPM_EVD_AA = EVD_AA, 
+           adj_EVO_total = off_diff, 
+           adj_EVD_total = def_diff, 
            EVO_AA_adj, EVD_AA_adj
            ) %>% 
     data.frame()
@@ -12174,7 +12194,18 @@ fun.ALL_PP_GAA <- function() {
            PPO_AA_adj =    (PPO_AA_60_adj / 60) * TOI, 
            off_diff =      PPO_AA_adj - PPO_AA
            ) %>% 
-    select(player:GP, PPO_AA, PPO_GF_AA_team, TOI_perc_tot, off_diff, PPO_AA_adj) %>% 
+    select(player:GP, 
+           TOI_perc_PP = TOI_perc_tot, 
+           SPM_PPO_60 = PPO_60, 
+           SPM_PPO_AA_60 = PPO_AA_60, 
+           team_TOI_PP = t_TOI_PP, 
+           team_skaters_PP = skaters_PP, 
+           team_PPO_GF_AA = PPO_GF_AA_team,
+           adj_PPO_60 = adj_off, 
+           SPM_PPO_AA = PPO_AA, 
+           adj_PPO_total = off_diff, 
+           PPO_AA_adj
+           ) %>% 
     data.frame()
   
   
@@ -12242,7 +12273,18 @@ fun.ALL_PP_GAA <- function() {
            PPO_AA_adj =    (PPO_AA_60_adj / 60) * TOI, 
            off_diff =      PPO_AA_adj - PPO_AA
            ) %>% 
-    select(player:GP, PPO_AA, PPO_GF_AA_team, TOI_perc_tot, off_diff, PPO_AA_adj) %>% 
+    select(player:GP, 
+           TOI_perc_PP = TOI_perc_tot, 
+           SPM_PPO_60 = PPO_60, 
+           SPM_PPO_AA_60 = PPO_AA_60, 
+           team_TOI_PP = t_TOI_PP, 
+           team_skaters_PP = skaters_PP, 
+           team_PPO_GF_AA = PPO_GF_AA_team,
+           adj_PPO_60 = adj_off, 
+           SPM_PPO_AA = PPO_AA, 
+           adj_PPO_total = off_diff, 
+           PPO_AA_adj
+           ) %>% 
     data.frame()
   
   
@@ -12320,7 +12362,18 @@ fun.ALL_SH_GAA <- function() {
            SHD_AA =        -1 * SHD_AA,
            def_diff =      SHD_AA_adj - SHD_AA
            ) %>% 
-    select(player:GP, SHD_AA, SHD_xG_AA_team, TOI_perc_tot, def_diff, SHD_AA_adj) %>% 
+    select(player:GP, 
+           TOI_perc_SH = TOI_perc_tot, 
+           SPM_SHD_60 = SHD_60, 
+           SPM_SHD_AA_60 = SHD_AA_60, 
+           team_TOI_SH = t_TOI_SH, 
+           team_skaters_SH = skaters_SH, 
+           team_SHD_xGA_AA = SHD_xG_AA_team, 
+           adj_SHD_60 = adj_def,
+           SPM_SHD_AA = SHD_AA, 
+           adj_SHD_total = def_diff,
+           SHD_AA_adj
+           ) %>% 
     data.frame()
   
   
@@ -12387,7 +12440,18 @@ fun.ALL_SH_GAA <- function() {
            SHD_AA =        -1 * SHD_AA,
            def_diff =      SHD_AA_adj - SHD_AA
            ) %>% 
-    select(player:GP, SHD_AA, SHD_xG_AA_team, TOI_perc_tot, def_diff, SHD_AA_adj) %>% 
+    select(player:GP, 
+           TOI_perc_SH = TOI_perc_tot, 
+           SPM_SHD_60 = SHD_60, 
+           SPM_SHD_AA_60 = SHD_AA_60, 
+           team_TOI_SH = t_TOI_SH, 
+           team_skaters_SH = skaters_SH, 
+           team_SHD_xGA_AA = SHD_xG_AA_team, 
+           adj_SHD_60 = adj_def,
+           SPM_SHD_AA = SHD_AA, 
+           adj_SHD_total = def_diff,
+           SHD_AA_adj
+           ) %>% 
     data.frame()
   
   

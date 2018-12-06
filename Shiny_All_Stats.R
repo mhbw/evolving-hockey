@@ -962,6 +962,7 @@ db <- DBI::dbConnect(SQLite(), dbname = "data/NHL_db_1819.sqlite") # NEW DATABAS
 dbSendQuery(db, "DROP INDEX game_id_index")
 suppressWarnings(dbGetQuery(db, "PRAGMA INDEX_LIST(pbp_full)"))
 
+# Write new data
 dbWriteTable(db, "pbp_full", pbp_df, overwrite = F, append = T)
 dbWriteTable(db, "shifts_full", shifts_new, overwrite = F, append = T)
 dbWriteTable(db, "rosters_full", rosters_new, overwrite = F, append = T)
@@ -1015,7 +1016,7 @@ dbDisconnect(db)
 
 
 ## Remove a Table - *** if needed ***
-db <- DBI::dbConnect(SQLite(), dbname = "data/NHL_db_1819.sqlite") # NEW DATABASE NAME (second time)
+#db <- DBI::dbConnect(SQLite(), dbname = "data/NHL_db_1819.sqlite") # NEW DATABASE NAME (second time)
 
 #dbRemoveTable(db, "games_data_all_sit")
 #dbRemoveTable(db, "games_data_EV")
@@ -1051,7 +1052,7 @@ db <- DBI::dbConnect(SQLite(), dbname = "data/NHL_db_1819.sqlite") # NEW DATABAS
 #dbRemoveTable(db, "adj_pen_games_all_sit")
 #dbRemoveTable(db, "game_charts_labels")
 
-dbDisconnect(db)
+#dbDisconnect(db)
 
 
 
@@ -1790,47 +1791,45 @@ Pens_rep_D <- round(0.01702584, 5)
 
 # Final GAA + GAR Join
 ALL_GAR <- on_ice_all_sit_season %>% 
-  left_join(., ALL_EV %>% select(player, season, Team, EVO_AA_adj, EVD_AA_adj), by = c("player", "season", "Team")) %>% 
-  left_join(., ALL_PP %>% select(player, season, Team, PPO_AA_adj), by = c("player", "season", "Team")) %>% 
-  left_join(., ALL_SH %>% select(player, season, Team, SHD_AA_adj), by = c("player", "season", "Team")) %>% 
-  left_join(., adj_pen_season %>% select(player, season, Team, take_AA, draw_AA, pens), by = c("player", "season", "Team")) %>% 
-  
-  mutate_at(vars(EVO_AA_adj, EVD_AA_adj, PPO_AA_adj, SHD_AA_adj, take_AA, draw_AA, pens), funs(ifelse(is.na(.), 0, .))) %>% 
-  
-  left_join(., all_metrics_season_EV %>% select(player, season, Team, TOI) %>% rename(TOI_EV = TOI), by = c("player", "season", "Team")) %>% 
-  left_join(., all_metrics_season_PP %>% select(player, season, Team, TOI) %>% rename(TOI_PP = TOI), by = c("player", "season", "Team")) %>% 
-  left_join(., all_metrics_season_SH %>% select(player, season, Team, TOI) %>% rename(TOI_SH = TOI), by = c("player", "season", "Team")) %>% 
-  
-  mutate(GAA = EVO_AA_adj + EVD_AA_adj + PPO_AA_adj + SHD_AA_adj + pens) %>% 
-  
+  left_join(., ALL_EV %>% select(player, season, Team, TOI_EV, TOI_perc_EV:adj_EVD_total, EVO_AA_adj, EVD_AA_adj), by = c("player", "season", "Team")) %>% 
+  left_join(., ALL_PP %>% select(player, season, Team, TOI_PP, TOI_perc_PP:adj_PPO_total, PPO_AA_adj), by = c("player", "season", "Team")) %>% 
+  left_join(., ALL_SH %>% select(player, season, Team, TOI_SH, TOI_perc_SH:adj_SHD_total, SHD_AA_adj), by = c("player", "season", "Team")) %>% 
+  left_join(., adj_pen_season %>% select(player, season, Team, take_AA, draw_AA, pens_AA = pens), by = c("player", "season", "Team")) %>% 
   left_join(., player_position, by = "player") %>% 
   filter(!is.na(position)) %>% 
-  select(player, position, season, Team, 
-         GP, 
-         TOI_all, TOI_EV, TOI_PP, TOI_SH, EVO_AA_adj, EVD_AA_adj, PPO_AA_adj, SHD_AA_adj, take_AA, draw_AA, pens, GAA) %>% 
-  rename_at(vars(EVO_AA_adj:SHD_AA_adj), funs(gsub("_adj", "", .))) %>% 
-  rename(pens_AA = pens) %>% 
-  mutate(TOI_SH = ifelse(is.na(TOI_SH), 0, TOI_SH)) %>% 
+  
+  mutate_if(is.numeric, funs(ifelse(is.na(.), 0, .))) %>% 
+  mutate(GAA = EVO_AA_adj + EVD_AA_adj + PPO_AA_adj + SHD_AA_adj + pens_AA) %>% 
+  
+  select(player, position, season, Team, GP, TOI_all, TOI_EV, TOI_PP, TOI_SH, TOI_perc_EV, TOI_perc_PP, TOI_perc_SH, 
+         SPM_EVO_60, SPM_EVD_60, SPM_PPO_60, SPM_SHD_60, SPM_EVO_AA_60, SPM_EVD_AA_60, SPM_PPO_AA_60, SPM_SHD_AA_60,
+         team_TOI_EV, team_TOI_PP, team_TOI_SH, team_skaters_EV, team_skaters_PP, team_skaters_SH, team_EV_GF, team_EV_xGA, team_PPO_GF_AA, team_SHD_xGA_AA, 
+         adj_EVO_60, adj_EVD_60, adj_PPO_60, adj_SHD_60, 
+         SPM_EVO_AA, SPM_EVD_AA, SPM_PPO_AA, SPM_SHD_AA, 
+         adj_EVO_total, adj_EVD_total, adj_PPO_total, adj_SHD_total, 
+         EVO_AA = EVO_AA_adj, 
+         EVD_AA = EVD_AA_adj, 
+         PPO_AA = PPO_AA_adj, 
+         SHD_AA = SHD_AA_adj, 
+         take_AA, draw_AA, pens_AA, 
+         GAA
+         ) %>% 
   
   # Goals Above Replacement
   mutate(EV_GAA = EVO_AA + EVD_AA, 
-         
-         # New team adjustment - objects made above, from GAR_scratch script
          EV_GAR =   ifelse(position == 1, EV_GAA +  (TOI_EV * (EV_rep_F / 60)), EV_GAA + (TOI_EV * (EV_rep_D / 60))), 
          PP_GAR =   ifelse(position == 1, PPO_AA +  (TOI_PP * (PP_rep_F / 60)), PPO_AA + (TOI_PP * (PP_rep_D / 60))), 
          SH_GAR =   ifelse(position == 1, SHD_AA +  (TOI_SH * (SH_rep_F / 60)), SHD_AA + (TOI_SH * (SH_rep_D / 60))), 
          Pens_GAR = ifelse(position == 1, pens_AA + (TOI_all * (Pens_rep_F / 60)), pens_AA + (TOI_all * (Pens_rep_D / 60))), 
-         
-         # Re-zero players below TOI cutoffs
-         #EV_GAR =   ifelse(TOI_EV < TOI_cut_EV, 0, EV_GAR), 
-         #PP_GAR =   ifelse(TOI_PP < TOI_cut_PP, 0, PP_GAR), 
-         #SH_GAR =   ifelse(TOI_SH < TOI_cut_SH, 0, SH_GAR), 
-         
          GAR = EV_GAR + PP_GAR + SH_GAR + Pens_GAR, 
-         WAR = GAR / goals_to_wins_season$GPW[match(season, goals_to_wins_season$season_ID)]
+         WAR = GAR / goals_to_wins_season$GPW[match(season, goals_to_wins_season$season_ID)] # determined in GAR_predicitions_2.R script
          ) %>% 
-  select(player:TOI_SH, EVO_AA:GAA, EV_GAR:GAR, WAR) %>% 
-  mutate_if(is.numeric, funs(round(., 1))) %>% 
+  mutate_at(vars(TOI_all:TOI_SH), funs(round(., 1))) %>% 
+  mutate_at(vars(TOI_perc_EV:TOI_perc_SH), funs(100 * round(., 4))) %>% 
+  mutate_at(vars(contains("_60")), funs(round(., 3))) %>% 
+  mutate_at(vars(contains("_AA")), funs(round(., 1))) %>% 
+  mutate_at(vars(contains("_total")), funs(round(., 2))) %>% 
+  mutate_at(vars(GAA:WAR), funs(round(., 1))) %>% 
   data.frame()
 
 # Split
