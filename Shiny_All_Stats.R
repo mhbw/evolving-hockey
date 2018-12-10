@@ -8,8 +8,6 @@ library(RCurl); library(rjson); library(lubridate); library(doMC); library(rvest
 # Script Dependencies
 library(Matrix); library(RSQLite)
 library(xgboost); library(glmnet)
-
-library(doMC);  
 library(ggridges); library(tidyverse)
 
 options(scipen = 999)
@@ -1824,12 +1822,10 @@ ALL_GAR <- on_ice_all_sit_season %>%
          GAR = EV_GAR + PP_GAR + SH_GAR + Pens_GAR, 
          WAR = GAR / goals_to_wins_season$GPW[match(season, goals_to_wins_season$season_ID)] # determined in GAR_predicitions_2.R script
          ) %>% 
-  mutate_at(vars(TOI_all:TOI_SH), funs(round(., 1))) %>% 
-  mutate_at(vars(TOI_perc_EV:TOI_perc_SH), funs(100 * round(., 4))) %>% 
-  mutate_at(vars(contains("_60")), funs(round(., 3))) %>% 
-  mutate_at(vars(contains("_AA")), funs(round(., 1))) %>% 
-  mutate_at(vars(contains("_total")), funs(round(., 2))) %>% 
-  mutate_at(vars(GAA:WAR), funs(round(., 1))) %>% 
+  mutate_at(vars(TOI_perc_EV:TOI_perc_SH), funs(100 * round(., 3))) %>% 
+  mutate_at(vars(SPM_EVO_60:SPM_SHD_AA_60, adj_EVO_60:adj_SHD_60), funs(round(., 3))) %>% 
+  mutate_at(vars(team_skaters_EV:team_skaters_SH, team_EV_GF:team_SHD_xGA_AA, SPM_EVO_AA:SPM_SHD_AA, adj_EVO_total:adj_SHD_total), funs(round(., 2))) %>% 
+  mutate_at(vars(TOI_all:TOI_SH, team_TOI_EV:team_TOI_SH, EVO_AA:SHD_AA, GAA:WAR), funs(round(., 1))) %>% 
   data.frame()
 
 # Split

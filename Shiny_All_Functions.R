@@ -886,6 +886,7 @@ fun.NHL_info_scrape <- function(season_) {
            seasonId = as.character(seasonId), 
            playerTeamsPlayedFor = ifelse(grepl(", ", playerTeamsPlayedFor), gsub(", ", "/", playerTeamsPlayedFor), playerTeamsPlayedFor), 
            
+           # Name Corrections
            player = ifelse(grepl("ALEXANDER", player), gsub("ALEXANDER", "ALEX", player), player), 
            player = ifelse(grepl("ALEXANDRE", player), gsub("ALEXANDRE", "ALEX", player), player), 
            player = ifelse(player == "BEN.ONDRUS", "BENJAMIN.ONDRUS", player),
@@ -970,7 +971,10 @@ fun.NHL_info_scrape <- function(season_) {
            birthday = as.Date(playerBirthDate), 
            season_age = as.numeric(floor((as.Date(paste0(substr(seasonId, 5, 8), "-2-15"), "%Y-%m-%d") - birthday) / 365.25)), # updated to reflect 365.25
            seasonId = as.character(seasonId), 
-           playerTeamsPlayedFor = ifelse(grepl(", ", playerTeamsPlayedFor), gsub(", ", "/", playerTeamsPlayedFor), playerTeamsPlayedFor)
+           playerTeamsPlayedFor = ifelse(grepl(", ", playerTeamsPlayedFor), gsub(", ", "/", playerTeamsPlayedFor), playerTeamsPlayedFor), 
+           
+           # Name Corrections
+           player = ifelse(player == "CHRISTOPHER.GIBSON", "CHRIS.GIBSON", player)
            ) %>% 
     rename(season = seasonId) %>% 
     ungroup() %>% 
