@@ -10091,7 +10091,7 @@ fun.team_sum_SH <- function(data, strength) {
 
 
 ## --------------------------- ##
-##   TEAM RAPM FUNCTION - EV   ## *** Up to Date as of 8/26/18
+##   TEAM RAPM FUNCTION - EV   ## *** Updated 12/11/18 with factor variable correction
 ## --------------------------- ##
 
 #################################
@@ -10221,7 +10221,7 @@ fun.team_RAPM <- function(data, regularized) {
     return(data_)
   
     }
-  pbp_part <- fun.IDs(data_ = pbp_part, 
+  pbp_part <- fun.IDs(data_ =      pbp_part, 
                       names_data = names_match)
   
   
@@ -10465,9 +10465,18 @@ fun.team_RAPM <- function(data, regularized) {
   CF60 <- unlist(rapply(CF60_l, f = function(x) ifelse(is.infinite(x), 0, x), how = "replace"))
   xGF60 <- unlist(rapply(xGF60_l, f = function(x) ifelse(is.infinite(x), 0, x), how = "replace"))
   
+  
+  ## sparse matrix column names:
+  # [1]  "n"                   "season"              "game_strength_state" "off_team"            "def_team"            "length"              "GF60"               
+  # [8]  "CF60"                "xGF60"               "off_zonestart"       "def_zonestart"       "btb"                 "score_down_3"        "score_down_2"       
+  # [15] "score_down_1"        "score_even"          "score_up_1"          "score_up_2"          "score_up_3"          "state_5v5"           "state_4v4"          
+  # [22] "state_3v3"           "is_home"
+  
+  
   # Construct matrix
-  APM_teams_matrix <- APM_teams[, -c(1:9)] # remove unnecessary columns
-  APM_teams_matrix <- APM_teams_matrix[, -c(1:2)] # remove zone start variables for Teams
+  APM_teams_matrix <- APM_teams[, -c(1:9, 10:11)] # remove excess columns
+  #APM_teams_matrix <- APM_teams[, -c(1:9, 10:11, 16, 20)] # *** to be implemented, corrected factor variables
+  
   
   rm(APM_teams, pbp_part, GF60_l, CF60_l, xGF60_l, length_l)
   gc()
@@ -10734,8 +10743,7 @@ fun.team_RAPM <- function(data, regularized) {
     mutate_at(vars(skaters:xGPM), funs(round(., 3)))
   
   return_list <- list(team_data =  APM_combine, 
-                      cv_results = cv_results_df
-                      )
+                      cv_results = cv_results_df)
   
   }
 
@@ -10744,12 +10752,14 @@ fun.team_RAPM <- function(data, regularized) {
 
 
 ## ---------------------- ##
-##   TEAM RAPM RUN - PP   ## *** Up to Date as of 8/26/18
+##   TEAM RAPM RUN - PP   ## *** Updated 12/11/18 with factor variable correction
 ## ---------------------- ##
 
 #################################
 
 fun.team_RAPM_PP_SH <- function(data) { 
+  
+  print(paste0("prepare - season: ", unique(data$season)), quote = F)
   
   # Prepare pbp (initial) - filter to PP strength + column select
   fun.pbp_prepare <- function(data_) {
@@ -10914,11 +10924,12 @@ fun.team_RAPM_PP_SH <- function(data) {
   ##############################################
   
   
+  
   ## ------------------------------ ##
   ##        Construct Tables        ##
   ## ------------------------------ ##
   
-  ## Home Table 1 (Home GF in Home PP Strengths)
+  ## Home Table 1 (Home Offense in Home PP Strengths)
   ##############################################
   
   print("home_df_1")
@@ -11048,7 +11059,7 @@ fun.team_RAPM_PP_SH <- function(data) {
   ##############################################
   
   
-  ## Home Table 2 (Home GF in Away PP Strengths)
+  ## Home Table 2 (Home Offense in Away PP Strengths)
   ##############################################
   
   print("home_df_2")
@@ -11178,7 +11189,7 @@ fun.team_RAPM_PP_SH <- function(data) {
   ##############################################
   
   
-  ## Away Table 1 (Away GF in Away PP Strengths)
+  ## Away Table 1 (Away Offense in Away PP Strengths)
   ##############################################
   
   print("away_df_1")
@@ -11308,7 +11319,7 @@ fun.team_RAPM_PP_SH <- function(data) {
   ##############################################
   
   
-  ## Away Table 2 (Away GF in Home PP Strengths)
+  ## Away Table 2 (Away Offense in Home PP Strengths)
   ##############################################
   
   print("away_df_2")
@@ -11439,6 +11450,7 @@ fun.team_RAPM_PP_SH <- function(data) {
   ##############################################
   
   
+  
   ## ------------------------------ ##
   ##             Big Join           ##
   ## ------------------------------ ##
@@ -11481,9 +11493,17 @@ fun.team_RAPM_PP_SH <- function(data) {
   xGF60_pp <-  unlist(rapply(xGF60_l, f = function(x) ifelse(is.infinite(x), 0, x), how = "replace"))
   
   
+  ## sparse matrix column names:
+  # [1]  "n"                   "season"              "game_strength_state" "off_team"            "def_team"            "length"              "GF60"               
+  # [8]  "CF60"                "xGF60"               "off_zonestart"       "def_zonestart"       "btb"                 "score_down_3"        "score_down_2"       
+  # [15] "score_down_1"        "score_even"          "score_up_1"          "score_up_2"          "score_up_3"          "state_5v4"           "state_5v3"          
+  # [22] "state_4v3"           "is_home"
+  
+  
   # Construct matrix
-  APM_PP_teams_matrix <- APM_PP_teams[, -c(1:9)] # predictors
-  APM_PP_teams_matrix <- APM_PP_teams_matrix[, -c(1:2)] # remove zone start variables for Team RAPMs
+  APM_PP_teams_matrix <- APM_PP_teams[, -c(1:9, 10:11)] # remove excess columns
+  #APM_PP_teams_matrix <- APM_PP_teams[, -c(1:9, 10:11, 16, 20)] # *** to be implemented, correct factor variables
+  
   
   rm(APM_PP_teams, GF60_l, CF60_l, xGF60_l, length_l)
   gc()
@@ -12775,11 +12795,18 @@ fun.shooting_RAPM <- function(pbp_data, strength_) {
   
   ##########################
   
-  print("Cross Validation", quote = F)
+  ## sparse matrix column names:
+  # [1]  "is_goal"             "pred_goal"           "shooter"             "goalie"              "state_5v5"           "state_4v4"           "state_3v3"          
+  # [8]  "state_5v4"           "state_5v3"           "state_4v3"           "state_5vE"           "state_4vE"           "shooter_score_trail" "shooter_score_even" 
+  # [15] "shooter_score_lead"  "shooter_is_home"     "shooter_is_F"        "shooter_is_D"        "home_btb"            "away_btb"
+  
   
   is_goal <- pbp_sparse[, "is_goal"]
-  shooting_design <- pbp_sparse[, -c(1, 3:4)] # remove is_goal & shooter / goalie columns
+  shooting_design <- pbp_sparse[, -c(1, 3:4)] # remove excess columns
+  #shooting_design <- pbp_sparse[, -c(1, 3:4, 5, 14, 17)] # *** to be implemented, corrected factor variables
   
+  
+  print("Cross Validation", quote = F)
   
   registerDoMC(cores = 2)
   
@@ -12788,7 +12815,7 @@ fun.shooting_RAPM <- function(pbp_data, strength_) {
                           family = "binomial", 
                           alpha = 0, 
                           nfolds = 10, 
-                          #standardize = FALSE, # not using standardization
+                          #standardize = FALSE, # not using standardization for single-season model
                           parallel = TRUE)
   gc()
   
@@ -12856,7 +12883,7 @@ fun.shooting_RAPM <- function(pbp_data, strength_) {
 
 
 ## -------------------- ##
-##   Skater RAPM - EV   ##
+##   Skater RAPM - EV   ## *** Updated 12/11/18 with factor variable correction
 ## -------------------- ##
 
 ##########################
@@ -13254,11 +13281,11 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
     
     # Determine Columns
     tmp <- lapply(groups_o, function(x, test.H)  which(test.H[, "home_on_1"] == x | 
-                                                         test.H[, "home_on_2"] == x |
-                                                         test.H[, "home_on_3"] == x |
-                                                         test.H[, "home_on_4"] == x |
-                                                         test.H[, "home_on_5"] == x |
-                                                         test.H[, "home_on_6"] == x), test.H = test.H)
+                                                       test.H[, "home_on_2"] == x |
+                                                       test.H[, "home_on_3"] == x |
+                                                       test.H[, "home_on_4"] == x |
+                                                       test.H[, "home_on_5"] == x |
+                                                       test.H[, "home_on_6"] == x), test.H = test.H)
     # Make Dummy Variables
     j = rep(seq_along(tmp), lengths(tmp))
     i = unlist(tmp)
@@ -13273,11 +13300,11 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
     
     # Determine Columns
     tmp <- lapply(groups_d, function(x, test.H)  which((test.H[, "away_on_1"] == x | 
-                                                          test.H[, "away_on_2"] == x |
-                                                          test.H[, "away_on_3"] == x |
-                                                          test.H[, "away_on_4"] == x |
-                                                          test.H[, "away_on_5"] == x |
-                                                          test.H[, "away_on_6"] == x) & test.H[, "home_goalie"] != x), test.H = test.H)
+                                                        test.H[, "away_on_2"] == x |
+                                                        test.H[, "away_on_3"] == x |
+                                                        test.H[, "away_on_4"] == x |
+                                                        test.H[, "away_on_5"] == x |
+                                                        test.H[, "away_on_6"] == x) & test.H[, "home_goalie"] != x), test.H = test.H)
     # Make Dummy Variables
     j = rep(seq_along(tmp), lengths(tmp))
     i = unlist(tmp)
@@ -13354,11 +13381,11 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
     
     # Determine Columns
     tmp <- lapply(groups_o, function(x, test.A)  which(test.A[, "away_on_1"] == x | 
-                                                         test.A[, "away_on_2"] == x |
-                                                         test.A[, "away_on_3"] == x |
-                                                         test.A[, "away_on_4"] == x |
-                                                         test.A[, "away_on_5"] == x |
-                                                         test.A[, "away_on_6"] == x), test.A = test.A)
+                                                       test.A[, "away_on_2"] == x |
+                                                       test.A[, "away_on_3"] == x |
+                                                       test.A[, "away_on_4"] == x |
+                                                       test.A[, "away_on_5"] == x |
+                                                       test.A[, "away_on_6"] == x), test.A = test.A)
     # Make Dummy Variables
     j = rep(seq_along(tmp), lengths(tmp))
     i = unlist(tmp)
@@ -13371,11 +13398,11 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
     print(" -- away_defense")
     # Determine Columns
     tmp <- lapply(groups_d, function(x, test.A)  which((test.A[, "home_on_1"] == x | 
-                                                          test.A[, "home_on_2"] == x |
-                                                          test.A[, "home_on_3"] == x |
-                                                          test.A[, "home_on_4"] == x |
-                                                          test.A[, "home_on_5"] == x |
-                                                          test.A[, "home_on_6"] == x) & test.A[, "away_goalie"] != x), test.A = test.A)
+                                                        test.A[, "home_on_2"] == x |
+                                                        test.A[, "home_on_3"] == x |
+                                                        test.A[, "home_on_4"] == x |
+                                                        test.A[, "home_on_5"] == x |
+                                                        test.A[, "home_on_6"] == x) & test.A[, "away_goalie"] != x), test.A = test.A)
     # Make Dummy Variables
     j = rep(seq_along(tmp), lengths(tmp))
     i = unlist(tmp)
@@ -13451,11 +13478,23 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
   rm(length_l, GF60_l, CF60_l, xGF60_l)
   
   
-  # Base design matrix - GF / xG
+  ## sparse matrix column names:
+  # [1]  "n"                   "game_strength_state" "home_on_1"           "home_on_2"           "home_on_3"           "home_on_4"           "home_on_5"          
+  # [8]  "home_on_6"           "away_on_1"           "away_on_2"           "away_on_3"           "away_on_4"           "away_on_5"           "away_on_6"          
+  # [15] "home_goalie"         "away_goalie"         "off_team"            "def_team"            "length"              "GF60"                "CF60"               
+  # [22] "xGF60"               "off_zonestart"       "def_zonestart"       "btb"                 "score_down_3"        "score_down_2"        "score_down_1"       
+  # [29] "score_up_1"          "score_up_2"          "score_up_3"          "score_even"          "score_trail"         "score_lead"          "state_5v5"          
+  # [36] "state_4v4"           "state_3v3"           "is_home"
+  
+  
+  # Base design matrices - GF / xG
   APM_g <- APM[, -c(1:22, 26:31)] # score state: 3-level (trail / even / lead)
+  #APM_g <- APM[, -c(1:22, 26:32, 35)] # *** to be implemented... 3-level score state, corrected dummies
   
   # Base design matrix - CF
   APM_c <- APM[, -c(1:22, 33:34)] # score state: 7-level (score of -3 to +3)
+  #APM_c <- APM[, -c(1:22, 32:34, 35)] # *** to be implemented... 7-level score state, corrected dummies
+  
   
   # Find goalie names
   goalie_names <- names_match %>% 
@@ -13899,7 +13938,7 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
 
 
 ## ----------------------- ##
-##   Skater RAPM - PP/SH   ##
+##   Skater RAPM - PP/SH   ## *** Updated 12/11/18 with factor variable correction
 ## ----------------------- ##
 
 #############################
@@ -14389,11 +14428,12 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
     ##############################################
     
     
+    
     ## ------------------------------ ##
     ##        Construct Tables        ##
     ## ------------------------------ ##
     
-    ## Home Table 1 (Home GF in Home PP Strengths)
+    ## Home Table 1 (Home Offense in Home PP Strengths)
     ##############################################
     
     print("home_df_1")
@@ -14455,11 +14495,11 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
     
     # Determine Columns
     tmp <- lapply(groups_PPO, function(x, test.H1)  which(test.H1[, "home_on_1"] == x | 
-                                                            test.H1[, "home_on_2"] == x |
-                                                            test.H1[, "home_on_3"] == x |
-                                                            test.H1[, "home_on_4"] == x |
-                                                            test.H1[, "home_on_5"] == x |
-                                                            test.H1[, "home_on_6"] == x), test.H1 = test.H1)
+                                                          test.H1[, "home_on_2"] == x |
+                                                          test.H1[, "home_on_3"] == x |
+                                                          test.H1[, "home_on_4"] == x |
+                                                          test.H1[, "home_on_5"] == x |
+                                                          test.H1[, "home_on_6"] == x), test.H1 = test.H1)
     
     # Make Dummy Variables
     j = rep(seq_along(tmp), lengths(tmp))
@@ -14477,11 +14517,11 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
     
     # Determine Columns
     tmp <- lapply(groups_SHD, function(x, test.H1)  which((test.H1[, "away_on_1"] == x | 
-                                                             test.H1[, "away_on_2"] == x |
-                                                             test.H1[, "away_on_3"] == x |
-                                                             test.H1[, "away_on_4"] == x |
-                                                             test.H1[, "away_on_5"] == x |
-                                                             test.H1[, "away_on_6"] == x) & test.H1[, "home_goalie"] != x), test.H1 = test.H1)
+                                                           test.H1[, "away_on_2"] == x |
+                                                           test.H1[, "away_on_3"] == x |
+                                                           test.H1[, "away_on_4"] == x |
+                                                           test.H1[, "away_on_5"] == x |
+                                                           test.H1[, "away_on_6"] == x) & test.H1[, "home_goalie"] != x), test.H1 = test.H1)
     
     # Make Dummy Variables
     j = rep(seq_along(tmp), lengths(tmp))
@@ -14538,7 +14578,7 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
     ##############################################
     
     
-    ## Home Table 2 (Home GF in Away PP Strengths)
+    ## Home Table 2 (Home Offense in Away PP Strengths)
     ##############################################
     
     print("home_df_2")
@@ -14634,11 +14674,11 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
     
     # Determine Columns
     tmp <- lapply(groups_SHO, function(x, test.H2)  which(test.H2[, "home_on_1"] == x | 
-                                                            test.H2[, "home_on_2"] == x |
-                                                            test.H2[, "home_on_3"] == x |
-                                                            test.H2[, "home_on_4"] == x |
-                                                            test.H2[, "home_on_5"] == x |
-                                                            test.H2[, "home_on_6"] == x), test.H2 = test.H2)
+                                                          test.H2[, "home_on_2"] == x |
+                                                          test.H2[, "home_on_3"] == x |
+                                                          test.H2[, "home_on_4"] == x |
+                                                          test.H2[, "home_on_5"] == x |
+                                                          test.H2[, "home_on_6"] == x), test.H2 = test.H2)
     
     # Make Dummy Variables
     j = rep(seq_along(tmp), lengths(tmp))
@@ -14656,11 +14696,11 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
     
     # Determine Columns
     tmp <- lapply(groups_PPD, function(x, test.H2)  which((test.H2[, "away_on_1"] == x | 
-                                                             test.H2[, "away_on_2"] == x |
-                                                             test.H2[, "away_on_3"] == x |
-                                                             test.H2[, "away_on_4"] == x |
-                                                             test.H2[, "away_on_5"] == x |
-                                                             test.H2[, "away_on_6"] == x) & test.H2[, "home_goalie"] != x), test.H2 = test.H2)
+                                                           test.H2[, "away_on_2"] == x |
+                                                           test.H2[, "away_on_3"] == x |
+                                                           test.H2[, "away_on_4"] == x |
+                                                           test.H2[, "away_on_5"] == x |
+                                                           test.H2[, "away_on_6"] == x) & test.H2[, "home_goalie"] != x), test.H2 = test.H2)
     
     # Make Dummy Variables
     j = rep(seq_along(tmp), lengths(tmp))
@@ -14683,7 +14723,7 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
     ##############################################
     
     
-    ## Away Table 1 (Away GF in Away PP Strengths)
+    ## Away Table 1 (Away Offense in Away PP Strengths)
     ##############################################
     
     print("away_df_1")
@@ -14745,11 +14785,11 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
     
     # Determine Columns
     tmp <- lapply(groups_PPO, function(x, test.A1)  which(test.A1[, "away_on_1"] == x | 
-                                                            test.A1[, "away_on_2"] == x |
-                                                            test.A1[, "away_on_3"] == x |
-                                                            test.A1[, "away_on_4"] == x |
-                                                            test.A1[, "away_on_5"] == x |
-                                                            test.A1[, "away_on_6"] == x), test.A1 = test.A1)
+                                                          test.A1[, "away_on_2"] == x |
+                                                          test.A1[, "away_on_3"] == x |
+                                                          test.A1[, "away_on_4"] == x |
+                                                          test.A1[, "away_on_5"] == x |
+                                                          test.A1[, "away_on_6"] == x), test.A1 = test.A1)
     
     # Make Dummy Variables
     j = rep(seq_along(tmp), lengths(tmp))
@@ -14767,11 +14807,11 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
     
     # Determine Columns
     tmp <- lapply(groups_SHD, function(x, test.A1)  which((test.A1[, "home_on_1"] == x | 
-                                                             test.A1[, "home_on_2"] == x |
-                                                             test.A1[, "home_on_3"] == x |
-                                                             test.A1[, "home_on_4"] == x |
-                                                             test.A1[, "home_on_5"] == x |
-                                                             test.A1[, "home_on_6"] == x) & test.A1[, "away_goalie"] != x), test.A1 = test.A1)
+                                                           test.A1[, "home_on_2"] == x |
+                                                           test.A1[, "home_on_3"] == x |
+                                                           test.A1[, "home_on_4"] == x |
+                                                           test.A1[, "home_on_5"] == x |
+                                                           test.A1[, "home_on_6"] == x) & test.A1[, "away_goalie"] != x), test.A1 = test.A1)
     
     # Make Dummy Variables
     j = rep(seq_along(tmp), lengths(tmp))
@@ -14828,7 +14868,7 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
     ##############################################
     
     
-    ## Away Table 2 (Away GF in Home PP Strengths)
+    ## Away Table 2 (Away Offense in Home PP Strengths)
     ##############################################
     
     print("away_df_2")
@@ -14924,11 +14964,11 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
     
     # Determine Columns
     tmp <- lapply(groups_SHO, function(x, test.A2)  which(test.A2[, "away_on_1"] == x | 
-                                                            test.A2[, "away_on_2"] == x |
-                                                            test.A2[, "away_on_3"] == x |
-                                                            test.A2[, "away_on_4"] == x |
-                                                            test.A2[, "away_on_5"] == x |
-                                                            test.A2[, "away_on_6"] == x), test.A2 = test.A2)
+                                                          test.A2[, "away_on_2"] == x |
+                                                          test.A2[, "away_on_3"] == x |
+                                                          test.A2[, "away_on_4"] == x |
+                                                          test.A2[, "away_on_5"] == x |
+                                                          test.A2[, "away_on_6"] == x), test.A2 = test.A2)
     
     # Make Dummy Variables
     j = rep(seq_along(tmp), lengths(tmp))
@@ -14946,11 +14986,11 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
     
     # Determine Columns
     tmp <- lapply(groups_PPD, function(x, test.A2)  which((test.A2[, "home_on_1"] == x | 
-                                                             test.A2[, "home_on_2"] == x |
-                                                             test.A2[, "home_on_3"] == x |
-                                                             test.A2[, "home_on_4"] == x |
-                                                             test.A2[, "home_on_5"] == x |
-                                                             test.A2[, "home_on_6"] == x) & test.A2[, "away_goalie"] != x), test.A2 = test.A2)
+                                                           test.A2[, "home_on_2"] == x |
+                                                           test.A2[, "home_on_3"] == x |
+                                                           test.A2[, "home_on_4"] == x |
+                                                           test.A2[, "home_on_5"] == x |
+                                                           test.A2[, "home_on_6"] == x) & test.A2[, "away_goalie"] != x), test.A2 = test.A2)
     
     # Make Dummy Variables
     j = rep(seq_along(tmp), lengths(tmp))
@@ -14972,9 +15012,11 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
     ##############################################
     
     
+    
     ## ------------------------------ ##
     ##             Big Join           ##
     ## ------------------------------ ##
+    
     print("combine")
     
     test_sparse.All <- rbind(test_sparse.H1, test_sparse.A1, test_sparse.H2, test_sparse.A2)
@@ -14982,9 +15024,7 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
     rm(test_sparse.H1, test_sparse.A1, test_sparse.H2, test_sparse.A2)
     gc()
     
-    APM_PP <- test_sparse.All
-    
-    return(APM_PP)
+    return(test_sparse.All)
     
     }
   APM_PP <- fun.APM_PP_sparse_GF(data =  pbp_part)
@@ -15026,11 +15066,21 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
   xGF60_PP <-  unlist(rapply(xGF60_l, f = function(x) ifelse(is.nan(x), 0, x), how = "replace"))
   
   
-  # Make Predictors - GF, xGF & CF
+  ## sparse matrix column names:
+  # [1]  "n"                   "game_strength_state" "home_on_1"           "home_on_2"           "home_on_3"           "home_on_4"           "home_on_5"          
+  # [8]  "home_on_6"           "away_on_1"           "away_on_2"           "away_on_3"           "away_on_4"           "away_on_5"           "away_on_6"          
+  # [15] "home_goalie"         "away_goalie"         "off_team"            "def_team"            "length"              "GF60"                "CF60"               
+  # [22] "xGF60"               "off_zonestart"       "def_zonestart"       "btb"                 "score_down_3"        "score_down_2"        "score_down_1"       
+  # [29] "score_up_1"          "score_up_2"          "score_up_3"          "score_even"          "score_trail"         "score_lead"          "state_5v4"          
+  # [36] "state_5v3"           "state_4v3"           "is_home"
+  
+  
+  # Make Base Design Matrix - GF, xGF & CF
   APM_PP_g <- APM_PP[, -c(1:22, 26:31)] # remove -3 to +3 score variables
+  #APM_PP_g <- APM_PP[, -c(1:22, 26:32, 35)] # *** to be implemented, 3-level score state, corrected factor variables
   
   
-  # Model matrix without goalies (xGF / CF)
+  # Design matrix without goalies (xGF / CF)
   goalies_SHD <- paste0(qual_goalies, ".SHD")
   goalies_PPD <- paste0(qual_goalies, ".PPD")
   goalie_names <- c(goalies_SHD, goalies_PPD)

@@ -740,6 +740,8 @@ paste0("Season: ", unique(pbp_df$season), "  //  Games: ", length(unique(pbp_df$
 ##   Skaters - Game By Game   ##
 ## -------------------------- ##
 
+################################
+
 games_all_sit_new <- fun.all_sit_standard(data_ = pbp_df)
 
 games_EV_new <- fun.combine_counts(data = pbp_df)
@@ -759,10 +761,14 @@ games_3v5_new <- fun.combine_counts_SH_strength(data = pbp_df, strength = "3v5",
 games_3v4_new <- fun.combine_counts_SH_strength(data = pbp_df, strength = "3v4", scr_adj_list = score_adj_4v3)
 
 
+################################
+
 
 ## ------------------------------- ##
 ##   Rel_TM - TOI Together Games   ##
 ## ------------------------------- ##
+
+#####################################
 
 teammate_TOI_EV_new <- fun.teammate(pbp_data = pbp_df, strength = "even")
 teammate_TOI_PP_new <- fun.teammate(pbp_data = pbp_df, strength = "powerplay")
@@ -773,18 +779,26 @@ teammate_TOI_5v4_new <- fun.teammate(pbp_data = pbp_df, strength = "5v4")
 teammate_TOI_4v5_new <- fun.teammate(pbp_data = pbp_df, strength = "4v5")
 
 
+#####################################
+
 
 ## -------------------------- ##
 ##   Goalies - Game by Game   ##
 ## -------------------------- ##
 
+################################
+
 goalie_games_all_sit_new <- fun.goalie_games(data = pbp_df)
 
+
+################################
 
 
 ## ---------------------------- ##
 ##   Penalty Goals Calculaton   ##
 ## ---------------------------- ##
+
+##################################
 
 # Run Functions
 pen_source <- fun.pen_setup(data = pbp_df)
@@ -796,10 +810,14 @@ adj_pen_games <- fun.pen_value_sum(main_data = pen_calc_main, xtra_data = pen_ca
 adj_pen_games_new <- fun.pen_value_sum_add(pen_data = adj_pen_games, skater_data = games_all_sit_new, goalie_data = goalie_games_all_sit_new, position_data = player_position)
 
 
+##################################
+
 
 ## ------------------------------ ##
 ##   Team Stats Games Functions   ##
 ## ------------------------------ ##
+
+####################################
 
 team_games_all_sit_new <- fun.team_games_all_sit(data = pbp_df)
 
@@ -820,13 +838,19 @@ team_games_3v5_new <- fun.team_games_SH(data = pbp_df, strength = "3v5", scr_adj
 team_games_3v4_new <- fun.team_games_SH(data = pbp_df, strength = "3v4", scr_adj_list = score_adj_4v3)
 
 
+####################################
+
 
 ## --------------------------- ##
 ##   Team Game Charts Labels   ## *** For New PBP Data
 ## --------------------------- ##
 
+#################################
+
 team_games_new_pbp <- fun.team_game_labels(pbp_data = pbp_df)
 
+
+#################################
 
 
 
@@ -953,7 +977,12 @@ check_new_games <- fun.check_new_games()
 ## ---------------- SAVE NEW DATA AND LOAD TOTAL DATA ---------------- ##
 
 
-# Save New Data
+## ------------------------- ##
+##   Save / Check New Data   ##
+## ------------------------- ##
+
+###############################
+
 db <- DBI::dbConnect(SQLite(), dbname = "data/NHL_db_1819.sqlite") # NEW DATABASE NAME (second time)
 
 # Remove game_id index before writing new data
@@ -1053,12 +1082,13 @@ dbDisconnect(db)
 #dbDisconnect(db)
 
 
+###############################
+
 
 
 # PIT v ??? 20180xxxxx - Only Offsetting Penalties
 # TOR v CBJ 2018020308 - No Penalties
 # TOR v PHI 2018020348 - No Penalties
-
 
 # Check game_id counts in database
 fun.check_db_games <- function(db_name) { 
@@ -1139,7 +1169,6 @@ fun.check_db_games <- function(db_name) {
   }
 check_db_games <- fun.check_db_games(db_name = "data/NHL_db_1819.sqlite") # NEW DATABASE NAME
 
-
 # Remove New Data
 rm(pbp_new, shifts_new, rosters_new,
    games_EV_new, games_PP_new, games_SH_new, games_all_sit_new, 
@@ -1154,15 +1183,12 @@ gc()
 
 
 
+## ------------------------- ##
+##   Load Full Joined Data   ##
+## ------------------------- ##
 
+###############################
 
-## ------------------------------------------------------ ##
-
-
-
-
-
-# Load Full Joined Data
 db <- DBI::dbConnect(SQLite(), dbname = "data/NHL_db_1819.sqlite") # NEW DATABASE NAME
 
 pbp_joined <-          db %>% tbl("pbp_full") %>% data.frame()
@@ -1209,6 +1235,9 @@ goalie_games_all_sit_joined <- db %>% tbl("goalie_games_all_sit") %>% data.frame
 adj_pen_games_joined <-        db %>% tbl("adj_pen_games_all_sit") %>% data.frame()
 
 dbDisconnect(db)
+
+
+###############################
 
 
 
