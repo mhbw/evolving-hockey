@@ -337,6 +337,9 @@ rosters_new <- pbp_list_new$new_rosters %>%
 
 
 
+# *** ADDED CALVIN.PETERSEN ... CHECK NEXT TIME *** 
+
+
 ## --------------------------- ##
 ##   Get Positions In Season   ##
 ## --------------------------- ##
@@ -358,9 +361,9 @@ player_position <- player_position_historic %>%
   select(-c(test)) %>% 
   
   ##        ***  Manual Addition  ***            ##
-  #rbind(., data.frame(player = "MATT.LUFF", 
-  #                    position = 1)
-  #      ) %>% 
+  rbind(., data.frame(player = "CALVIN.PETERSEN", 
+                      position = 3)
+        ) %>% 
   
   arrange(player) %>% 
   data.frame()
@@ -1802,18 +1805,18 @@ ALL_SH <- fun.ALL_SH_GAA()
 ##   Combine All / Create Final Table   ##
 ## ------------------------------------ ##
 
-# Replacement Level Objects
-EV_rep_F <-   round(0.1913415, 4)
-EV_rep_D <-   round(0.0969201, 5)
+# Objects - new replacement level as of 12/12/18
+EV_rep_F <-   round(0.1911043, 4)
+EV_rep_D <-   round(0.1191875, 4)
 
-PP_rep_F <-   round(0.4098104, 4)
-PP_rep_D <-   round(0.3804468, 4)
+PP_rep_F <-   round(0.3864802, 4)
+PP_rep_D <-   round(0.3594602, 4)
 
-SH_rep_F <-   round(-0.0355829, 5)
-SH_rep_D <-   round(0.06923532, 5)
+SH_rep_F <-   round(-0.0411400, 5)
+SH_rep_D <-   round(0.07133463, 5)
 
 Pens_rep_F <- round(0.03211396, 5)
-Pens_rep_D <- round(0.01702584, 5)
+Pens_rep_D <- round(0.02519755, 5)
 
 
 # Final GAA + GAR Join

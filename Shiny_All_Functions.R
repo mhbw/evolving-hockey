@@ -10466,6 +10466,7 @@ fun.team_RAPM <- function(data, regularized) {
   xGF60 <- unlist(rapply(xGF60_l, f = function(x) ifelse(is.infinite(x), 0, x), how = "replace"))
   
   
+  
   ## sparse matrix column names:
   # [1]  "n"                   "season"              "game_strength_state" "off_team"            "def_team"            "length"              "GF60"               
   # [8]  "CF60"                "xGF60"               "off_zonestart"       "def_zonestart"       "btb"                 "score_down_3"        "score_down_2"       
@@ -10473,9 +10474,9 @@ fun.team_RAPM <- function(data, regularized) {
   # [22] "state_3v3"           "is_home"
   
   
-  # Construct matrix
-  APM_teams_matrix <- APM_teams[, -c(1:9, 10:11)] # remove excess columns
-  #APM_teams_matrix <- APM_teams[, -c(1:9, 10:11, 16, 20)] # *** to be implemented, corrected factor variables
+  # Construct design matrix
+  APM_teams_matrix <- APM_teams[, -c(1:9, 10:11, 16, 20)]  # remove excess columns - correct factor variables
+  
   
   
   rm(APM_teams, pbp_part, GF60_l, CF60_l, xGF60_l, length_l)
@@ -11493,6 +11494,7 @@ fun.team_RAPM_PP_SH <- function(data) {
   xGF60_pp <-  unlist(rapply(xGF60_l, f = function(x) ifelse(is.infinite(x), 0, x), how = "replace"))
   
   
+  
   ## sparse matrix column names:
   # [1]  "n"                   "season"              "game_strength_state" "off_team"            "def_team"            "length"              "GF60"               
   # [8]  "CF60"                "xGF60"               "off_zonestart"       "def_zonestart"       "btb"                 "score_down_3"        "score_down_2"       
@@ -11500,9 +11502,10 @@ fun.team_RAPM_PP_SH <- function(data) {
   # [22] "state_4v3"           "is_home"
   
   
-  # Construct matrix
-  APM_PP_teams_matrix <- APM_PP_teams[, -c(1:9, 10:11)] # remove excess columns
-  #APM_PP_teams_matrix <- APM_PP_teams[, -c(1:9, 10:11, 16, 20)] # *** to be implemented, correct factor variables
+  # Construct design matrix
+  APM_PP_teams_matrix <- APM_PP_teams[, -c(1:9, 10:11, 16, 20)] # remove excess columns - correct factor variables
+  
+  
   
   
   rm(APM_PP_teams, GF60_l, CF60_l, xGF60_l, length_l)
@@ -11974,8 +11977,8 @@ fun.ALL_EV_GAA <- function() {
               ) %>% 
     group_by(player, season) %>% 
     mutate(TOI_perc_tot =  TOI_player / TOI_team, 
-           adj_off =       (1.7 * GF - (TOI_perc_tot * EVO_AA_60)) / skaters, # new team adjustment 
-           adj_def =       (1.45 * xGA - (TOI_perc_tot * EVD_AA_60)) / skaters, # new team adjustment 
+           adj_off =       (1.6 * GF - (TOI_perc_tot * EVO_AA_60)) / skaters,   # new team adjustment (run 3)
+           adj_def =       (1.4 * xGA - (TOI_perc_tot * EVD_AA_60)) / skaters,  # new team adjustment (run 3)
            EVO_AA_60_adj = EVO_AA_60 + adj_off, 
            EVD_AA_60_adj = EVD_AA_60 + adj_def, 
            EVO_AA_adj =    (EVO_AA_60_adj / 60) * TOI_player, 
@@ -12112,8 +12115,8 @@ fun.ALL_EV_GAA <- function() {
               ) %>% 
     group_by(player, season) %>% 
     mutate(TOI_perc_tot =  TOI_player / TOI_team, 
-           adj_off =       (1.7 * GF - (TOI_perc_tot * EVO_AA_60)) / skaters,    # new team adjustment
-           adj_def =       (1.45 * xGA - (TOI_perc_tot * EVD_AA_60)) / skaters,  # new team adjustment
+           adj_off =       (1.6 * GF - (TOI_perc_tot * EVO_AA_60)) / skaters,   # new team adjustment (run 3)
+           adj_def =       (1.4 * xGA - (TOI_perc_tot * EVD_AA_60)) / skaters,  # new team adjustment (run 3)
            EVO_AA_60_adj = EVO_AA_60 + adj_off, 
            EVD_AA_60_adj = EVD_AA_60 + adj_def, 
            EVO_AA_adj =    (EVO_AA_60_adj / 60) * TOI_player, 
@@ -12213,7 +12216,7 @@ fun.ALL_PP_GAA <- function() {
     left_join(., team_strength_PP_full_AA %>% select(season, Team, t_TOI_PP, skaters_PP, PPO_GF_AA_team), by = c("Team", "season")) %>% 
     group_by(player, season) %>% 
     mutate(TOI_perc_tot =  TOI / t_TOI_PP, 
-           adj_off =       (1.4 * PPO_GF_AA_team - (TOI_perc_tot * PPO_AA_60)) / skaters_PP, 
+           adj_off =       (1.3 * PPO_GF_AA_team - (TOI_perc_tot * PPO_AA_60)) / skaters_PP, 
            PPO_AA_60_adj = PPO_AA_60 + adj_off, 
            PPO_AA_adj =    (PPO_AA_60_adj / 60) * TOI, 
            off_diff =      PPO_AA_adj - PPO_AA
@@ -12292,7 +12295,7 @@ fun.ALL_PP_GAA <- function() {
     left_join(., team_strength_PP_full_AA %>% select(season, Team, t_TOI_PP, skaters_PP, PPO_GF_AA_team), by = c("Team", "season")) %>% 
     group_by(player, season) %>% 
     mutate(TOI_perc_tot =  TOI / t_TOI_PP, 
-           adj_off =       (1.4 * PPO_GF_AA_team - (TOI_perc_tot * PPO_AA_60)) / skaters_PP, 
+           adj_off =       (1.3 * PPO_GF_AA_team - (TOI_perc_tot * PPO_AA_60)) / skaters_PP, 
            PPO_AA_60_adj = PPO_AA_60 + adj_off, 
            PPO_AA_adj =    (PPO_AA_60_adj / 60) * TOI, 
            off_diff =      PPO_AA_adj - PPO_AA
@@ -12380,7 +12383,7 @@ fun.ALL_SH_GAA <- function() {
     left_join(., team_strength_SH_full_AA %>% select(season, Team, t_TOI_SH, skaters_SH, SHD_xG_AA_team), by = c("Team", "season")) %>% 
     group_by(player, season) %>% 
     mutate(TOI_perc_tot =  TOI / t_TOI_SH, 
-           adj_def =       (1.4 * SHD_xG_AA_team - (TOI_perc_tot * SHD_AA_60)) / skaters_SH, 
+           adj_def =       (1.3 * SHD_xG_AA_team - (TOI_perc_tot * SHD_AA_60)) / skaters_SH, 
            SHD_AA_60_adj = SHD_AA_60 + adj_def, 
            SHD_AA_adj =    -1 * ((SHD_AA_60_adj / 60) * TOI), 
            SHD_AA =        -1 * SHD_AA,
@@ -12458,7 +12461,7 @@ fun.ALL_SH_GAA <- function() {
     left_join(., team_strength_SH_full_AA %>% select(season, Team, t_TOI_SH, skaters_SH, SHD_xG_AA_team), by = c("Team", "season")) %>% 
     group_by(player, season) %>% 
     mutate(TOI_perc_tot =  TOI / t_TOI_SH, 
-           adj_def =       (1.4 * SHD_xG_AA_team - (TOI_perc_tot * SHD_AA_60)) / skaters_SH, 
+           adj_def =       (1.3 * SHD_xG_AA_team - (TOI_perc_tot * SHD_AA_60)) / skaters_SH, 
            SHD_AA_60_adj = SHD_AA_60 + adj_def, 
            SHD_AA_adj =    -1 * ((SHD_AA_60_adj / 60) * TOI), 
            SHD_AA =        -1 * SHD_AA,
