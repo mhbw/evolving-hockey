@@ -10091,12 +10091,12 @@ fun.team_sum_SH <- function(data, strength) {
 
 
 ## --------------------------- ##
-##   TEAM RAPM FUNCTION - EV   ## *** Updated 12/11/18 with factor variable correction
+##   TEAM RAPM FUNCTION - EV   ## *** Updated 12/16/18 with cv.glmnet change
 ## --------------------------- ##
 
 #################################
 
-fun.team_RAPM <- function(data, regularized) { 
+fun.team_RAPM <- function(data) { 
   
   # Objects
   st.shot_events <- c("SHOT",  "GOAL")
@@ -10475,8 +10475,7 @@ fun.team_RAPM <- function(data, regularized) {
   
   
   # Construct design matrix
-  APM_teams_matrix <- APM_teams[, -c(1:9, 10:11, 16, 20)]  # remove excess columns - correct factor variables
-  
+  APM_teams_matrix <- APM_teams[, -c(1:9, 10:11, 16, 20)]  # remove excess columns - corrected factor variables
   
   
   rm(APM_teams, pbp_part, GF60_l, CF60_l, xGF60_l, length_l)
@@ -10487,201 +10486,157 @@ fun.team_RAPM <- function(data, regularized) {
   
   registerDoMC(cores = 2)
   
-  # *** If regularized == "FALSE", set lambda to 0 ***
-  lambda_min_GF <- 0
-  lambda_min_xG <- 0
-  lambda_min_CF <- 0
+  
+  ## ------------------ ##
+  ##   CV - Goals For   ##
+  ## ------------------ ##
+  
+  print("cross validation - GF", quote = F)
+  
+  CV_results_GF <- cv.glmnet(x = APM_teams_matrix, 
+                             y = GF60, 
+                             weights = length, 
+                             alpha = 0, 
+                             nfolds = 10, 
+                             standardize = FALSE, 
+                             parallel = TRUE)
+  gc()
   
   
-  ### GOALS
-  if (regularized %in% c("TRUE", "T")) { 
-    
-    print("cross validation - GF", quote = F)
-    
-    CV_results_GF <- cv.glmnet(APM_teams_matrix, 
-                               GF60, 
-                               weights = length, 
-                               alpha = 0, 
-                               nfolds = 10, 
-                               standardize = FALSE, 
-                               parallel = TRUE)
-    gc()
-    
-    lambda_min_GF <- CV_results_GF$lambda.min
-    MSE_GF <- min(CV_results_GF$cvm)
-    
-    }
+  ## ----------------------- ##
+  ##   CV - Expected Goals   ##
+  ## ----------------------- ##
   
-  ridge_GF <- glmnet(APM_teams_matrix, 
-                     GF60, 
-                     family = c("gaussian"), 
-                     weights = length, 
-                     alpha = 0, 
-                     standardize = FALSE, 
-                     lambda = lambda_min_GF)
+  print("cross validation - xG", quote = F)
+  
+  CV_results_xG <- cv.glmnet(x = APM_teams_matrix, 
+                             y = xGF60, 
+                             weights = length, 
+                             alpha = 0, 
+                             nfolds = 10, 
+                             standardize = FALSE, 
+                             parallel = TRUE)
+  gc()
   
   
-  ### EXPECTED GOALS
-  if (regularized %in% c("TRUE", "T")) { 
-    
-    print("cross validation - xG", quote = F)
-    
-    CV_results_xG <- cv.glmnet(APM_teams_matrix, 
-                               xGF60, 
-                               weights = length, 
-                               alpha = 0, 
-                               nfolds = 10, 
-                               standardize = FALSE, 
-                               parallel = TRUE)
-    gc()
-    
-    lambda_min_xG <- CV_results_xG$lambda.min
-    MSE_xG <- min(CV_results_xG$cvm)
-    
-    }
+  ## ------------------ ##
+  ##   CV - Corsi For   ##
+  ## ------------------ ##
   
-  ridge_xG <- glmnet(APM_teams_matrix, 
-                     xGF60, 
-                     family = c("gaussian"), 
-                     weights = length, 
-                     alpha = 0, 
-                     standardize = FALSE, 
-                     lambda = lambda_min_xG)
+  print("cross validation - CF", quote = F)
+  
+  CV_results_CF <- cv.glmnet(x = APM_teams_matrix, 
+                             y = CF60, 
+                             weights = length, 
+                             alpha = 0, 
+                             nfolds = 10, 
+                             standardize = FALSE, 
+                             parallel = TRUE)
+  gc()
   
   
-  ### CORSI
-  if (regularized %in% c("TRUE", "T")) { 
-    
-    print("cross validation - CF", quote = F)
-    
-    CV_results_CF <- cv.glmnet(APM_teams_matrix, 
-                               CF60, 
-                               weights = length, 
-                               alpha = 0, 
-                               nfolds = 10, 
-                               standardize = FALSE, 
-                               parallel = TRUE)
-    gc()
-    
-    lambda_min_CF <- CV_results_CF$lambda.min
-    MSE_CF <- min(CV_results_CF$cvm)
-    
-    }
-  
-  ridge_CF <- glmnet(APM_teams_matrix, 
-                     CF60, 
-                     family = c("gaussian"), 
-                     weights = length, 
-                     alpha = 0, 
-                     standardize = FALSE, 
-                     lambda = lambda_min_CF)
-  
-  
-  # Combined CV metrics
-  if (regularized %in% c("TRUE", "T")) { 
-    cv_results_df <- data.frame(value = c("lambda", "MSE"),  
-                                GF =    c(lambda_min_GF, MSE_GF), 
-                                xG =    c(lambda_min_xG, MSE_xG), 
-                                CF =    c(lambda_min_CF, MSE_CF))
-    } 
-  else if (regularized %in% c("FALSE", "F")) { 
-    cv_results_df <- NULL  
-    
-    }
-  
-  
-  
-  ## -------------------- ##
-  ##   Make Final Table   ##
-  ## -------------------- ##
   
   print("join / combine / finalize", quote = F)
   
-  # Retrieve Coefficients - Goals
-  APM_GF <- data.frame(as.matrix(coef(ridge_GF, s = lambda_min_GF)))
-  APM_names_GF <- dimnames(coef(ridge_GF))[[1]]
-  APM_test_GF <- cbind(APM_names_GF, APM_GF)
+  
+  ## ------------------------ ##
+  ##   Get Coefficients - GF  ##
+  ## ------------------------ ##
+  
+  APM_test_GF <- data.frame(as.matrix(coef(CV_results_GF, s = CV_results_GF$lambda.min))) %>% 
+    rownames_to_column(var = "APM_names")
+
   
   # Remove .d / .o suffixes
   APM_test_GF_d <- APM_test_GF %>%
-    filter(grepl(".d", APM_names_GF), 
-           !grepl("_", APM_names_GF)
+    filter(grepl(".d", APM_names), 
+           !grepl("_", APM_names)
            ) %>% 
-    mutate(APM_names_GF = gsub(".d", "", APM_names_GF)) %>% 
+    mutate(APM_names = gsub(".d", "", APM_names)) %>% 
     rename(GA = X1)
   
   APM_test_GF_o <- APM_test_GF %>% 
-    filter(grepl(".o", APM_names_GF), 
-           !grepl("_", APM_names_GF)
+    filter(grepl(".o", APM_names), 
+           !grepl("_", APM_names)
            ) %>% 
-    mutate(APM_names_GF = gsub(".o", "", APM_names_GF)) %>% 
+    mutate(APM_names = gsub(".o", "", APM_names)) %>% 
     rename(GF = X1)
   
   # Join
   APM_all_GF <- APM_test_GF_d %>% 
-    left_join(., APM_test_GF_o, by = "APM_names_GF") %>% 
+    left_join(., APM_test_GF_o, by = "APM_names") %>% 
     mutate(GPM = GF - GA) %>% 
-    select(APM_names_GF, GF, GA, GPM) %>% 
-    rename(player = APM_names_GF)
+    select(APM_names, GF, GA, GPM) %>% 
+    rename(player = APM_names)
   
   
   
-  # Retrieve Coefficients - xG
-  APM_xG <- data.frame(as.matrix(coef(ridge_xG, s = lambda_min_xG)))
-  APM_names_xG <- dimnames(coef(ridge_xG))[[1]]
-  APM_test_xG <- cbind(APM_names_xG, APM_xG)
+  ## ------------------------ ##
+  ##   Get Coefficients - xG  ##
+  ## ------------------------ ##
+  
+  APM_test_xG <- data.frame(as.matrix(coef(CV_results_xG, s = CV_results_xG$lambda.min))) %>% 
+    rownames_to_column(var = "APM_names")
+  
   
   # Remove .d / .o suffixes
   APM_test_xG_d <- APM_test_xG %>%
-    filter(grepl(".d", APM_names_xG), 
-           !grepl("_", APM_names_xG)
+    filter(grepl(".d", APM_names), 
+           !grepl("_", APM_names)
            ) %>% 
-    mutate(APM_names_xG = gsub(".d", "", APM_names_xG)) %>% 
+    mutate(APM_names = gsub(".d", "", APM_names)) %>% 
     rename(xGA = X1)
   
   APM_test_xG_o <- APM_test_xG %>% 
-    filter(grepl(".o", APM_names_xG), 
-           !grepl("_", APM_names_xG)
+    filter(grepl(".o", APM_names), 
+           !grepl("_", APM_names)
            ) %>% 
-    mutate(APM_names_xG = gsub(".o", "", APM_names_xG)) %>% 
+    mutate(APM_names = gsub(".o", "", APM_names)) %>% 
     rename(xGF = X1)
   
   # Join
   APM_all_xG <- APM_test_xG_d %>% 
-    left_join(., APM_test_xG_o, by = "APM_names_xG") %>% 
+    left_join(., APM_test_xG_o, by = "APM_names") %>% 
     mutate(xGPM = xGF - xGA) %>% 
-    select(APM_names_xG, xGF, xGA, xGPM) %>% 
-    rename(player = APM_names_xG)
+    select(APM_names, xGF, xGA, xGPM) %>% 
+    rename(player = APM_names)
   
   
   
-  # Retrieve Coefficients - Corsi
-  APM_CF <- data.frame(as.matrix(coef(ridge_CF, s = lambda_min_CF)))
-  APM_names_CF <- dimnames(coef(ridge_CF))[[1]]
-  APM_test_CF <- cbind(APM_names_CF, APM_CF)
+  ## ------------------------ ##
+  ##   Get Coefficients - CF  ##
+  ## ------------------------ ##
+  
+  APM_test_CF <- data.frame(as.matrix(coef(CV_results_CF, s = CV_results_CF$lambda.min))) %>% 
+    rownames_to_column(var = "APM_names")
+  
   
   # Remove .d / .o suffixes
   APM_test_CF_d <- APM_test_CF %>%
-    filter(grepl(".d", APM_names_CF), 
-           !grepl("_", APM_names_CF)
+    filter(grepl(".d", APM_names), 
+           !grepl("_", APM_names)
            ) %>% 
-    mutate(APM_names_CF = gsub(".d", "", APM_names_CF)) %>% 
+    mutate(APM_names = gsub(".d", "", APM_names)) %>% 
     rename(CA = X1)
   
   APM_test_CF_o <- APM_test_CF %>% 
-    filter(grepl(".o", APM_names_CF), 
-           !grepl("_", APM_names_CF)
+    filter(grepl(".o", APM_names), 
+           !grepl("_", APM_names)
            ) %>% 
-    mutate(APM_names_CF = gsub(".o", "", APM_names_CF)) %>% 
+    mutate(APM_names = gsub(".o", "", APM_names)) %>% 
     rename(CF = X1)
   
   # Join
   APM_all_CF <- APM_test_CF_d %>% 
-    left_join(., APM_test_CF_o, by = "APM_names_CF") %>% 
+    left_join(., APM_test_CF_o, by = "APM_names") %>% 
     mutate(CPM = CF - CA) %>% 
-    select(APM_names_CF, CF, CA, CPM) %>% 
-    rename(player = APM_names_CF)
+    select(APM_names, CF, CA, CPM) %>% 
+    rename(player = APM_names)
   
+  
+  ## ----------------- ##
+  ##   TOI / Combine   ##
+  ## ----------------- ##
   
   # Match names
   APM_all_GF$player <- names_match$player[match(APM_all_GF$player, names_match$ID)]
@@ -10743,8 +10698,33 @@ fun.team_RAPM <- function(data, regularized) {
     mutate_at(vars(TOI:TOI_3v3, CF:CF_impact), funs(round(., 2))) %>% 
     mutate_at(vars(skaters:xGPM), funs(round(., 3)))
   
-  return_list <- list(team_data =  APM_combine, 
-                      cv_results = cv_results_df)
+  
+  # Return list of objects
+  return_list <- list(
+    
+    # Target variables
+    target_GF = GF60, 
+    target_xG = xGF60, 
+    target_CF = CF60,
+    
+    # Weights
+    weights = length, 
+    
+    # Design matrix
+    design_matrix = APM_teams_matrix, 
+    
+    # cv.glmnet objects
+    cv_results_GF = CV_results_GF, 
+    cv_results_xG = CV_results_xG, 
+    cv_results_CF = CV_results_CF,
+    
+    # Names object
+    IDs_master = names_match, 
+    
+    # Final RAPM table
+    team_data =  APM_combine
+    
+    )
   
   }
 
@@ -10753,7 +10733,7 @@ fun.team_RAPM <- function(data, regularized) {
 
 
 ## ---------------------- ##
-##   TEAM RAPM RUN - PP   ## *** Updated 12/11/18 with factor variable correction
+##   TEAM RAPM RUN - PP   ## *** Updated 12/16/18 with cv.glmnet change
 ## ---------------------- ##
 
 #################################
@@ -10879,7 +10859,7 @@ fun.team_RAPM_PP_SH <- function(data) {
     return(data_)
   
     }
-  pbp_part <- fun.IDs(data_ = pbp_part, 
+  pbp_part <- fun.IDs(data_ =      pbp_part, 
                       names_data = names_match_PP)
   
   
@@ -11473,25 +11453,25 @@ fun.team_RAPM_PP_SH <- function(data) {
   # Cleanup / separate target, weights, and predictors
   length_l <- list(APM_PP_teams[, "length"])
   GF60_l <-   list(APM_PP_teams[, "GF60"])
-  CF60_l <-   list(APM_PP_teams[, "CF60"])
   xGF60_l <-  list(APM_PP_teams[, "xGF60"])
+  CF60_l <-   list(APM_PP_teams[, "CF60"])
   
   # Remove NaNs
   length <- unlist(rapply(length_l, f = function(x) ifelse(x == 0, 1, x), how = "replace")) # correct length of 0
   GF60 <-   unlist(rapply(GF60_l, f = function(x) ifelse(is.nan(x), 0, x), how = "replace")) # correct NANs
-  CF60 <-   unlist(rapply(CF60_l, f = function(x) ifelse(is.nan(x), 0, x), how = "replace"))
   xGF60 <-  unlist(rapply(xGF60_l, f = function(x) ifelse(is.nan(x), 0, x), how = "replace"))
+  CF60 <-   unlist(rapply(CF60_l, f = function(x) ifelse(is.nan(x), 0, x), how = "replace"))
   
   # Remove Infs
   length_l <- list(length)
   GF60_l <-   list(GF60)
-  CF60_l <-   list(CF60)
   xGF60_l <-  list(xGF60)
+  CF60_l <-   list(CF60)
   
   length_PP <- unlist(rapply(length_l, f = function(x) ifelse(x == 0, 1, x), how = "replace"))
   GF60_PP <-   unlist(rapply(GF60_l, f = function(x) ifelse(is.infinite(x), 0, x), how = "replace"))
+  xGF60_PP <-  unlist(rapply(xGF60_l, f = function(x) ifelse(is.infinite(x), 0, x), how = "replace"))
   CF60_PP <-   unlist(rapply(CF60_l, f = function(x) ifelse(is.infinite(x), 0, x), how = "replace"))
-  xGF60_pp <-  unlist(rapply(xGF60_l, f = function(x) ifelse(is.infinite(x), 0, x), how = "replace"))
   
   
   
@@ -11506,8 +11486,6 @@ fun.team_RAPM_PP_SH <- function(data) {
   APM_PP_teams_matrix <- APM_PP_teams[, -c(1:9, 10:11, 16, 20)] # remove excess columns - correct factor variables
   
   
-  
-  
   rm(APM_PP_teams, GF60_l, CF60_l, xGF60_l, length_l)
   gc()
   
@@ -11517,36 +11495,30 @@ fun.team_RAPM_PP_SH <- function(data) {
   registerDoMC(cores = 2)
   
   
-  ### --- GOALS --- ###
-  print("cross_validation - Goals")
+  ## ------------------------- ##
+  ##   Cross Validation - GF   ##
+  ## ------------------------- ##
   
-  CV_results <- cv.glmnet(APM_PP_teams_matrix, 
-                          GF60_PP, 
-                          weights = length_PP, 
-                          alpha = 0, 
-                          nfolds = 10, 
-                          standardize = FALSE, 
-                          parallel = TRUE)
+  print("cross_validation - GF")
+  
+  CV_results_GF <- cv.glmnet(x = APM_PP_teams_matrix, 
+                             y = GF60_PP, 
+                             weights = length_PP, 
+                             alpha = 0, 
+                             nfolds = 10, 
+                             standardize = FALSE, 
+                             parallel = TRUE)
   gc()
   
-  lambda_min_PP_GF <- CV_results$lambda.min
-  MSE_GF <- min(CV_results$cvm)
   
-  ridge_PP_GF <- glmnet(APM_PP_teams_matrix, 
-                        GF60_PP, 
-                        family = c("gaussian"), 
-                        weights = length_PP, 
-                        alpha = 0, 
-                        standardize = FALSE, 
-                        lambda = lambda_min_PP_GF)
+  ## ------------------------- ##
+  ##   Cross Validation - xG   ##
+  ## ------------------------- ##
   
-  
-  
-  ### --- EXPECTED GOALS --- ###
   print("cross_validation - xG")
   
-  CV_results_xG <- cv.glmnet(APM_PP_teams_matrix, 
-                             xGF60_pp, 
+  CV_results_xG <- cv.glmnet(x = APM_PP_teams_matrix, 
+                             y = xGF60_PP, 
                              weights = length_PP, 
                              alpha = 0, 
                              nfolds = 10, 
@@ -11554,182 +11526,164 @@ fun.team_RAPM_PP_SH <- function(data) {
                              parallel = TRUE)
   gc()
   
-  lambda_min_PP_xG <- CV_results_xG$lambda.min
-  MSE_xG <- min(CV_results_xG$cvm)
   
-  ridge_PP_xG <- glmnet(APM_PP_teams_matrix, 
-                        xGF60_pp, 
-                        family = c("gaussian"), 
-                        weights = length_PP, 
-                        alpha = 0, 
-                        standardize = FALSE, 
-                        lambda = lambda_min_PP_xG)
+  ## ------------------------- ##
+  ##   Cross Validation - CF   ##
+  ## ------------------------- ##
   
+  print("cross_validation - CF")
   
-  ### --- CORSI --- ###
-  print("cross_validation - Corsi")
-  
-  CV_results_CF <- cv.glmnet(APM_PP_teams_matrix, 
-                             CF60_PP, 
+  CV_results_CF <- cv.glmnet(x = APM_PP_teams_matrix, 
+                             y = CF60_PP, 
                              weights = length_PP, 
                              alpha = 0, 
                              nfolds = 10, 
                              standardize = FALSE, 
                              parallel = TRUE)
   gc()
-  
-  lambda_min_PP_CF <- CV_results_CF$lambda.min
-  MSE_CF <- min(CV_results_CF$cvm)
-  
-  ridge_PP_CF <- glmnet(APM_PP_teams_matrix, 
-                        CF60_PP, 
-                        family = c("gaussian"), 
-                        weights = length_PP, 
-                        alpha = 0, 
-                        standardize = FALSE, 
-                        lambda = lambda_min_PP_CF)
-  
-  
-  # Combined CV metrics
-  cv_results_df <- data.frame(value = c("lambda", "MSE"),  
-                              GF =    c(lambda_min_PP_GF, MSE_GF), 
-                              xG =    c(lambda_min_PP_xG, MSE_xG), 
-                              CF =    c(lambda_min_PP_CF, MSE_CF)
-                              )
   
   
   print("finalize")
   
-  ### --- GOALS --- ###
   
-  APM_PP_GF <- data.frame(as.matrix(coef(ridge_PP_GF, s = lambda_min_PP_GF)))
-  APM_names_GF <- dimnames(coef(ridge_PP_GF))[[1]]
-  APM_test_GF <- cbind(APM_names_GF, APM_PP_GF)
+  ## ------------------------ ##
+  ##   Get Coefficients - GF  ##
+  ## ------------------------ ##
+  
+  APM_test_GF <- data.frame(as.matrix(coef(CV_results_GF, s = CV_results_GF$lambda.min))) %>% 
+    rownames_to_column(var = "APM_names")
+  
   
   # Remove .d / .o suffixes
   APM_test_GF_PPO <- APM_test_GF %>%
-    filter(grepl(".PPO", APM_names_GF), 
-           !grepl("_", APM_names_GF)) %>% 
-    mutate(APM_names_GF = gsub(".PPO", "", APM_names_GF)) %>% 
+    filter(grepl(".PPO", APM_names), 
+           !grepl("_", APM_names)) %>% 
+    mutate(APM_names = gsub(".PPO", "", APM_names)) %>% 
     rename(PPO_GF = X1)
   
   APM_test_GF_PPD <- APM_test_GF %>%
-    filter(grepl(".PPD", APM_names_GF), 
-           !grepl("_", APM_names_GF)) %>%  
-    mutate(APM_names_GF = gsub(".PPD", "", APM_names_GF)) %>% 
+    filter(grepl(".PPD", APM_names), 
+           !grepl("_", APM_names)) %>%  
+    mutate(APM_names = gsub(".PPD", "", APM_names)) %>% 
     rename(PPD_GF = X1)
   
   APM_test_GF_SHO <- APM_test_GF %>% 
-    filter(grepl(".SHO", APM_names_GF), 
-           !grepl("_", APM_names_GF)) %>% 
-    mutate(APM_names_GF = gsub(".SHO", "", APM_names_GF)) %>% 
+    filter(grepl(".SHO", APM_names), 
+           !grepl("_", APM_names)) %>% 
+    mutate(APM_names = gsub(".SHO", "", APM_names)) %>% 
     rename(SHO_GF = X1)
   
   APM_test_GF_SHD <- APM_test_GF %>% 
-    filter(grepl(".SHD", APM_names_GF), 
-           !grepl("_", APM_names_GF)) %>% 
-    mutate(APM_names_GF = gsub(".SHD", "", APM_names_GF)) %>% 
+    filter(grepl(".SHD", APM_names), 
+           !grepl("_", APM_names)) %>% 
+    mutate(APM_names = gsub(".SHD", "", APM_names)) %>% 
     rename(SHD_GF = X1)
   
   # Join
   APM_PP_all_GF <- APM_test_GF_PPO %>% 
-    left_join(., APM_test_GF_PPD, by = "APM_names_GF") %>% 
-    left_join(., APM_test_GF_SHO, by = "APM_names_GF") %>% 
-    left_join(., APM_test_GF_SHD, by = "APM_names_GF") %>% 
-    select(APM_names_GF, PPO_GF, SHD_GF, SHO_GF, PPD_GF) %>% 
-    rename(player = APM_names_GF)
+    left_join(., APM_test_GF_PPD, by = "APM_names") %>% 
+    left_join(., APM_test_GF_SHO, by = "APM_names") %>% 
+    left_join(., APM_test_GF_SHD, by = "APM_names") %>% 
+    select(player = APM_names, PPO_GF, SHD_GF, SHO_GF, PPD_GF)
   
   # Rename
   APM_PP_all_GF$player <- names_match_PP$player[match(APM_PP_all_GF$player, names_match_PP$ID)]
   
   
   
-  ### --- EXPECTED GOALS --- ###
+  ## ------------------------ ##
+  ##   Get Coefficients - xG  ##
+  ## ------------------------ ##
   
-  APM_PP_xG <- data.frame(as.matrix(coef(ridge_PP_xG, s = lambda_min_PP_xG)))
-  APM_names_xG <- dimnames(coef(ridge_PP_xG))[[1]]
-  APM_test_xG <- cbind(APM_names_xG, APM_PP_xG)
+  APM_test_xG <- data.frame(as.matrix(coef(CV_results_xG, s = CV_results_xG$lambda.min))) %>% 
+    rownames_to_column(var = "APM_names")
+  
   
   # Remove .d / .o suffixes
   APM_test_xG_PPO <- APM_test_xG %>%
-    filter(grepl(".PPO", APM_names_xG), 
-           !grepl("_", APM_names_xG)) %>% 
-    mutate(APM_names_xG = gsub(".PPO", "", APM_names_xG)) %>% 
+    filter(grepl(".PPO", APM_names), 
+           !grepl("_", APM_names)) %>% 
+    mutate(APM_names = gsub(".PPO", "", APM_names)) %>% 
     rename(PPO_xG = X1)
   
   APM_test_xG_PPD <- APM_test_xG %>%
-    filter(grepl(".PPD", APM_names_xG), 
-           !grepl("_", APM_names_xG)) %>%  
-    mutate(APM_names_xG = gsub(".PPD", "", APM_names_xG)) %>% 
+    filter(grepl(".PPD", APM_names), 
+           !grepl("_", APM_names)) %>%  
+    mutate(APM_names = gsub(".PPD", "", APM_names)) %>% 
     rename(PPD_xG = X1)
   
   APM_test_xG_SHO <- APM_test_xG %>% 
-    filter(grepl(".SHO", APM_names_xG), 
-           !grepl("_", APM_names_xG)) %>% 
-    mutate(APM_names_xG = gsub(".SHO", "", APM_names_xG)) %>% 
+    filter(grepl(".SHO", APM_names), 
+           !grepl("_", APM_names)) %>% 
+    mutate(APM_names = gsub(".SHO", "", APM_names)) %>% 
     rename(SHO_xG = X1)
   
   APM_test_xG_SHD <- APM_test_xG %>% 
-    filter(grepl(".SHD", APM_names_xG), 
-           !grepl("_", APM_names_xG)) %>% 
-    mutate(APM_names_xG = gsub(".SHD", "", APM_names_xG)) %>% 
+    filter(grepl(".SHD", APM_names), 
+           !grepl("_", APM_names)) %>% 
+    mutate(APM_names = gsub(".SHD", "", APM_names)) %>% 
     rename(SHD_xG = X1)
   
   # Join
   APM_PP_all_xG <- APM_test_xG_PPO %>% 
-    left_join(., APM_test_xG_PPD, by = "APM_names_xG") %>% 
-    left_join(., APM_test_xG_SHO, by = "APM_names_xG") %>% 
-    left_join(., APM_test_xG_SHD, by = "APM_names_xG") %>% 
-    select(APM_names_xG, PPO_xG, SHD_xG, SHO_xG, PPD_xG) %>% 
-    rename(player = APM_names_xG)
+    left_join(., APM_test_xG_PPD, by = "APM_names") %>% 
+    left_join(., APM_test_xG_SHO, by = "APM_names") %>% 
+    left_join(., APM_test_xG_SHD, by = "APM_names") %>% 
+    select(player = APM_names, PPO_xG, SHD_xG, SHO_xG, PPD_xG)
   
   # Rename
   APM_PP_all_xG$player <- names_match_PP$player[match(APM_PP_all_xG$player, names_match_PP$ID)]
   
   
   
-  ### --- CORSI --- ###
+  ## ------------------------ ##
+  ##   Get Coefficients - CF  ##
+  ## ------------------------ ##
   
-  APM_PP_CF <- data.frame(as.matrix(coef(ridge_PP_CF, s = lambda_min_PP_CF)))
-  APM_names_CF <- dimnames(coef(ridge_PP_CF))[[1]]
-  APM_test_CF <- cbind(APM_names_CF, APM_PP_CF)
+  APM_test_CF <- data.frame(as.matrix(coef(CV_results_CF, s = CV_results_CF$lambda.min))) %>% 
+    rownames_to_column(var = "APM_names")
+  
   
   # Remove .d / .o suffixes
   APM_test_CF_PPO <- APM_test_CF %>%
-    filter(grepl(".PPO", APM_names_CF), 
-           !grepl("_", APM_names_CF)) %>% 
-    mutate(APM_names_CF = gsub(".PPO", "", APM_names_CF)) %>% 
+    filter(grepl(".PPO", APM_names), 
+           !grepl("_", APM_names)) %>% 
+    mutate(APM_names = gsub(".PPO", "", APM_names)) %>% 
     rename(PPO_CF = X1)
   
   APM_test_CF_PPD <- APM_test_CF %>%
-    filter(grepl(".PPD", APM_names_CF), 
-           !grepl("_", APM_names_CF)) %>%  
-    mutate(APM_names_CF = gsub(".PPD", "", APM_names_CF)) %>% 
+    filter(grepl(".PPD", APM_names), 
+           !grepl("_", APM_names)) %>%  
+    mutate(APM_names = gsub(".PPD", "", APM_names)) %>% 
     rename(PPD_CF = X1)
   
   APM_test_CF_SHO <- APM_test_CF %>% 
-    filter(grepl(".SHO", APM_names_CF), 
-           !grepl("_", APM_names_CF)) %>% 
-    mutate(APM_names_CF = gsub(".SHO", "", APM_names_CF)) %>% 
+    filter(grepl(".SHO", APM_names), 
+           !grepl("_", APM_names)) %>% 
+    mutate(APM_names = gsub(".SHO", "", APM_names)) %>% 
     rename(SHO_CF = X1)
   
   APM_test_CF_SHD <- APM_test_CF %>% 
-    filter(grepl(".SHD", APM_names_CF), 
-           !grepl("_", APM_names_CF)) %>% 
-    mutate(APM_names_CF = gsub(".SHD", "", APM_names_CF)) %>% 
+    filter(grepl(".SHD", APM_names), 
+           !grepl("_", APM_names)) %>% 
+    mutate(APM_names = gsub(".SHD", "", APM_names)) %>% 
     rename(SHD_CF = X1)
   
   # Join
   APM_PP_all_CF <- APM_test_CF_PPO %>% 
-    left_join(., APM_test_CF_PPD, by = "APM_names_CF") %>% 
-    left_join(., APM_test_CF_SHO, by = "APM_names_CF") %>% 
-    left_join(., APM_test_CF_SHD, by = "APM_names_CF") %>% 
-    select(APM_names_CF, PPO_CF, SHD_CF, SHO_CF, PPD_CF) %>% 
-    rename(player = APM_names_CF)
+    left_join(., APM_test_CF_PPD, by = "APM_names") %>% 
+    left_join(., APM_test_CF_SHO, by = "APM_names") %>% 
+    left_join(., APM_test_CF_SHD, by = "APM_names") %>% 
+    select(APM_names, PPO_CF, SHD_CF, SHO_CF, PPD_CF) %>% 
+    rename(player = APM_names)
   
   # Rename
   APM_PP_all_CF$player <- names_match_PP$player[match(APM_PP_all_CF$player, names_match_PP$ID)]
   
+  
+  ## ----------------- ##
+  ##   TOI / Combine   ##
+  ## ----------------- ##
   
   # TOI
   fun.team_sum_PP <- function(data_inner) {
@@ -11848,11 +11802,33 @@ fun.team_RAPM_PP_SH <- function(data) {
     mutate_if(is.numeric, funs(round(., 3)))
   
   
-  # Return
-  RAPM_return <- list(team_PP =    APM_combine_PP, 
-                      team_SH =    APM_combine_SH, 
-                      cv_results = cv_results_df
-                      )
+  # Return list of objects
+  RAPM_return <- list(
+    
+    # Target variables
+    target_GF = GF60_PP, 
+    target_xG = xGF60_PP, 
+    target_CF = CF60_PP, 
+    
+    # Weights
+    weights = length_PP, 
+    
+    # Design matrix
+    design_matrix = APM_PP_teams_matrix, 
+    
+    # cv.glmnet objects
+    cv_results_GF = CV_results_GF, 
+    cv_results_xG = CV_results_xG, 
+    cv_results_CF = CV_results_CF,
+    
+    # Names object
+    IDs_master = names_match_PP, 
+    
+    # Final RAPM tables
+    team_PP =    APM_combine_PP, 
+    team_SH =    APM_combine_SH
+    
+    )
   
   }
 
@@ -12805,8 +12781,7 @@ fun.shooting_RAPM <- function(pbp_data, strength_) {
   
   
   is_goal <- pbp_sparse[, "is_goal"]
-  shooting_design <- pbp_sparse[, -c(1, 3:4)] # remove excess columns
-  #shooting_design <- pbp_sparse[, -c(1, 3:4, 5, 14, 17)] # *** to be implemented, corrected factor variables
+  shooting_design <- pbp_sparse[, -c(1, 3:4, 5, 14, 17)] # remove excess columns, corrected factor variables, added 12/12/18
   
   
   print("Cross Validation", quote = F)
@@ -12886,7 +12861,7 @@ fun.shooting_RAPM <- function(pbp_data, strength_) {
 
 
 ## -------------------- ##
-##   Skater RAPM - EV   ## *** Updated 12/11/18 with factor variable correction
+##   Skater RAPM - EV   ## *** Updated 12/16/18 with cv.glmnet change
 ## -------------------- ##
 
 ##########################
@@ -13491,12 +13466,10 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
   
   
   # Base design matrices - GF / xG
-  APM_g <- APM[, -c(1:22, 26:31)] # score state: 3-level (trail / even / lead)
-  #APM_g <- APM[, -c(1:22, 26:32, 35)] # *** to be implemented... 3-level score state, corrected dummies
+  APM_g <- APM[, -c(1:22, 26:32, 35)] # *** to be implemented... 3-level score state, corrected dummies
   
   # Base design matrix - CF
-  APM_c <- APM[, -c(1:22, 33:34)] # score state: 7-level (score of -3 to +3)
-  #APM_c <- APM[, -c(1:22, 32:34, 35)] # *** to be implemented... 7-level score state, corrected dummies
+  APM_c <- APM[, -c(1:22, 32:34, 35)] # *** to be implemented... 7-level score state, corrected dummies
   
   
   # Find goalie names
@@ -13528,24 +13501,14 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
   
   registerDoMC(cores = 2)
   
-  CV_results <- cv.glmnet(APM_g, 
-                          GF60, 
-                          weights = length, 
-                          alpha = 0, 
-                          nfolds = 10, 
-                          standardize = FALSE, 
-                          parallel = TRUE)
+  CV_results_GF <- cv.glmnet(x = APM_g, 
+                             y = GF60, 
+                             weights = length, 
+                             alpha = 0, 
+                             nfolds = 10, 
+                             standardize = FALSE, 
+                             parallel = TRUE)
   gc()
-  
-  lambda_min <- CV_results$lambda.min
-  
-  ridge <- glmnet(APM_g, 
-                  GF60, 
-                  family = c("gaussian"), 
-                  weights = length, 
-                  alpha = 0, 
-                  standardize = FALSE, 
-                  lambda = lambda_min)
   
   
   ## ---------------------------- ##
@@ -13554,24 +13517,14 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
   
   print(" -- CV, Expected Goals", quote = F)
   
-  CV_results_shots <- cv.glmnet(APM_s, 
-                                xGF60, 
-                                weights = length, 
-                                alpha = 0, 
-                                nfolds = 10, 
-                                standardize = FALSE, 
-                                parallel = TRUE)
+  CV_results_xG <- cv.glmnet(x = APM_s, 
+                             y = xGF60, 
+                             weights = length, 
+                             alpha = 0, 
+                             nfolds = 10, 
+                             standardize = FALSE, 
+                             parallel = TRUE)
   gc()
-  
-  lambda_min_shots <- CV_results_shots$lambda.min
-  
-  ridge_shots <- glmnet(APM_s, 
-                        xGF60, 
-                        family = c("gaussian"), 
-                        weights = length, 
-                        alpha = 0, 
-                        standardize = FALSE, 
-                        lambda = lambda_min_shots)
   
   
   ## ---------------------------- ##
@@ -13580,24 +13533,14 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
   
   print(" -- CV, Corsi", quote = F)
   
-  CV_results_corsi <- cv.glmnet(APM_c, 
-                                CF60, 
-                                weights = length, 
-                                alpha = 0, 
-                                nfolds = 10, 
-                                standardize = FALSE, 
-                                parallel = TRUE)
+  CV_results_CF <- cv.glmnet(x = APM_c, 
+                             y = CF60, 
+                             weights = length, 
+                             alpha = 0, 
+                             nfolds = 10, 
+                             standardize = FALSE, 
+                             parallel = TRUE)
   gc()
-  
-  lambda_min_corsi <- CV_results_corsi$lambda.min
-  
-  ridge_corsi <- glmnet(APM_s, 
-                        CF60, 
-                        family = c("gaussian"), 
-                        weights = length, 
-                        alpha = 0, 
-                        standardize = FALSE, 
-                        lambda = lambda_min_corsi)
   
   
   
@@ -13612,12 +13555,12 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
   ##     Goals Join     ##
   ## ------------------ ##
   
-  fun.APM_bind <- function(model_data, names_data, lambda_value) {
+  fun.APM_bind <- function(model_data, names_data) {
     
     # Retrieve Coefficients
-    APM <- data.frame(as.matrix(coef(model_data, s = lambda_value)))
-    APM_names <- dimnames(coef(model_data))[[1]]
-    APM_test <- cbind(APM_names, APM)
+    APM_test <- data.frame(as.matrix(coef(model_data, s = model_data$lambda.min))) %>% 
+      rownames_to_column(var = "APM_names")
+    
     
     # Remove .d / .o suffixes
     APM_test_d <- APM_test %>% 
@@ -13638,26 +13581,25 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
     
     APM_all$APM_names <- names_data$player[match(APM_all$APM_names, names_data$ID)]
     
-    APM_list <- list(APM_all = APM_all, 
+    APM_list <- list(APM_all =  APM_all, 
                      APM_coef = APM_test)
     
     return(APM_list)
   
     }
+  APM_list_GF <- fun.APM_bind(model_data =   CV_results_GF, 
+                              names_data =   names_match)
   
-  APM_list <- fun.APM_bind(model_data =   ridge, 
-                           names_data =   names_match, 
-                           lambda_value = lambda_min)
+  APM_initial_GF <-  APM_list_GF$APM_all
+  APM_raw_coef_GF <- APM_list_GF$APM_coef
   
-  APM_initial <- APM_list$APM_all
-  APM_raw_coef <- APM_list$APM_coef
   
   # Add TOI and combine
-  APM_initial <- APM_initial %>% 
+  APM_initial_GF <- APM_initial_GF %>% 
     rename(player = APM_names) %>% 
     left_join(., names_match, by = c("player"))
   
-  APM_join <- games_data %>% 
+  APM_join_GF <- games_data %>% 
     filter(TOI > 0) %>% 
     group_by(player) %>% 
     mutate(n = n()) %>% 
@@ -13665,11 +13607,13 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
               Games = first(n)
               ) %>% 
     mutate(TOI.GP = round(TOI / Games, 2)) %>% 
-    left_join(APM_initial, ., by = "player") %>% 
-    left_join(., pbp_goalie, by = c("player", "qual"))
+    left_join(APM_initial_GF, ., by = "player") %>% 
+    left_join(., pbp_goalie, by = c("player", "qual")) %>% 
+    data.frame()
   
-  # GF APM Chart
-  APM_GF <- APM_join %>% 
+  
+  # GF RAPM table
+  APM_GF <- APM_join_GF %>% 
     filter(!is.na(player)) %>% 
     mutate(TOI = ifelse(position == 3, TOI_goalie, TOI), 
            O_impact_GF = Off_GF * (TOI / 60), 
@@ -13692,12 +13636,12 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
   ## ------------------- ##
   
   # Pull out coefficients and match names
-  fun.APM_bind <- function(model_data, names_data, lambda_value) {
+  fun.APM_bind <- function(model_data, names_data) {
     
     # Retrieve Coefficients
-    APM <- data.frame(as.matrix(coef(model_data, s = lambda_value)))
-    APM_names <- dimnames(coef(model_data))[[1]]
-    APM_test <- cbind(APM_names, APM)
+    APM_test <- data.frame(as.matrix(coef(model_data, s = model_data$lambda.min))) %>% 
+      rownames_to_column(var = "APM_names")
+    
     
     # Remove .d / .o suffixes
     APM_test_d <- APM_test %>% 
@@ -13724,21 +13668,19 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
     return(APM_list)
   
     }
+  APM_list_xG <- fun.APM_bind(model_data =   CV_results_xG, 
+                              names_data =   names_match)
   
-  APM_list_shots <- fun.APM_bind(model_data =   ridge_shots, 
-                                 names_data =   names_match, 
-                                 lambda_value = lambda_min_shots)
+  APM_initial_xG <-  APM_list_xG$APM_all
+  APM_raw_coef_xG <- APM_list_xG$APM_coef
   
-  APM_initial_shots <- APM_list_shots$APM_all
-  APM_raw_coef_shots <- APM_list_shots$APM_coef
   
   # Add TOI and clean up
-  APM_initial_shots <- APM_initial_shots %>% 
+  APM_initial_xG <- APM_initial_xG %>% 
     rename(player = APM_names) %>% 
     left_join(., names_match, by = "player")
   
-  
-  APM_join_shots <- games_data %>% 
+  APM_join_xG <- games_data %>% 
     filter(TOI > 0) %>% 
     group_by(player) %>% 
     mutate(n = n()) %>% 
@@ -13746,11 +13688,12 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
               Games = first(n)
               ) %>% 
     mutate(TOI.GP = round(TOI / Games, 2)) %>% 
-    left_join(APM_initial_shots, ., by = "player")
+    left_join(APM_initial_xG, ., by = "player") %>% 
+    data.frame()
   
   
-  # Final APM table
-  APM_xG <- APM_join_shots %>% 
+  # xG RAPM table
+  APM_xG <- APM_join_xG %>% 
     filter(!is.na(player)) %>% 
     mutate(O_impact_xG =  Off_xG * (TOI / 60), 
            D_impact_xG =  Def_xG * (TOI / 60), 
@@ -13769,12 +13712,12 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
   ## -------------------- ##
   
   # Pull out coefficients and match names
-  fun.APM_bind <- function(model_data, names_data, lambda_value) {
+  fun.APM_bind <- function(model_data, names_data) {
     
     # Retrieve Coefficients
-    APM <- data.frame(as.matrix(coef(model_data, s = lambda_value)))
-    APM_names <- dimnames(coef(model_data))[[1]]
-    APM_test <- cbind(APM_names, APM)
+    APM_test <- data.frame(as.matrix(coef(model_data, s = model_data$lambda.min))) %>% 
+      rownames_to_column(var = "APM_names")
+    
     
     # Remove .d / .o suffixes
     APM_test_d <- APM_test %>% 
@@ -13801,21 +13744,19 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
     return(APM_list)
   
     }
+  APM_list_CF <- fun.APM_bind(model_data =   CV_results_CF, 
+                              names_data =   names_match)
   
-  APM_list_corsi <- fun.APM_bind(model_data =   ridge_corsi, 
-                                 names_data =   names_match, 
-                                 lambda_value = lambda_min_corsi)
+  APM_initial_CF <-  APM_list_CF$APM_all
+  APM_raw_coef_CF <- APM_list_CF$APM_coef
   
-  APM_initial_corsi <- APM_list_corsi$APM_all
-  APM_raw_coef_corsi <- APM_list_corsi$APM_coef
   
   # Add TOI and clean up
-  APM_initial_corsi <- APM_initial_corsi %>% 
+  APM_initial_CF <- APM_initial_CF %>% 
     rename(player = APM_names) %>% 
     left_join(., names_match, by = "player")
   
-  
-  APM_join_corsi <- games_data %>% 
+  APM_join_CF <- games_data %>% 
     filter(TOI > 0) %>% 
     group_by(player) %>% 
     mutate(n = n()) %>% 
@@ -13823,11 +13764,12 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
               Games = first(n)
               ) %>% 
     mutate(TOI.GP = round(TOI / Games, 2)) %>% 
-    left_join(APM_initial_corsi, ., by = "player")
+    left_join(APM_initial_CF, ., by = "player") %>% 
+    data.frame()
   
   
-  # Final APM table
-  APM_CF <- APM_join_corsi %>% 
+  # CF RAPM table
+  APM_CF <- APM_join_CF %>% 
     filter(!is.na(player)) %>% 
     mutate(O_impact_CF =  Off_CF * (TOI / 60), 
            D_impact_CF =  Def_CF * (TOI / 60), 
@@ -13911,26 +13853,42 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
   ##   List of Objects to Return   ##
   ## ----------------------------- ##
   
-  return_list <- list(design_GF = APM_g, 
-                      design_xG = APM_s, 
-                      design_CF = APM_c, 
-                      
-                      cv_results_GF = CV_results, 
-                      cv_results_xG = CV_results_shots, 
-                      cv_results_CF = CV_results_corsi,
-                      
-                      RAPM_coef_GF = APM_raw_coef, 
-                      RAPM_coef_xG = APM_raw_coef_shots, 
-                      RAPM_coef_CF = APM_raw_coef_corsi, 
-                      
-                      player_base = player_base_, 
-                      IDs_master = names_match, 
-                      
-                      RAPM_EV_join =    APM_EV_join, 
-                      RAPM_EV_rates =   APM_EV_join_rates, 
-                      RAPM_EV_impact =  APM_EV_join_impact, 
-                      RAPM_EV_goalies = APM_EV_goalies
-                      )
+  return_list <- list(
+    
+    # Target variables
+    target_GF = GF60,  
+    target_xG = xGF60, 
+    target_CF = CF60, 
+    
+    # Design matrices
+    design_GF = APM_g, 
+    design_xG = APM_s, 
+    design_CF = APM_c, 
+    
+    # Weights
+    weights = length, 
+    
+    # cv.glmnet objects
+    cv_results_GF = CV_results_GF, 
+    cv_results_xG = CV_results_xG, 
+    cv_results_CF = CV_results_CF,
+    
+    # Raw coefficients from cv.glmnet objects
+    RAPM_coef_GF = APM_raw_coef_GF, 
+    RAPM_coef_xG = APM_raw_coef_xG, 
+    RAPM_coef_CF = APM_raw_coef_CF, 
+    
+    # Player information
+    player_base = player_base_, 
+    IDs_master =  names_match, 
+    
+    # Final tables
+    RAPM_EV_join =    APM_EV_join, 
+    RAPM_EV_rates =   APM_EV_join_rates, 
+    RAPM_EV_impact =  APM_EV_join_impact, 
+    RAPM_EV_goalies = APM_EV_goalies
+    
+    )
   
   return(return_list)
   
@@ -13941,7 +13899,7 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
 
 
 ## ----------------------- ##
-##   Skater RAPM - PP/SH   ## *** Updated 12/11/18 with factor variable correction
+##   Skater RAPM - PP/SH   ## *** Updated 12/16/18 with cv.glmnet change
 ## ----------------------- ##
 
 #############################
@@ -15079,11 +15037,10 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
   
   
   # Make Base Design Matrix - GF, xGF & CF
-  APM_PP_g <- APM_PP[, -c(1:22, 26:31)] # remove -3 to +3 score variables
-  #APM_PP_g <- APM_PP[, -c(1:22, 26:32, 35)] # *** to be implemented, 3-level score state, corrected factor variables
+  APM_PP_g <- APM_PP[, -c(1:22, 26:32, 35)] # *** corrected factor variables, 3-level score state
   
   
-  # Design matrix without goalies (xGF / CF)
+  # Design matrix without goalies (xGF & CF)
   goalies_SHD <- paste0(qual_goalies, ".SHD")
   goalies_PPD <- paste0(qual_goalies, ".PPD")
   goalie_names <- c(goalies_SHD, goalies_PPD)
@@ -15105,58 +15062,42 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
   
   registerDoMC(cores = 2)
   
-  print("Cross Validation")
+  print(" -- Cross Validation: Goals")
   
-  CV_results_GF <- cv.glmnet(APM_PP_g, 
-                             GF60_PP, 
+  CV_results_GF <- cv.glmnet(x = APM_PP_g, 
+                             y = GF60_PP, 
                              weights = length_PP, 
                              alpha = 0, 
                              nfolds = 10, 
                              standardize = FALSE, 
                              parallel = TRUE)
   gc()
-  
-  lambda_min_GF <- CV_results_GF$lambda.min
-  
-  ridge_PP_GF <- glmnet(APM_PP_g, 
-                        GF60_PP, 
-                        family = c("gaussian"), 
-                        weights = length_PP, 
-                        alpha = 0, 
-                        lambda = lambda_min_GF, 
-                        standardize = FALSE)
   
   
   ## ------------------------- ##
   ##   Cross Validation - xG   ##
   ## ------------------------- ##
   
-  CV_results_xG <- cv.glmnet(APM_PP_s, 
-                             xGF60_PP, 
+  print(" -- Cross Validation: xG")
+  
+  CV_results_xG <- cv.glmnet(x = APM_PP_s, 
+                             y = xGF60_PP, 
                              weights = length_PP, 
                              alpha = 0, 
                              nfolds = 10, 
                              standardize = FALSE, 
                              parallel = TRUE)
   gc()
-  
-  lambda_min_xG <- CV_results_xG$lambda.min
-  
-  ridge_PP_xG <- glmnet(APM_PP_s, 
-                        xGF60_PP, 
-                        family = c("gaussian"), 
-                        weights = length_PP, 
-                        alpha = 0, 
-                        lambda = lambda_min_xG, 
-                        standardize = FALSE)
   
   
   ## ---------------------------- ##
   ##   Cross Validation - Corsi   ##
   ## ---------------------------- ##
   
-  CV_results_CF <- cv.glmnet(APM_PP_s, 
-                             CF60_PP, 
+  print(" -- Cross Validation: Corsi")
+  
+  CV_results_CF <- cv.glmnet(x = APM_PP_s, 
+                             y = CF60_PP, 
                              weights = length_PP, 
                              alpha = 0, 
                              nfolds = 10, 
@@ -15164,15 +15105,6 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
                              parallel = TRUE)
   gc()
   
-  lambda_min_CF <- CV_results_CF$lambda.min
-  
-  ridge_PP_CF <- glmnet(APM_PP_s, 
-                        CF60_PP, 
-                        family = c("gaussian"), 
-                        weights = length_PP, 
-                        alpha = 0, 
-                        lambda = lambda_min_CF, 
-                        standardize = FALSE)
   
   
   ## ---------------- ##
@@ -15181,12 +15113,12 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
   
   print("Results / Combine")
   
-  fun.APM_bind_PP <- function(model_data, names_data, lambda_value) {
+  fun.APM_bind_PP <- function(model_data, names_data) {
     
     # Pull out coefficients
-    APM <- data.frame(as.matrix(coef(model_data, s = lambda_value)))
-    APM_names <- dimnames(coef(model_data))[[1]]
-    APM_test <- cbind(APM_names, APM)
+    APM_test <- data.frame(as.matrix(coef(model_data, s = model_data$lambda.min))) %>% 
+      rownames_to_column(var = "APM_names")
+    
     
     # Remove suffixes
     APM_test_SHD <- APM_test %>% 
@@ -15225,11 +15157,10 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
     return(APM_list)
     
     }
-  APM_list_PP_GF <- fun.APM_bind_PP(model_data =   ridge_PP_GF, 
-                                    names_data =   names_match_PP, 
-                                    lambda_value = lambda_min_GF)
+  APM_list_PP_GF <- fun.APM_bind_PP(model_data =   CV_results_GF, 
+                                    names_data =   names_match_PP)
   
-  APM_initial_PP_GF <- APM_list_PP_GF$APM_all
+  APM_initial_PP_GF <-  APM_list_PP_GF$APM_all
   APM_raw_coef_PP_GF <- APM_list_PP_GF$APM_coef
   rm(APM_list_PP_GF)
   
@@ -15290,12 +15221,12 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
   ##   Results - xG   ##
   ## ---------------- ##
   
-  fun.APM_bind_PP <- function(model_data, names_data, lambda_value) {
+  fun.APM_bind_PP <- function(model_data, names_data) {
     
     # Pull out coefficients
-    APM <- data.frame(as.matrix(coef(model_data, s = lambda_value)))
-    APM_names <- dimnames(coef(model_data))[[1]]
-    APM_test <- cbind(APM_names, APM)
+    APM_test <- data.frame(as.matrix(coef(model_data, s = model_data$lambda.min))) %>% 
+      rownames_to_column(var = "APM_names")
+    
     
     # Remove suffixes
     APM_test_SHD <- APM_test %>% 
@@ -15334,9 +15265,8 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
     return(APM_list)
   
     }
-  APM_list_PP_xG <- fun.APM_bind_PP(model_data =   ridge_PP_xG, 
-                                    names_data =   names_match_PP, 
-                                    lambda_value = lambda_min_xG)
+  APM_list_PP_xG <- fun.APM_bind_PP(model_data =   CV_results_xG, 
+                                    names_data =   names_match_PP)
   
   APM_initial_PP_xG <- APM_list_PP_xG$APM_all
   APM_raw_coef_PP_xG <- APM_list_PP_xG$APM_coef
@@ -15399,12 +15329,12 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
   ##   Results - Corsi   ##
   ## ------------------- ##
   
-  fun.APM_bind_PP <- function(model_data, names_data, lambda_value) {
+  fun.APM_bind_PP <- function(model_data, names_data) {
     
     # Pull out coefficients
-    APM <- data.frame(as.matrix(coef(model_data, s = lambda_value)))
-    APM_names <- dimnames(coef(model_data))[[1]]
-    APM_test <- cbind(APM_names, APM)
+    APM_test <- data.frame(as.matrix(coef(model_data, s = model_data$lambda.min))) %>% 
+      rownames_to_column(var = "APM_names")
+    
     
     # Remove suffixes
     APM_test_SHD <- APM_test %>% 
@@ -15443,9 +15373,8 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
     return(APM_list)
   
     }
-  APM_list_PP_CF <- fun.APM_bind_PP(model_data =   ridge_PP_CF, 
-                                    names_data =   names_match_PP, 
-                                    lambda_value = lambda_min_CF)
+  APM_list_PP_CF <- fun.APM_bind_PP(model_data =   CV_results_CF, 
+                                    names_data =   names_match_PP)
   
   APM_initial_PP_CF <- APM_list_PP_CF$APM_all
   APM_raw_coef_PP_CF <- APM_list_PP_CF$APM_coef
@@ -15572,26 +15501,43 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
   ##   List of Objects to Return   ##
   ## ----------------------------- ##
   
-  return_list <- list(design_GF =    APM_PP_g, 
-                      design_xG_CF = APM_PP_s, 
-                      
-                      cv_results_GF = CV_results_GF, 
-                      cv_results_xG = CV_results_xG, 
-                      cv_results_CF = CV_results_CF,
-                      
-                      RAPM_coef_GF = APM_raw_coef_PP_GF, 
-                      RAPM_coef_xG = APM_raw_coef_PP_xG, 
-                      RAPM_coef_CF = APM_raw_coef_PP_CF, 
-                      
-                      player_base_PP = player_base_PP_,
-                      player_base_SH = player_base_SH_, 
-                      IDs_master_PP =  names_match_PP,
-                      IDs_master_SH =  names_match_SH,
-                      
-                      RAPM_PP_join =    APM_PP_join, 
-                      RAPM_PP_rates =   APM_PP_join_rates, 
-                      RAPM_PP_impact =  APM_PP_join_impact, 
-                      RAPM_PP_goalies = APM_PP_goalies)
+  return_list <- list(
+    
+    # Target variables
+    target_GF = GF60_PP, 
+    target_xG = xGF60_PP, 
+    target_CF = CF60_PP, 
+    
+    # Design matrices
+    design_GF =    APM_PP_g, 
+    design_xG_CF = APM_PP_s, 
+    
+    # Weights
+    weights = length_PP, 
+    
+    # cv.glmnet objects
+    cv_results_GF = CV_results_GF, 
+    cv_results_xG = CV_results_xG, 
+    cv_results_CF = CV_results_CF,
+    
+    # Raw coefficients from cv.glmnet objects
+    RAPM_coef_GF = APM_raw_coef_PP_GF, 
+    RAPM_coef_xG = APM_raw_coef_PP_xG, 
+    RAPM_coef_CF = APM_raw_coef_PP_CF, 
+    
+    # Player information
+    player_base_PP = player_base_PP_,
+    player_base_SH = player_base_SH_, 
+    IDs_master_PP =  names_match_PP,
+    IDs_master_SH =  names_match_SH,
+    
+    # Final RAPM tables
+    RAPM_PP_join =    APM_PP_join, 
+    RAPM_PP_rates =   APM_PP_join_rates, 
+    RAPM_PP_impact =  APM_PP_join_impact, 
+    RAPM_PP_goalies = APM_PP_goalies
+    
+    )
   
   return(return_list)
   

@@ -337,9 +337,6 @@ rosters_new <- pbp_list_new$new_rosters %>%
 
 
 
-# *** ADDED CALVIN.PETERSEN ... CHECK NEXT TIME *** 
-
-
 ## --------------------------- ##
 ##   Get Positions In Season   ##
 ## --------------------------- ##
@@ -361,9 +358,9 @@ player_position <- player_position_historic %>%
   select(-c(test)) %>% 
   
   ##        ***  Manual Addition  ***            ##
-  rbind(., data.frame(player = "CALVIN.PETERSEN", 
-                      position = 3)
-        ) %>% 
+  #rbind(., data.frame(player = "CALVIN.PETERSEN", 
+  #                    position = 3)
+  #      ) %>% 
   
   arrange(player) %>% 
   data.frame()
@@ -708,9 +705,9 @@ pbp_df <- pbp_xG_add_list$pbp_full
 
 
 # Check densities
-hist(na.omit(filter(pbp_df, event_type %in% st.fenwick_events, game_strength_state %in% st.even_strength)$pred_XGB_7), breaks = 50)
-hist(na.omit(filter(pbp_df, event_type %in% st.fenwick_events, game_strength_state %in% st.pp_strength)$pred_XGB_7), breaks = 50)
 hist(na.omit(filter(pbp_df, event_type %in% st.fenwick_events, grepl("E", game_strength_state))$pred_XGB_7), breaks = 50)
+hist(na.omit(filter(pbp_df, event_type %in% st.fenwick_events, game_strength_state %in% st.pp_strength)$pred_XGB_7), breaks = 50)
+hist(na.omit(filter(pbp_df, event_type %in% st.fenwick_events, game_strength_state %in% st.even_strength)$pred_XGB_7), breaks = 50)
 
 
 if (nrow(pbp_new) == nrow(pbp_df) & ncol(pbp_new) == ncol(pbp_df) - 14) { 
@@ -1489,7 +1486,7 @@ team_sum_3v4_season <- fun.team_sum_SH(data = team_games_3v4_joined, strength = 
 ############################
 
 # Run Functions
-team_strength_list_EV <- fun.team_RAPM(data = pbp_joined, regularized = "TRUE")
+team_strength_list_EV <- fun.team_RAPM(data = pbp_joined)
 team_strength_RAPM_EV <- team_strength_list_EV$team_data
 
 
@@ -1892,7 +1889,8 @@ shooter_GAR_in_season <- shooting_RAPM_All_Sit_list$shooter_df
 ## ----------- ##
 
 # Current replacement level (3rd goalie and below per team, per team per season, 10-fold cv)
-goalie_rep <- -0.007312411
+#goalie_rep <- -0.007312411
+goalie_rep <- -0.007315805
 
 # Convert to GAR / WAR
 goalie_GAR_in_season_final <- goalie_GAR_in_season %>% 
@@ -1919,8 +1917,10 @@ teams_shooter <- ALL_GAR %>%
   data.frame()
 
 # Shooter Replacement Level Per Position
-shooter_rep_F <- -0.007263538
-shooter_rep_D <- -0.01033
+#shooter_rep_F <- -0.007263538
+#shooter_rep_D <- -0.01033
+shooter_rep_F <- -0.006706953
+shooter_rep_D <- -0.011937867
 
 # Shooter GAR Final data.frame
 shooter_GAR_in_season_final <- shooter_GAR_in_season %>% 
