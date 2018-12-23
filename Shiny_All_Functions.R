@@ -12473,7 +12473,7 @@ fun.ALL_SH_GAA <- function() {
 
 
 ## ---------------------------- ##
-##   Goalie & Shooter GAR/WAR   ##
+##   Goalie & Shooter GAR/WAR   ## *** Updated 12/16/18 with factor variable change
 ## ---------------------------- ##
 
 ##################################
@@ -12531,7 +12531,9 @@ fun.shooting_RAPM <- function(pbp_data, strength_) {
     pbp_goalie_H <- hold %>% 
       group_by(home_goalie, home_team, season) %>% 
       summarise(TOI = sum(event_length)) %>% 
-      filter(!is.na(TOI) & home_goalie != 50) %>% 
+      filter(!is.na(TOI),
+             home_goalie != 50
+             ) %>% 
       rename(goalie = home_goalie, 
              Team =   home_team
              ) %>% 
@@ -12540,7 +12542,9 @@ fun.shooting_RAPM <- function(pbp_data, strength_) {
     pbp_goalie_A <- hold %>% 
       group_by(away_goalie, away_team, season) %>% 
       summarise(TOI = sum(event_length)) %>% 
-      filter(!is.na(TOI) & away_goalie != 50) %>% 
+      filter(!is.na(TOI), 
+             away_goalie != 50
+             ) %>% 
       rename(goalie = away_goalie, 
              Team =   away_team
              ) %>% 
@@ -12608,6 +12612,7 @@ fun.shooting_RAPM <- function(pbp_data, strength_) {
     st.even_strength <- c("5v5", "4v4", "3v3") %>% as.factor()
     st.strength_states <- c("3v3", "5v5", "4v4", "5v4", "4v5", "5v3", "3v5", "4v3", "3v4", "5vE", "Ev5", "4vE", "Ev4") %>% as.factor()
     
+    # variables selected later in function
     if (strength == "All") { 
       
       return_pbp <- data %>% 
@@ -12845,12 +12850,15 @@ fun.shooting_RAPM <- function(pbp_data, strength_) {
   gc()
   
   # Return
-  return_list <- list(shooter_df = GAA_Shooters, 
-                      goalie_df =  GAA_Goalies, 
-                      CV_object =  CV_results, 
-                      coefs_raw =  shooting_coefs_raw, 
-                      goal_vec = is_goal, 
-                      design_matrix = shooting_design)
+  return_list <- list(shooter_df =    GAA_Shooters, 
+                      goalie_df =     GAA_Goalies, 
+                      names_match =   names_match, 
+                      CV_object =     CV_results, 
+                      coefs_raw =     shooting_coefs_raw, 
+                      goal_vec =      is_goal, 
+                      design_matrix = shooting_design, 
+                      full_matrix =   pbp_sparse
+                      )
   
   return(return_list)
   

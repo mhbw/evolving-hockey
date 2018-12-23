@@ -7,6 +7,7 @@ library(RCurl); library(rjson); library(lubridate); library(doMC); library(rvest
 
 # Script Dependencies
 library(Matrix); library(RSQLite)
+library(arm); library(lme4)
 library(xgboost); library(glmnet)
 library(ggridges); library(tidyverse)
 
@@ -1169,6 +1170,10 @@ fun.check_db_games <- function(db_name) {
   }
 check_db_games <- fun.check_db_games(db_name = "data/NHL_db_1819.sqlite") # NEW DATABASE NAME
 
+
+
+check_db_games <- "no_use"
+
 # Remove New Data
 rm(pbp_new, shifts_new, rosters_new,
    games_EV_new, games_PP_new, games_SH_new, games_all_sit_new, 
@@ -2116,6 +2121,8 @@ in_season_sums_list <- list(# Skater Standard Stats
 
 
 # SAVE Running List Data
+saveRDS(RAPM_EV_list, "data/RAPM_EV_list_in_season.rds")
+saveRDS(RAPM_PP_list, "data/RAPM_PP_list_in_season.rds")
 saveRDS(in_season_sums_list, "data/in_season_sums_list.rds")
 
 
