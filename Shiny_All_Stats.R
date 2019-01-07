@@ -8,7 +8,7 @@ library(RCurl); library(rjson); library(lubridate); library(doMC); library(rvest
 # Script Dependencies
 library(Matrix); library(RSQLite)
 library(arm); library(lme4)
-library(xgboost); library(glmnet)
+library(caret); library(xgboost); library(glmnet)
 library(ggridges); library(tidyverse)
 
 options(scipen = 999)
@@ -202,59 +202,6 @@ source("ALLSCRAPE.R")
 #############################
 
 # Scrape Schedule of previous games
-fun.schedule <- function(start, end) { 
-  
-  # Create Team IDs
-  fun.Team_IDs <- function() { 
-    
-    IDs <- data.frame(matrix(nrow = 33, ncol = 2))
-    IDs$X1 <- c("N.J", "NYI", "NYR", "PHI", "PIT", "BOS", "BUF", "MTL", "OTT", "TOR", 
-                "1000", "CAR", "FLA", "T.B", "WSH", "CHI", "DET", "NSH", "STL", "CGY", 
-                "COL", "EDM", "VAN", "ANA", "DAL", "L.A", "1000", "S.J", "CBJ", "MIN", 
-                "WPG", "ARI", "VGK")
-    
-    IDs$X2 <- seq(1:33)
-    IDs$X2 <- ifelse(IDs$X2 == 31, 52, IDs$X2)
-    IDs$X2 <- ifelse(IDs$X2 == 32, 53, IDs$X2)
-    IDs$X2 <- ifelse(IDs$X2 == 33, 54, IDs$X2)
-    names(IDs) <- c("Team", "ID")
-    
-    return(IDs)
-    
-    }
-  Team_ID <- fun.Team_IDs()
-  
-  # Scrape Schedule
-  sched <- ds.scrape_schedule(start,
-                              end, 
-                              try_tolerance = 5, 
-                              agents = ds.user_agents)
-  
-  sched <- filter(sched, session != "PR")
-  
-  sched$home_team_id <- Team_ID$Team[match(sched$home_team_id, Team_ID$ID)]
-  sched$away_team_id <- Team_ID$Team[match(sched$away_team_id, Team_ID$ID)]
-  
-  sched$test <- format(as.POSIXct(sched$game_datetime, 
-                                  tz = "UTC", 
-                                  format = "%Y-%m-%d %H:%M:%S"), 
-                       tz = "Canada/Eastern")
-  
-  sched$test <- as.Date(sched$test)
-  sched$test <- as.Date(ifelse(is.na(sched$test), 
-                               as.Date(sched$game_datetime) - 1,
-                               sched$test), 
-                        origin = "1970-01-01")
-  
-  sched$game_date <- sched$test
-  
-  sched <- sched %>% 
-    arrange(game_id) %>% 
-    rename(home_team = home_team_id, 
-           away_team = away_team_id)
-  
-  }
-
 schedule_current <- fun.schedule(Sys.Date() - 1,
                                  Sys.Date() - 1)
 
@@ -264,8 +211,6 @@ print(schedule_current)
 # Scrape pbp data
 fun.scrape_pbp <- function(year) { 
   
-  #scrape <- as.character(unique(schedule_current$game_id))
-  #scrape <- gsub(paste0(substr(year, 1, 4), 0), "", scrape)
   scrape <- gsub(paste0(substr(year, 1, 4), 0), "", as.character(unique(schedule_current$game_id)))
   
   Year <- year
@@ -290,7 +235,7 @@ fun.scrape_pbp <- function(year) {
       hold_rosters <- pbp_list[[2]]
       hold_shifts <-  pbp_list[[3]]
       
-      if(i == 1) { 
+      if (i == 1) { 
         new_pbp <-     pbp_list[[1]]
         new_rosters <- pbp_list[[2]]
         new_shifts <-  pbp_list[[3]]
@@ -339,7 +284,7 @@ rosters_new <- pbp_list_new$new_rosters %>%
 
 
 ## --------------------------- ##
-##   Get Positions In Season   ##
+##   Get Positions In Season   ##  
 ## --------------------------- ##
 
 #################################
@@ -350,7 +295,10 @@ NHL_player_info <- fun.NHL_info_scrape(season_ = "20182019")
 
 # Update player_posittion data.frame
 player_position <- player_position_historic %>% 
-  rbind(., NHL_player_info %>% select(player, position)) %>% 
+  rbind(., NHL_player_info %>% 
+          filter(position != 3) %>% 
+          select(player, position)
+        ) %>% 
   group_by(player, position) %>% 
   summarise() %>% 
   ungroup() %>% 
@@ -651,7 +599,11 @@ shifts_new <- shifts_new %>%
 # Test for NA positions in new pbp data
 fun.position_test <- function(pbp_data) { 
   
-  position_test <- data.frame(player = as.character(sort(unique(c(
+  pbp_data <- pbp_new
+  
+  goalies <- sort(unique(c(pbp_data$home_goalie, pbp_data$away_goalie)))
+  
+  position_test <- data.frame(player = sort(unique(c(
     sort(na.omit(unique(pbp_data$home_on_1))), 
     sort(na.omit(unique(pbp_data$home_on_2))), 
     sort(na.omit(unique(pbp_data$home_on_3))), 
@@ -664,8 +616,10 @@ fun.position_test <- function(pbp_data) {
     sort(na.omit(unique(pbp_data$away_on_3))), 
     sort(na.omit(unique(pbp_data$away_on_4))), 
     sort(na.omit(unique(pbp_data$away_on_5))), 
-    sort(na.omit(unique(pbp_data$away_on_6)))))))
+    sort(na.omit(unique(pbp_data$away_on_6))))))
     ) %>% 
+    mutate(player = as.character(player)) %>% 
+    filter(!player %in% goalies) %>% 
     left_join(., player_position, by = "player") %>% 
     filter(is.na(position))
   
@@ -1087,107 +1041,6 @@ dbDisconnect(db)
 
 
 
-# PIT v ??? 20180xxxxx - Only Offsetting Penalties
-# TOR v CBJ 2018020308 - No Penalties
-# TOR v PHI 2018020348 - No Penalties
-
-# Check game_id counts in database
-fun.check_db_games <- function(db_name) { 
-  
-  db <- DBI::dbConnect(SQLite(), dbname = db_name)
-  
-  check_games <- list(
-    pbp =      sort(dbGetQuery(db, "SELECT distinct(game_id) FROM pbp_full WHERE season == 20182019")$game_id),
-    shifts =   sort(dbGetQuery(db, "SELECT distinct(game_id) FROM shifts_full WHERE season == 20182019")$game_id),
-    rosters =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM rosters_full WHERE season == 20182019")$game_id),
-    
-    game_labels =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM game_charts_labels WHERE season == 20182019")$game_id),
-    
-    games_all =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_all_sit WHERE season == 20182019")$game_id), 
-    games_EV =   sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_EV WHERE season == 20182019")$game_id), 
-    games_PP =   sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_PP WHERE season == 20182019")$game_id), 
-    games_SH =   sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_SH WHERE season == 20182019")$game_id), 
-    games_5v5 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_5v5 WHERE season == 20182019")$game_id), 
-    games_4v4 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_4v4 WHERE season == 20182019")$game_id), 
-    games_3v3 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_3v3 WHERE season == 20182019")$game_id), 
-    games_5v4 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_5v4 WHERE season == 20182019")$game_id), 
-    games_5v3 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_5v3 WHERE season == 20182019")$game_id), 
-    games_4v3 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_4v3 WHERE season == 20182019")$game_id), 
-    games_4v5 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_4v5 WHERE season == 20182019")$game_id), 
-    games_3v5 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_3v5 WHERE season == 20182019")$game_id), 
-    games_3v4 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM games_data_3v4 WHERE season == 20182019")$game_id), 
-    
-    TOI_tog_EV =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM TOI_together_data_EV WHERE season == 20182019")$game_id), 
-    TOI_tog_PP =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM TOI_together_data_PP WHERE season == 20182019")$game_id), 
-    TOI_tog_SH =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM TOI_together_data_SH WHERE season == 20182019")$game_id), 
-    TOI_tog_5v5 = sort(dbGetQuery(db, "SELECT distinct(game_id) FROM TOI_together_data_5v5 WHERE season == 20182019")$game_id), 
-    TOI_tog_5v4 = sort(dbGetQuery(db, "SELECT distinct(game_id) FROM TOI_together_data_5v4 WHERE season == 20182019")$game_id), 
-    TOI_tog_4v5 = sort(dbGetQuery(db, "SELECT distinct(game_id) FROM TOI_together_data_4v5 WHERE season == 20182019")$game_id), 
-    
-    teams_all =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_all_sit WHERE season == 20182019")$game_id), 
-    teams_EV =   sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_EV WHERE season == 20182019")$game_id), 
-    teams_PP =   sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_PP WHERE season == 20182019")$game_id), 
-    teams_SH =   sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_SH WHERE season == 20182019")$game_id), 
-    teams_5v5 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_5v5 WHERE season == 20182019")$game_id), 
-    teams_4v4 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_4v4 WHERE season == 20182019")$game_id), 
-    teams_3v3 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_3v3 WHERE season == 20182019")$game_id), 
-    teams_5v4 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_5v4 WHERE season == 20182019")$game_id), 
-    teams_5v3 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_5v3 WHERE season == 20182019")$game_id), 
-    teams_4v3 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_4v3 WHERE season == 20182019")$game_id), 
-    teams_4v5 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_4v5 WHERE season == 20182019")$game_id), 
-    teams_3v5 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_3v5 WHERE season == 20182019")$game_id), 
-    teams_3v4 =  sort(dbGetQuery(db, "SELECT distinct(game_id) FROM team_data_3v4 WHERE season == 20182019")$game_id), 
-    
-    pen_goals =       sort(dbGetQuery(db, "SELECT distinct(game_id) FROM adj_pen_games_all_sit WHERE season == 20182019")$game_id), 
-    goalies_all_sit = sort(dbGetQuery(db, "SELECT distinct(game_id) FROM goalie_games_all_sit WHERE season == 20182019")$game_id)
-    )
-  
-  dbDisconnect(db)
-  
-  
-  # Check Game Totals
-  total_games <- length(check_games$pbp)
-  
-  check <- data.frame(game_count = do.call(rbind, lapply(check_games, function(x) length(x)))) %>% 
-    rownames_to_column(., var = "table") %>% 
-    mutate(test = 1 * (game_count == total_games))
-  
-  print(check)
-  
-  # Print message
-  if (mean(check$test) == 1) { 
-    print("Success! - All Games Match! Great Job! :)", quote = F)
-    
-    } 
-  else if (mean(check$test) != 1) { 
-    print("Games Don't Match, Strength States Causing This... will fix this message", quote = F)
-    
-    }
-  
-  # Return
-  return(check)
-  
-  }
-check_db_games <- fun.check_db_games(db_name = "data/NHL_db_1819.sqlite") # NEW DATABASE NAME
-
-
-
-check_db_games <- "no_use"
-
-# Remove New Data
-rm(pbp_new, shifts_new, rosters_new,
-   games_EV_new, games_PP_new, games_SH_new, games_all_sit_new, 
-   games_5v5_new, games_4v4_new, games_3v3_new, games_5v4_new, games_5v3_new, games_4v3_new, games_4v5_new, games_3v5_new, games_3v4_new, 
-   teammate_TOI_EV_new, teammate_TOI_PP_new, teammate_TOI_SH_new, teammate_TOI_5v5_new, teammate_TOI_5v4_new, teammate_TOI_4v5_new, 
-   team_games_EV_new, team_games_PP_new, team_games_SH_new, team_games_all_sit_new, 
-   team_games_3v3_new, team_games_3v4_new, team_games_3v5_new, team_games_4v3_new, team_games_4v4_new, team_games_4v5_new, team_games_5v3_new, team_games_5v4_new, team_games_5v5_new, 
-   goalie_games_all_sit_new, adj_pen_games_new, 
-   pen_source, pen_enhanced, pen_calc_main, pen_calc_xtras, adj_pen_games, 
-   xG_model_XGB_7_EV, xG_model_XGB_7_UE, xG_model_XGB_10_SH, xG_model_XGB_10_EN)
-gc()
-
-
-
 ## ------------------------- ##
 ##   Load Full Joined Data   ##
 ## ------------------------- ##
@@ -1249,9 +1102,6 @@ dbDisconnect(db)
 
 
 ## ------------------- COMPUTE SUMMED TABLES ------------------- ##
-
-
-
 
 
 ## ------------------ ##
@@ -2113,17 +1963,17 @@ in_season_sums_list <- list(# Skater Standard Stats
                             # Last Updated Time
                             last_update = as.character(Sys.time()), 
                             
-                            # Check db/new games data.frames
-                            last_scrape_check = check_new_games, 
-                            last_db_update_check = check_db_games
+                            # Check new games data.frame
+                            last_scrape_check = check_new_games
                             )
 
 
 
 # SAVE Running List Data
+saveRDS(in_season_sums_list, "data/in_season_sums_list.rds")
 saveRDS(RAPM_EV_list, "data/RAPM_EV_list_in_season.rds")
 saveRDS(RAPM_PP_list, "data/RAPM_PP_list_in_season.rds")
-saveRDS(in_season_sums_list, "data/in_season_sums_list.rds")
+saveRDS(shooting_RAPM_All_Sit_list, "data/shooting_RAPM_All_Sit_list.rds")
 
 
 #################################

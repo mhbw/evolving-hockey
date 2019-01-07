@@ -854,6 +854,69 @@ fun.pbp_full_add <- function(data, model_EV, model_UE, model_SH, model_EN) {
 ##################
 
 
+## --------------------- ##
+##   Schedule Function   ##
+## --------------------- ##
+
+###########################
+
+fun.schedule <- function(start, end) { 
+  
+  # Create Team IDs
+  fun.Team_IDs <- function() { 
+    
+    IDs <- data.frame(matrix(nrow = 33, ncol = 2))
+    IDs$X1 <- c("N.J", "NYI", "NYR", "PHI", "PIT", "BOS", "BUF", "MTL", "OTT", "TOR", 
+                "1000", "CAR", "FLA", "T.B", "WSH", "CHI", "DET", "NSH", "STL", "CGY", 
+                "COL", "EDM", "VAN", "ANA", "DAL", "L.A", "1000", "S.J", "CBJ", "MIN", 
+                "WPG", "ARI", "VGK")
+    
+    IDs$X2 <- seq(1:33)
+    IDs$X2 <- ifelse(IDs$X2 == 31, 52, IDs$X2)
+    IDs$X2 <- ifelse(IDs$X2 == 32, 53, IDs$X2)
+    IDs$X2 <- ifelse(IDs$X2 == 33, 54, IDs$X2)
+    names(IDs) <- c("Team", "ID")
+    
+    return(IDs)
+    
+    }
+  Team_ID <- fun.Team_IDs()
+  
+  # Scrape Schedule
+  sched <- ds.scrape_schedule(start,
+                              end, 
+                              try_tolerance = 5, 
+                              agents = ds.user_agents)
+  
+  sched <- filter(sched, session != "PR")
+  
+  sched$home_team_id <- Team_ID$Team[match(sched$home_team_id, Team_ID$ID)]
+  sched$away_team_id <- Team_ID$Team[match(sched$away_team_id, Team_ID$ID)]
+  
+  sched$test <- format(as.POSIXct(sched$game_datetime, 
+                                  tz = "UTC", 
+                                  format = "%Y-%m-%d %H:%M:%S"), 
+                       tz = "Canada/Eastern")
+  
+  sched$test <- as.Date(sched$test)
+  sched$test <- as.Date(ifelse(is.na(sched$test), 
+                               as.Date(sched$game_datetime) - 1,
+                               sched$test), 
+                        origin = "1970-01-01")
+  
+  sched$game_date <- sched$test
+  
+  sched <- sched %>% 
+    arrange(game_id) %>% 
+    rename(home_team = home_team_id, 
+           away_team = away_team_id)
+  
+  }
+
+
+###########################
+
+
 ## ------------------- ##
 ##   NHL Player JSON   ##
 ## ------------------- ##
@@ -974,7 +1037,8 @@ fun.NHL_info_scrape <- function(season_) {
            playerTeamsPlayedFor = ifelse(grepl(", ", playerTeamsPlayedFor), gsub(", ", "/", playerTeamsPlayedFor), playerTeamsPlayedFor), 
            
            # Name Corrections
-           player = ifelse(player == "CHRISTOPHER.GIBSON", "CHRIS.GIBSON", player)
+           player = ifelse(player == "CHRISTOPHER.GIBSON", "CHRIS.GIBSON", player), 
+           player = ifelse(player == "CAL.PETERSEN", "CALVIN.PETERSEN", player)
            ) %>% 
     rename(season = seasonId) %>% 
     ungroup() %>% 
@@ -4150,14 +4214,25 @@ fun.shotmetrics_EV_strength <- function(data, scr_adj_list) {
     
     }
   
-  goalieremove <- fun.goalie_remove(data_ = data)
+  if (nrow(data) > 0) { 
+    goalieremove <- fun.goalie_remove(data_ = data)
+    
+    }
   
-  all <- joined %>% 
-    left_join(., goalieremove, "player") %>% 
-    filter(is.na(is_goalie)) %>% 
-    select(-c(is_goalie)) %>% 
-    arrange(player, game_id) %>% 
-    data.frame()
+  if (nrow(data) > 0) { 
+    all <- joined %>% 
+      left_join(., goalieremove, "player") %>% 
+      filter(is.na(is_goalie)) %>% 
+      select(-c(is_goalie)) %>% 
+      arrange(player, game_id) %>% 
+      data.frame()
+    
+    } else { 
+      all <- joined %>% 
+        arrange(player, game_id) %>% 
+        data.frame()
+    
+      }
   
   return(all)
   
@@ -13112,9 +13187,9 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
     return(all)
   
     }
-  names_match <- fun.names_match(sub_data2 = pbp_data, 
-                                 qual_data = Qualified_GF, 
-                                 player_data = player_position)
+  names_match <- fun.names_match(sub_data2 =   pbp_data, 
+                                 qual_data =   Qualified_GF, 
+                                 player_data = player_position %>% filter(position != 3))
   
   
   # Determine non-qualified players
@@ -14181,7 +14256,7 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
     }
   names_match_PP <- fun.names_match_PP(sub_data2 =   pbp_part, 
                                        qual_data =   Qualified_GF_PP,  
-                                       player_data = player_position)
+                                       player_data = player_position %>% filter(position != 3))
   
   # Create IDs for Shorthanded Names Match
   fun.names_match_SH <- function(sub_data2, qual_data, player_data) {
@@ -14262,7 +14337,7 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
     }
   names_match_SH <- fun.names_match_SH(sub_data2 =   pbp_part, 
                                        qual_data =   Qualified_GF_SH, 
-                                       player_data = player_position)
+                                       player_data = player_position %>% filter(position != 3))
   
   
   # Determine non-qualified players for Powerplay
