@@ -1657,15 +1657,28 @@ ALL_SH <- fun.ALL_SH_GAA()
 ##   Combine All / Create Final Table   ##
 ## ------------------------------------ ##
 
-# Objects - new replacement level as of 12/12/18
-EV_rep_F <-   round(0.1911043, 4)
-EV_rep_D <-   round(0.1191875, 4)
+# Objects - new replacement level as of 12/12/18 *** deprecated
+#EV_rep_F <-   round(0.1911043, 4)
+#EV_rep_D <-   round(0.1191875, 4)
 
-PP_rep_F <-   round(0.3864802, 4)
-PP_rep_D <-   round(0.3594602, 4)
+#PP_rep_F <-   round(0.3864802, 4)
+#PP_rep_D <-   round(0.3594602, 4)
 
-SH_rep_F <-   round(-0.0411400, 5)
-SH_rep_D <-   round(0.07133463, 5)
+#SH_rep_F <-   round(-0.0411400, 5)
+#SH_rep_D <-   round(0.07133463, 5)
+
+#Pens_rep_F <- round(0.03211396, 5)
+#Pens_rep_D <- round(0.02519755, 5)
+
+# Objects - new replacement level as of 1/16/19
+EV_rep_F <-   round(0.1878387, 4)
+EV_rep_D <-   round(0.1163090, 4)
+
+PP_rep_F <-   round(0.3865902, 4)
+PP_rep_D <-   round(0.3594252, 4)
+
+SH_rep_F <-   round(-0.04115749, 5)
+SH_rep_D <-   round(0.07122438, 5)
 
 Pens_rep_F <- round(0.03211396, 5)
 Pens_rep_D <- round(0.02519755, 5)
