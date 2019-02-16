@@ -98,6 +98,117 @@ na_if_null <- function(x) {
 
 ##########################
 
+# Scrape Schedule
+sc.scrape_schedule <- function(start_date, end_date) { 
+  
+  # getURL for schedule data
+  url_schedule <- NULL
+  try_count <- 3
+  
+  while (!is.character(url_schedule) & try_count > 0) { 
+    
+    url_schedule <- try(
+      getURL(paste0("https://statsapi.web.nhl.com/api/v1/schedule?startDate=",
+                    as.character(start_date),
+                    "&endDate=",
+                    as.character(end_date)
+                    ))
+      )
+    
+    try_count <- try_count - 1
+    
+    }
+  
+  # Parse JSON data
+  if (is.character(url_schedule)) {
+    schedule_list <- jsonlite::fromJSON(url_schedule)
+    }
+  
+  # Return from function if scrape returned no data
+  if (length(schedule_list$dates) == 0) {
+    
+    warning("NHL Schedule API Returned No Data")
+    
+    # Return empty data.frame in same format if error occurred
+    return(
+      data.frame(game_id = character(), 
+                 game_date = character(), 
+                 season = character(), 
+                 session = character(), 
+                 game_status = character(), 
+                 away_team = character(), 
+                 home_team = character(), 
+                 game_venue = character(), 
+                 game_datetime = character(), 
+                 EST_time_convert = character(), 
+                 EST_date = character(), 
+                 stringsAsFactors = FALSE)
+      )
+    
+    }
+  
+  
+  # Bind games from schedule list
+  bind_schedule <- foreach(i = 1:length(schedule_list$dates$games), .combine = rbind) %do% {
+    
+    schedule_current <- data.frame(game_id =       as.character(schedule_list$dates$games[[i]]$gamePk), 
+                                   game_date =     as.Date(schedule_list$dates$games[[i]]$gameDate),
+                                   season =        schedule_list$dates$games[[i]]$season, 
+                                   session =       schedule_list$dates$games[[i]]$gameType, 
+                                   game_status =   schedule_list$dates$games[[i]]$status$detailedState, 
+                                   away_team_id =  schedule_list$dates$games[[i]]$teams$away$team$id, 
+                                   home_team_id =  schedule_list$dates$games[[i]]$teams$home$team$id, 
+                                   game_venue =    schedule_list$dates$games[[i]]$venue$name, 
+                                   game_datetime = schedule_list$dates$games[[i]]$gameDate, 
+                                   
+                                   stringsAsFactors = FALSE
+                                   )
+    
+    }
+  
+  
+  # Modify bound schedule data
+  schedule_current <- bind_schedule %>% 
+    arrange(game_id) %>% 
+    filter(session != "PR") %>%   ## filter out preseason games
+    mutate(home_team_id = Team_ID$Team[match(home_team_id, Team_ID$ID)], 
+           away_team_id = Team_ID$Team[match(away_team_id, Team_ID$ID)], 
+           
+           EST_time_convert = format(
+             as.POSIXct(gsub("T", " ", game_datetime) %>% gsub("Z", "", .), 
+                        tz = "UTC", 
+                        format = "%Y-%m-%d %H:%M:%S"), 
+             tz = "Canada/Eastern"
+             ), 
+           
+           EST_date = as.Date(
+             ifelse(is.na(EST_time_convert), as.Date(game_datetime) - 1, EST_time_convert), 
+             origin = "1970-01-01"
+             ), 
+           
+           game_date = EST_date
+           ) %>% 
+    arrange(game_id) %>% 
+    rename(home_team = home_team_id, 
+           away_team = away_team_id
+           ) %>% 
+    data.frame()
+  
+  # Arrange if playoff games
+  if (unique(schedule_current$session == "P")) { 
+    schedule_current <- arrange(schedule_current, game_date, EST_time_convert)
+    }
+  
+  # print schedule
+  print(head(schedule_current, 20))
+  
+  # return schedule
+  return(schedule_current)
+  
+  }
+
+
+
 # Scrape Events (HTM)
 sc.scrape_events_HTM <- function(game_id_fun, season_id_fun, attempts) { 
   
@@ -300,24 +411,23 @@ sc.game_info <- function(game_id_fun, season_id_fun, events_data, roster_data) {
 # Create rosters data frame
 sc.roster_info <- function(game_id_fun, season_id_fun, roster_data, game_info_data, shifts_list) { 
   
-  # Get total roster & scratch players (roster away/home ... scratch away/home) *** not used at this time
-  #lapply(str_extract_all(rosters_text[grep("^\r\n#\r\nPos\r\nName|^\r\n#\r\nPos\r\nNom/Name", rosters_text)], "[0-9]+"), length)
-  
+  # Get counts of roster & scratched players
+  roster_player_counts <- lapply(str_extract_all(roster_data[grep("^\r\n#\r\nPos\r\nName|^\r\n#\r\nPos\r\nNom/Name", roster_data)], "[0-9]+"), length)
   
   # Find players in rosters html text
   roster_index <- which(roster_data  %in% c("Name", "Nom/Name")) + 1
   
   roster_players <- bind_rows(
     bind_cols(
-      player =   roster_data[seq(roster_index[1] + 2, roster_index[1] + 59, by = 3)], 
-      number =   roster_data[seq(roster_index[1]    , roster_index[1] + 57, by = 3)], 
-      position = roster_data[seq(roster_index[1] + 1, roster_index[1] + 58, by = 3)]
+      player =   roster_data[seq(roster_index[1] + 2, roster_index[1] + 59, by = 3)][1:as.numeric(roster_player_counts[[1]])], 
+      number =   roster_data[seq(roster_index[1]    , roster_index[1] + 57, by = 3)][1:as.numeric(roster_player_counts[[1]])], 
+      position = roster_data[seq(roster_index[1] + 1, roster_index[1] + 58, by = 3)][1:as.numeric(roster_player_counts[[1]])]
       ) %>% 
       mutate(Team = game_info_data$away_team), 
     bind_cols(
-      player =   roster_data[seq(roster_index[2] + 2, roster_index[2] + 59, by = 3)], 
-      number =   roster_data[seq(roster_index[2]    , roster_index[2] + 57, by = 3)], 
-      position = roster_data[seq(roster_index[2] + 1, roster_index[2] + 58, by = 3)]
+      player =   roster_data[seq(roster_index[2] + 2, roster_index[2] + 59, by = 3)][1:as.numeric(roster_player_counts[[2]])], 
+      number =   roster_data[seq(roster_index[2]    , roster_index[2] + 57, by = 3)][1:as.numeric(roster_player_counts[[2]])], 
+      position = roster_data[seq(roster_index[2] + 1, roster_index[2] + 58, by = 3)][1:as.numeric(roster_player_counts[[2]])]
       ) %>% 
       mutate(Team = game_info_data$home_team)
     ) %>% 
@@ -327,8 +437,8 @@ sc.roster_info <- function(game_id_fun, season_id_fun, roster_data, game_info_da
   
   
   # Find scratches
-  away_scratch_count <- try(length(str_extract_all(roster_data[grep("^\r\n#\r\nPos\r\nName|^\r\n#\r\nPos\r\nNom/Name", roster_data)], "[0-9]+")[[3]]), silent = TRUE)
-  home_scratch_count <- try(length(str_extract_all(roster_data[grep("^\r\n#\r\nPos\r\nName|^\r\n#\r\nPos\r\nNom/Name", roster_data)], "[0-9]+")[[4]]), silent = TRUE)
+  away_scratch_count <- try(roster_player_counts[[3]], silent = TRUE)
+  home_scratch_count <- try(roster_player_counts[[4]], silent = TRUE)
   
   if (class(away_scratch_count) != "try-error" & class(home_scratch_count) != "try-error") { 
     
@@ -442,13 +552,17 @@ sc.roster_info <- function(game_id_fun, season_id_fun, roster_data, game_info_da
 sc.event_summary <- function(game_id_fun, season_id_fun, event_summary_data, roster_data, game_info_data) { 
   
   # Find players in scraped html
-  index <- grep("^([A-Z]+|[A-Z]+.+[A-Z+]),\\s*[A-Z]+", event_summary_data) - 2
+  index <-     grep("^([A-Z]+|[A-Z]+.+[A-Z+]),\\s*[A-Z]+", event_summary_data) - 2
+  index_sep <- grep("^TEAM TOTALS", event_summary_data)
+  
+  away_index <- index[index > 0 & index < index_sep[1]]
+  home_index <- index[index > index_sep[1] & index < index_sep[2]]
   
   
-  # Away players (first 20 players)
-  event_summary_away <- foreach(i = 1:20, .combine = bind_rows) %do% {
+  # Away players
+  event_summary_away <- foreach(i = 1:length(away_index), .combine = bind_rows) %do% {
     
-    event_summary_data[index[i]:(index[i] + 24)] %>%
+    event_summary_data[away_index[i]:(away_index[i] + 24)] %>%
       matrix(ncol = 25, byrow = TRUE) %>%
       data.frame(stringsAsFactors = FALSE)
     
@@ -458,10 +572,10 @@ sc.event_summary <- function(game_id_fun, season_id_fun, event_summary_data, ros
            Opponent = game_info_data$home_team, 
            is_home =  0)
   
-  # Home players (last 20 players)
-  event_summary_home <- foreach(i = 21:40, .combine = bind_rows) %do% {
+  # Home players
+  event_summary_home <- foreach(i = 1:length(home_index), .combine = bind_rows) %do% {
     
-    event_summary_data[index[i]:(index[i] + 24)] %>%
+    event_summary_data[home_index[i]:(home_index[i] + 24)] %>%
       matrix(ncol = 25, byrow = TRUE) %>%
       data.frame(stringsAsFactors = FALSE)
     
@@ -1458,16 +1572,14 @@ sc.scrape_game <- function(game_id, season_id) {
   }
 
 # Run sc.scrape_game function in loop for multiple games
-sc.scrape_pbp <- function(games, season, sleep) { 
+sc.scrape_pbp <- function(games, sleep) { 
   
   # Label games to be scraped
   if (length(games) > 1) cat(paste0("Processing ", length(games), " Games: ", min(sort(as.numeric(games))), " - ", max(sort(as.numeric(games))), "\n", "-------------", "\n")) 
   else cat(paste0("Processing Game:", "\n"))
   
-  
   # Create report data frame
   scrape_report_df <- data.frame()
-  
   
   # Loop to scrape games 
   for(i in 1:length(games)) {
@@ -1481,44 +1593,78 @@ sc.scrape_pbp <- function(games, season, sleep) {
     tryCatch({
       
       pbp_list <- sc.scrape_game(game_id =   games[i], 
-                                 season_id = season)
+                                 season_id = paste0(as.numeric(substr(games[i], 1, 4)), as.numeric(substr(games[i], 1, 4)) + 1)
+                                 )
+      
+      hold_pbp_base <-         pbp_list$pbp_base
+      hold_pbp_extras <-       pbp_list$pbp_extras
+      hold_shifts_raw <-       pbp_list$shifts_raw
+      hold_roster_df <-        pbp_list$roster_df 
+      hold_scratches_df <-     pbp_list$scratches_df 
+      hold_game_info_df <-     pbp_list$game_info_df
+      hold_event_summary_df <- pbp_list$event_summary_df
       
       if (i == 1) { 
-        new_pbp_list <- pbp_list
+        new_pbp_base <-         pbp_list$pbp_base
+        new_pbp_extras <-       pbp_list$pbp_extras
+        new_shifts_raw <-       pbp_list$shifts_raw
+        new_roster_df <-        pbp_list$roster_df 
+        new_scratches_df <-     pbp_list$scratches_df 
+        new_game_info_df <-     pbp_list$game_info_df
+        new_event_summary_df <- pbp_list$event_summary_df
         
         }
       else if (i > 1) { 
-        new_pbp_list <- lapply(seq(1, length(new_pbp_list)), function(x) bind_rows(new_pbp_list[[x]], pbp_list[[x]]))
+        new_pbp_base <-         bind_rows(hold_pbp_base, new_pbp_base)
+        new_pbp_extras <-       bind_rows(hold_pbp_extras, new_pbp_extras)
+        new_shifts_raw <-       bind_rows(hold_shifts_raw, new_shifts_raw)
+        new_roster_df <-        bind_rows(hold_roster_df, new_roster_df)
+        new_scratches_df <-     bind_rows(hold_scratches_df, new_scratches_df)
+        new_game_info_df <-     bind_rows(hold_game_info_df, new_game_info_df)
+        new_event_summary_df <- bind_rows(hold_event_summary_df, new_event_summary_df)
         
         }
       
       }, 
-    # tryCatch Error function
-    error = function(e) cat("ERROR :", conditionMessage(e), "\n")
-    )
+      
+      error = function(e) cat("ERROR :", conditionMessage(e), "\n")
+      
+      )
     
-    # Scrape Report data frame
-    scrape_report_df[i, 1] <- games[i]
-    scrape_report_df[i, 2] <- nrow(pbp_list$pbp_base)
-    scrape_report_df[i, 3] <- nrow(pbp_list$pbp_extras)
-    scrape_report_df[i, 4] <- nrow(pbp_list$shifts_raw)
-    scrape_report_df[i, 5] <- nrow(pbp_list$roster_df)
-    scrape_report_df[i, 6] <- nrow(pbp_list$scratches_df)
-    scrape_report_df[i, 7] <- nrow(pbp_list$game_info_df)
-    scrape_report_df[i, 8] <- nrow(pbp_list$event_summary_df)
-    scrape_report_df[i, 9] <- as.numeric(round(Sys.time() - start_time, 2))
+    # Scrape report data frame
+    if (games[i] == unique(hold_pbp_base$game_id)) { 
+      scrape_report_df[i, 1] <- games[i]
+      scrape_report_df[i, 2] <- nrow(pbp_list$pbp_base)
+      scrape_report_df[i, 3] <- nrow(pbp_list$pbp_extras)
+      scrape_report_df[i, 4] <- nrow(pbp_list$shifts_raw)
+      scrape_report_df[i, 5] <- nrow(pbp_list$roster_df)
+      scrape_report_df[i, 6] <- nrow(pbp_list$scratches_df)
+      scrape_report_df[i, 7] <- nrow(pbp_list$game_info_df)
+      scrape_report_df[i, 8] <- nrow(pbp_list$event_summary_df)
+      scrape_report_df[i, 9] <- as.numeric(round(Sys.time() - start_time, 2))
+      
+      } 
+    else {
+      scrape_report_df[i, 1] <- games[i]
+      scrape_report_df[i, 2] <- NA
+      scrape_report_df[i, 3] <- NA
+      scrape_report_df[i, 4] <- NA
+      scrape_report_df[i, 5] <- NA
+      scrape_report_df[i, 6] <- NA
+      scrape_report_df[i, 7] <- NA
+      scrape_report_df[i, 8] <- NA
+      scrape_report_df[i, 9] <- as.numeric(round(Sys.time() - start_time, 2))
+      
+      }
     
     }
   
-  
   # Add Names
-  names(new_pbp_list) <-     names(pbp_list)
   names(scrape_report_df) <- c("game_id", names(pbp_list), "time_elapsed")
-  
   
   # Print results
   cat("-------------", "\n", 
-      paste0(length(unique(new_pbp_list$pbp_base$game_id)), 
+      paste0(length(unique(new_pbp_base$game_id)), 
              " of ", 
              length(games), 
              " games returned // Avg Time Per Game: ", 
@@ -1526,10 +1672,15 @@ sc.scrape_pbp <- function(games, season, sleep) {
              "\n")
       )
   
-  
-  # Return all data as list
-  return_list <- list(scrape_list = new_pbp_list, 
-                      report =      scrape_report_df)
+  # Return List
+  return_list <- list(pbp_base =         new_pbp_base %>% arrange(game_id),  
+                      pbp_extras =       new_pbp_extras %>% arrange(game_id), 
+                      shifts_raw =       new_shifts_raw %>% arrange(game_id), 
+                      roster_df =        new_roster_df %>% arrange(game_id), 
+                      scratches_df =     new_scratches_df %>% arrange(game_id), 
+                      game_info_df =     new_game_info_df %>% arrange(game_id), 
+                      event_summary_df = new_event_summary_df %>% arrange(game_id), 
+                      report =           scrape_report_df %>% arrange(game_id))
   
   }
 
