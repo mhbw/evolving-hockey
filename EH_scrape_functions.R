@@ -414,6 +414,11 @@ sc.roster_info <- function(game_id_fun, season_id_fun, roster_data, game_info_da
   # Get counts of roster & scratched players
   roster_player_counts <- lapply(str_extract_all(roster_data[grep("^\r\n#\r\nPos\r\nName|^\r\n#\r\nPos\r\nNom/Name", roster_data)], "[0-9]+"), length)
   
+  if (length(roster_player_counts) == 0) { 
+    roster_player_counts <- lapply(str_extract_all(roster_data[grep("^\n#\nPos\nName", roster_data)], "[0-9]+"), length)
+    
+    }
+  
   # Find players in rosters html text
   roster_index <- which(roster_data  %in% c("Name", "Nom/Name")) + 1
   
@@ -1540,7 +1545,7 @@ sc.scrape_game <- function(game_id, season_id) {
     } 
   else { 
     # if ESPN data is not available
-    events_full_df <- prepare_events_HTM_df %>% 
+    events_full_df <- prepare_events_df %>% 
       mutate(coords_x =               NA, 
              coords_y =               NA, 
              event_description_ESPN = NA, 
@@ -1572,7 +1577,7 @@ sc.scrape_game <- function(game_id, season_id) {
   }
 
 # Run sc.scrape_game function in loop for multiple games
-sc.scrape_pbp <- function(games, sleep) { 
+sc.scrape_pbp <- function(games, sleep = 0) { 
   
   # Label games to be scraped
   if (length(games) > 1) cat(paste0("Processing ", length(games), " Games: ", min(sort(as.numeric(games))), " - ", max(sort(as.numeric(games))), "\n", "-------------", "\n")) 
@@ -1632,28 +1637,32 @@ sc.scrape_pbp <- function(games, sleep) {
       )
     
     # Scrape report data frame
-    if (games[i] == unique(hold_pbp_base$game_id)) { 
-      scrape_report_df[i, 1] <- games[i]
-      scrape_report_df[i, 2] <- nrow(pbp_list$pbp_base)
-      scrape_report_df[i, 3] <- nrow(pbp_list$pbp_extras)
-      scrape_report_df[i, 4] <- nrow(pbp_list$shifts_raw)
-      scrape_report_df[i, 5] <- nrow(pbp_list$roster_df)
-      scrape_report_df[i, 6] <- nrow(pbp_list$scratches_df)
-      scrape_report_df[i, 7] <- nrow(pbp_list$game_info_df)
-      scrape_report_df[i, 8] <- nrow(pbp_list$event_summary_df)
-      scrape_report_df[i, 9] <- as.numeric(round(Sys.time() - start_time, 2))
+    if (exists("hold_pbp_base")) { 
       
-      } 
-    else {
-      scrape_report_df[i, 1] <- games[i]
-      scrape_report_df[i, 2] <- NA
-      scrape_report_df[i, 3] <- NA
-      scrape_report_df[i, 4] <- NA
-      scrape_report_df[i, 5] <- NA
-      scrape_report_df[i, 6] <- NA
-      scrape_report_df[i, 7] <- NA
-      scrape_report_df[i, 8] <- NA
-      scrape_report_df[i, 9] <- as.numeric(round(Sys.time() - start_time, 2))
+      if (games[i] == unique(hold_pbp_base$game_id)) { 
+        scrape_report_df[i, 1] <- games[i]
+        scrape_report_df[i, 2] <- nrow(pbp_list$pbp_base)
+        scrape_report_df[i, 3] <- nrow(pbp_list$pbp_extras)
+        scrape_report_df[i, 4] <- nrow(pbp_list$shifts_raw)
+        scrape_report_df[i, 5] <- nrow(pbp_list$roster_df)
+        scrape_report_df[i, 6] <- nrow(pbp_list$scratches_df)
+        scrape_report_df[i, 7] <- nrow(pbp_list$game_info_df)
+        scrape_report_df[i, 8] <- nrow(pbp_list$event_summary_df)
+        scrape_report_df[i, 9] <- as.numeric(round(Sys.time() - start_time, 2))
+        
+        } 
+      else {
+        scrape_report_df[i, 1] <- games[i]
+        scrape_report_df[i, 2] <- NA
+        scrape_report_df[i, 3] <- NA
+        scrape_report_df[i, 4] <- NA
+        scrape_report_df[i, 5] <- NA
+        scrape_report_df[i, 6] <- NA
+        scrape_report_df[i, 7] <- NA
+        scrape_report_df[i, 8] <- NA
+        scrape_report_df[i, 9] <- as.numeric(round(Sys.time() - start_time, 2))
+        
+        }
       
       }
     
