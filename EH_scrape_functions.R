@@ -23,6 +23,9 @@
 # game summary:  http://www.nhl.com/scores/htmlreports/20182019/GS020001.HTM
 # event summary: http://www.nhl.com/scores/htmlreports/20182019/ES020001.HTM
 
+## NHL API link:
+# https://statsapi.web.nhl.com/api/v1/game/2018020001/feed/live?site=en_nhl
+
 ## ESPN links:
 # ESPN game IDs source: http://www.espn.com/nhl/scoreboard?date=20181003
 # ESPN XML source:      http://www.espn.com/nhl/gamecast/data/masterFeed?lang=en&isAll=true&rand=0&gameId=401044320
@@ -234,6 +237,161 @@ sc.scrape_events_HTM <- function(game_id_fun, season_id_fun, attempts) {
   
   }
 
+# Scrape Events (API)
+sc.scrape_events_API <- function(game_id_fun, attempts) { 
+  
+  url_events_API <- NULL
+  try_count <-  attempts
+  
+  while (!is.character(url_events_API) & try_count > 0) { 
+    
+    url_events_API <- try(
+      getURL(paste0("https://statsapi.web.nhl.com/api/v1/game/", 
+                    game_id_fun, 
+                    "/feed/live?site=en_nhl"))
+      )
+    
+    try_count <- try_count - 1
+    
+    }
+  
+  
+  ## Parse JSON // Error handling
+  if (is.character(url_events_API)) {
+    events_list_API <- try(jsonlite::fromJSON(url_events_API), silent = TRUE)
+    } else {
+      events_list_API <- list()
+      }
+  
+  if (class(events_list_API) == "try-error") { 
+    events_list_API <- jsonlite::fromJSON(
+      suppressWarnings(
+        readLines(paste0("https://statsapi.web.nhl.com/api/v1/game/", 
+                         game_id_fun, 
+                         "/feed/live?site=en_nhl"))
+        )
+      )
+    
+    }
+  
+  if (class(events_list_API) != "list") { 
+    events_list_API <- list()
+    
+    }
+  
+  
+  return(events_list_API)
+  
+  }
+
+# Scrape Events (ESPN)
+sc.scrape_events_ESPN <- function(game_id_fun, season_id_fun, game_info_data, attempts) { 
+  
+  ## Scrape ESPN to locate game IDs for the specified date
+  url_ESPN_page <- NULL
+  try_count <- attempts
+  
+  while(class(url_ESPN_page) != "character" & try_count > 0) {
+    
+    url_ESPN_page <- try(
+      getURL(.opts = curlOptions(referer = "www.espn.com",
+                                 verbose = FALSE,
+                                 followLocation = TRUE), 
+             # url to scrape
+             paste0("http://www.espn.com/nhl/scoreboard?date=", gsub("-", "", as.character(game_info_data$game_date)))
+             )
+      )
+    
+    try_count <- try_count - 1
+    
+    }
+  
+  
+  # Parse games from scraped ESPN day page
+  ESPN_game_ids <- as.character(unique(unlist(str_extract_all(url_ESPN_page, "gameId=[0-9]+")))) %>% gsub("gameId=", "", .)
+  ESPN_teams <-    toupper(gsub("team/_/name/|>|</div>", "", unique(unlist(str_extract_all(url_ESPN_page, "team/_/name/[a-zA-Z]+|>(Coyotes|Thrashers)</div>")))))
+  
+  # Check if ESPN URL returned game IDs
+  if (length(ESPN_game_ids) > 0) { 
+    
+    ESPN_games_df <- suppressWarnings(
+      cbind(
+        ESPN_game_ids, 
+        matrix(unique(ESPN_teams), byrow = TRUE, ncol = 2)
+        )) %>% 
+      data.frame(stringsAsFactors = FALSE) %>% 
+      select(game_id =   1, 
+             away_team = V2, 
+             home_team = V3
+        ) %>% 
+      mutate_at(vars(home_team, away_team), 
+                funs(
+                  case_when(
+                    . == "PHX" ~ "ARI", 
+                    . == "TB" ~ "T.B", 
+                    . == "NJ" ~ "N.J", 
+                    . == "SJ" ~ "S.J", 
+                    . == "LA" ~ "L.A", 
+                    . == "VGS" ~ "VGK", 
+                    . == "COYOTES" ~ "ARI", 
+                    . == "THRASHERS" ~ "ATL", 
+                    TRUE ~ .
+                    )
+                  )
+                ) %>% 
+      ## ensure duplicate games are not created
+      group_by(game_id) %>% 
+      mutate(index = row_number()) %>% 
+      filter(index == 1) %>% 
+      select(-index) %>% 
+      data.frame()
+    
+    
+    ## Scrape individual game
+    ESPN_game_id_ <- filter(ESPN_games_df, away_team == game_info_data$away_team, home_team == game_info_data$home_team)$game_id
+    
+    url_ESPN_game <- NULL
+    try_count <- 3
+    
+    while(class(url_ESPN_game) != "character" & try_count > 0) {
+      
+      url_ESPN_game <- try(
+        getURL(.opts = curlOptions(referer = "www.espn.com",
+                                   verbose = FALSE,
+                                   followLocation = TRUE), 
+               # url to scrape
+               paste0("http://www.espn.com/nhl/gamecast/data/masterFeed?lang=en&isAll=true&rand=0&gameId=", 
+                      ESPN_game_id_)
+               )
+        )
+      
+      try_count <- try_count - 1
+      
+      }
+    
+    
+    ## Parse xml data
+    xml_ESPN_events <- url_ESPN_game %>% 
+      gsub("\023", "", .) %>%   ## prevent xml parse from erroring
+      read_xml %>% 
+      xml_nodes("Plays") %>% 
+      xml_children() %>% 
+      xml_text() %>% 
+      strsplit("~") %>% 
+      do.call(rbind, .) %>% 
+      data.frame(stringsAsFactors = FALSE)
+    
+    
+    return(xml_ESPN_events)
+    
+    } else {
+    
+      return(return_char <- "ESPN_NULL")
+    
+      }
+  
+  }
+
 # Scrape Shifts
 sc.scrape_shifts <- function(game_id_fun, season_id_fun, attempts) { 
   
@@ -346,24 +504,22 @@ sc.game_info <- function(game_id_fun, season_id_fun, events_data, roster_data) {
   
   
   # Find referees (french format / standard format)
-  if (roster_data[grep("^Referee|^Arbitre/Referee", roster_data)    ] %in% c("Referee", "Arbitre/Referee") & 
-      roster_data[grep("^Referee|^Arbitre/Referee", roster_data) + 1] %in% c("Linesman", "JL/Linesman")
-      ) { 
+  if (roster_data[grep("^Referee|^Arbitre/Referee", roster_data)] %in% c("Referee", "Arbitre/Referee") & 
+      roster_data[grep("^Referee|^Arbitre/Referee", roster_data) + 1] %in% c("Linesman", "JL/Linesman")) { 
     referee_index <- grep("^Linesman|^JL/Linesman|^Referee:\\s*", roster_data) + 2
     referee_1 <-     na_if_null(toupper(gsub("#[0-9]*\\s", "", roster_data[referee_index    ]) %>% gsub("\\s", ".", .)))
     referee_2 <-     na_if_null(toupper(gsub("#[0-9]*\\s", "", roster_data[referee_index + 1]) %>% gsub("\\s", ".", .)))
     linesman_1 <-    na_if_null(toupper(gsub("#[0-9]*\\s", "", roster_data[referee_index + 3]) %>% gsub("\\s", ".", .)))
     linesman_2 <-    na_if_null(toupper(gsub("#[0-9]*\\s", "", roster_data[referee_index + 4]) %>% gsub("\\s", ".", .)))
     
-    } 
-  else {
-    referee_index <- grep("^Referee:", roster_data)
-    referee_1 <-     na_if_null(toupper(gsub("#[0-9]*\\s", "", roster_data[referee_index + 2]) %>% gsub("\\s", ".", .)))
-    referee_2 <-     na_if_null(toupper(gsub("#[0-9]*\\s", "", roster_data[referee_index + 3]) %>% gsub("\\s", ".", .)))
-    linesman_1 <-    na_if_null(toupper(gsub("#[0-9]*\\s", "", roster_data[referee_index + 6]) %>% gsub("\\s", ".", .)))
-    linesman_2 <-    na_if_null(toupper(gsub("#[0-9]*\\s", "", roster_data[referee_index + 7]) %>% gsub("\\s", ".", .)))
+    } else {
+      referee_index <- grep("^Referee:", roster_data)
+      referee_1 <-     na_if_null(toupper(gsub("#[0-9]*\\s", "", roster_data[referee_index + 2]) %>% gsub("\\s", ".", .)))
+      referee_2 <-     na_if_null(toupper(gsub("#[0-9]*\\s", "", roster_data[referee_index + 3]) %>% gsub("\\s", ".", .)))
+      linesman_1 <-    na_if_null(toupper(gsub("#[0-9]*\\s", "", roster_data[referee_index + 6]) %>% gsub("\\s", ".", .)))
+      linesman_2 <-    na_if_null(toupper(gsub("#[0-9]*\\s", "", roster_data[referee_index + 7]) %>% gsub("\\s", ".", .)))
     
-    }
+      }
   
   
   # Find venue & attendance (french format / standard format)
@@ -371,12 +527,11 @@ sc.game_info <- function(game_id_fun, season_id_fun, events_data, roster_data) {
     venue_vec <-      first(roster_data[grep("^Attendance\\s*", roster_data)]) %>% gsub(".*at\\s*", "", .)
     attendance_vec <- first(roster_data[grep("^Attendance*", roster_data)]) %>% str_extract(., "[0-9]+,[0-9]+") %>% gsub(",", "", .) %>% as.numeric()
     
-    } 
-  else {
-    venue_vec <-      first(roster_data[grep("^Ass./Att.\\s*", roster_data)]) %>% gsub(".*@\\s*", "", .)
-    attendance_vec <- first(roster_data[grep("^Ass./Att.\\s*", roster_data)]) %>% str_extract(., "[0-9]+,[0-9]+") %>% gsub(",", "", .) %>% as.numeric()
+    } else {
+      venue_vec <-      first(roster_data[grep("^Ass./Att.\\s*", roster_data)]) %>% gsub(".*@\\s*", "", .)
+      attendance_vec <- first(roster_data[grep("^Ass./Att.\\s*", roster_data)]) %>% str_extract(., "[0-9]+,[0-9]+") %>% gsub(",", "", .) %>% as.numeric()
     
-    }
+      }
   
   
   # Create game info data frame
@@ -481,25 +636,22 @@ sc.roster_info <- function(game_id_fun, season_id_fun, roster_data, game_info_da
              ) %>% 
       arrange(venue, player)
     
-    } 
-  else {
-    
-    roster_scratches <- data.frame(player = character(), 
-                                   player_num = character(), 
-                                   Team = character(), 
-                                   game_id = character(), 
-                                   game_date = character(), 
-                                   season = character(), 
-                                   session = character(), 
-                                   player_team_num = character(), 
-                                   venue = character(), 
-                                   position_type = character(), 
-                                   position = character(), 
-                                   stringsAsFactors = FALSE
-                                   )
-    
-    }
-  
+    } else {
+      
+      roster_scratches <- data.frame(player =          character(), 
+                                     player_num =      character(), 
+                                     Team =            character(), 
+                                     game_id =         character(), 
+                                     game_date =       character(), 
+                                     season =          character(), 
+                                     session =         character(), 
+                                     player_team_num = character(), 
+                                     venue =           character(), 
+                                     position_type =   character(), 
+                                     position =        character(), 
+                                     stringsAsFactors = FALSE)
+      
+      }
   
   
   # Construct roster data frame
@@ -626,7 +778,7 @@ sc.event_summary <- function(game_id_fun, season_id_fun, event_summary_data, ros
 
 
 
-# Prepare Events Data (HTM) - NEW
+# Prepare Events Data (HTM)
 sc.prepare_events_HTM <- function(game_id_fun, season_id_fun, events_data, game_info_data) { 
   
   # Convert raw html to data frame
@@ -711,6 +863,144 @@ sc.prepare_events_HTM <- function(game_id_fun, season_id_fun, events_data, game_
               funs(ifelse(grepl("[tT]oo\\s*many\\s*men|[A-Z]+\\s*[A-Z]+\\s*[bB]ench[(]", event_description), NA, .))
               ) %>% 
     select(-c(home_skaters, away_skaters)) %>% 
+    data.frame()
+  
+  }
+
+# Prepare Events Data (API)
+sc.prepare_events_API <- function(game_id_fun, events_data_API, game_info_data) { 
+  
+  # Parse API events data
+  events_join_API_raw <- 
+    bind_cols(
+      events_data_API$liveData$plays$allPlays$about %>% select(-goals), 
+      events_data_API$liveData$plays$allPlays$about$goals %>% rename(away.goals = away, home.goals = home) 
+      ) %>% 
+    mutate(eventIdx = eventIdx + 1) %>% 
+    left_join(
+      bind_cols(
+        events_data_API$liveData$plays$allPlays$result %>% select(-strength), 
+        events_data_API$liveData$plays$allPlays$result$strength %>% rename(strength.code = code, strength.name = name)) %>% 
+        mutate(eventIdx = row_number()), 
+      by = "eventIdx"
+      ) %>% 
+    left_join( 
+      events_data_API$liveData$plays$allPlays$coordinates %>% mutate(eventIdx = row_number()), 
+      by = "eventIdx"
+      ) %>% 
+    left_join(
+      events_data_API$liveData$plays$allPlays$team %>% 
+        mutate(triCode =  Team_ID$Team[match(id, Team_ID$ID)], ## use HTM source team triCodes
+               eventIdx = row_number()
+          ), 
+      by = "eventIdx"
+      ) %>% 
+    select(eventIdx, 
+           game_period = period, 
+           time_elapsed = periodTime, 
+           event_type = eventTypeId, 
+           event_team = triCode, 
+           event_description = description, 
+           coords_x = x, 
+           coords_y = y
+      ) %>% 
+    mutate(game_seconds = period_to_seconds(ms(time_elapsed)), 
+           game_seconds = 
+             case_when(
+               game_period == 2 ~ game_seconds + 1200, 
+               game_period == 3 ~ game_seconds + 2400, 
+               game_period == 4 ~ game_seconds + 3600, 
+               game_period == 5 ~ game_seconds + 3900, 
+               TRUE ~ game_seconds
+              ), 
+           event_type = 
+             case_when(
+               event_type == "BLOCKED_SHOT" ~ "BLOCK", 
+               event_type == "FACEOFF" ~ "FAC", 
+               event_type == "PENALTY" ~ "PENL", 
+               event_type == "GIVEAWAY" ~ "GIVE", 
+               event_type == "TAKEAWAY" ~ "TAKE", 
+               event_type == "MISSED_SHOT" ~ "MISS", 
+               TRUE ~ event_type
+               )
+           ) %>% 
+    filter(event_type %in% c("TAKE", "GIVE", "MISS", "HIT", "SHOT", "BLOCK", "GOAL", "PENL", "FAC")) %>% 
+    data.frame()
+  
+  
+  # Parse Roster Data
+  roster_data_API <- bind_rows(
+    # Home players
+    foreach(i = 1:length(events_data_API$liveData$boxscore$teams$home$players), .combine = bind_rows) %do% {
+      
+      data.frame(player_ID = na_if_null(events_data_API$liveData$boxscore$teams$home$players[[i]]$person$id), 
+                 fullName =  na_if_null(events_data_API$liveData$boxscore$teams$home$players[[i]]$person$fullName), 
+                 Team =      game_info_data$home_team, 
+                 number =    na_if_null(events_data_API$liveData$boxscore$teams$home$players[[i]]$jerseyNumber), 
+                 stringsAsFactors = FALSE
+        )
+      
+      } %>% 
+      data.frame(row.names = NULL), 
+    # Away players
+    foreach(i = 1:length(events_data_API$liveData$boxscore$teams$away$players), .combine = bind_rows) %do% {
+      
+      data.frame(player_ID = na_if_null(events_data_API$liveData$boxscore$teams$away$players[[i]]$person$id), 
+                 fullName =  na_if_null(events_data_API$liveData$boxscore$teams$away$players[[i]]$person$fullName), 
+                 Team =      game_info_data$away_team, 
+                 number =    na_if_null(events_data_API$liveData$boxscore$teams$away$players[[i]]$jerseyNumber), 
+                 stringsAsFactors = FALSE
+        )
+      
+      } %>% 
+      data.frame(row.names = NULL)
+    ) %>% 
+    mutate(player_team_num = paste0(Team, number))
+  
+  
+  # Parse event players data
+  events_players_list_API <- events_data_API$liveData$plays$allPlays$players
+  
+  events_players_raw_API <- foreach(i = 1:length(events_players_list_API), .combine = rbind) %do% { 
+    
+    if (length(events_players_list_API[[i]]$player$fullName) > 0) { 
+      
+      data.frame(eventIdx =       i,  
+                 event_player_1 = as.character(events_players_list_API[[i]]$player$id[1]), 
+                 event_player_2 = as.character(events_players_list_API[[i]]$player$id[2]), 
+                 stringsAsFactors = FALSE)
+      
+      } else {
+      
+        data.frame(eventIdx =       i,  
+                   event_player_1 = NA, 
+                   event_player_2 = NA, 
+                   stringsAsFactors = FALSE)
+      
+        }
+    
+    } %>% 
+    mutate(event_player_1 = roster_data_API$player_team_num[match(event_player_1, roster_data_API$player_ID)], 
+           event_player_2 = roster_data_API$player_team_num[match(event_player_2, roster_data_API$player_ID)]
+      ) %>% 
+    data.frame()
+  
+  
+  # Final Join
+  events_join_API <- events_join_API_raw %>% 
+    left_join(., events_players_raw_API, by = "eventIdx") %>% 
+    ## Correct event players and event team for blocked shots
+    mutate(hold_player_1 =  ifelse(event_type == "BLOCK", event_player_2, NA), 
+           hold_player_2 =  ifelse(event_type == "BLOCK", event_player_1, NA), 
+           event_player_1 = ifelse(event_type == "BLOCK", hold_player_1, event_player_1), 
+           event_player_2 = ifelse(event_type == "BLOCK", hold_player_2, event_player_2), 
+           event_team =     ifelse(event_type == "BLOCK", 
+                                   ifelse(event_team == game_info_data$home_team, game_info_data$away_team, game_info_data$home_team), 
+                                   event_team), 
+           coords_x =       coords_x - 1, 
+           coords_y =       coords_y + 1
+           ) %>% 
+    select(game_period, game_seconds, event_type, event_team, event_description, coords_x, coords_y, event_player_1) %>% 
     data.frame()
   
   }
@@ -858,120 +1148,230 @@ sc.prepare_shifts <- function(game_id_fun, season_id_fun, shifts_list, roster_da
 
 
 
-# Scrape Events (ESPN)
-sc.scrape_events_ESPN <- function(game_id_fun, season_id_fun, game_info_data, attempts) { 
+# Join coordinates (API, main)
+sc.join_coordinates_API <- function(events_data_API, events_data_HTM) { 
   
-  ## Scrape ESPN to locate game IDs for the specified date
-  url_ESPN_page <- NULL
-  try_count <- attempts
-  
-  while(class(url_ESPN_page) != "character" & try_count > 0) {
-    
-    url_ESPN_page <- try(
-      getURL(.opts = curlOptions(referer = "www.espn.com",
-                                 verbose = FALSE,
-                                 followLocation = TRUE), 
-             # url to scrape
-             paste0("http://www.espn.com/nhl/scoreboard?date=", gsub("-", "", as.character(game_info_data$game_date)))
-             )
-      )
-    
-    try_count <- try_count - 1
-    
-    }
-  
-  
-  # Parse games from scraped ESPN day page
-  ESPN_game_ids <- as.character(unique(unlist(str_extract_all(url_ESPN_page, "gameId=[0-9]+")))) %>% gsub("gameId=", "", .)
-  ESPN_teams <-    toupper(gsub("team/_/name/|>|</div>", "", unique(unlist(str_extract_all(url_ESPN_page, "team/_/name/[a-zA-Z]+|>(Coyotes|Thrashers)</div>")))))
-  
-  ESPN_games_df <- suppressWarnings(
-    cbind(
-    ESPN_game_ids, 
-    matrix(unique(ESPN_teams), byrow = TRUE, ncol = 2)
-    )) %>% 
-    data.frame(stringsAsFactors = FALSE) %>% 
-    select(game_id =   1, 
-           away_team = V2, 
-           home_team = V3
-           ) %>% 
-    mutate_at(vars(home_team, away_team), 
-              funs(
-                case_when(
-                  . == "PHX" ~ "ARI", 
-                  . == "TB" ~ "T.B", 
-                  . == "NJ" ~ "N.J", 
-                  . == "SJ" ~ "S.J", 
-                  . == "LA" ~ "L.A", 
-                  . == "VGS" ~ "VGK", 
-                  . == "COYOTES" ~ "ARI", 
-                  . == "THRASHERS" ~ "ATL", 
-                  TRUE ~ .
-                  )
-                )
-              ) %>% 
-    ## ensure duplicate games are not created
-    group_by(game_id) %>% 
-    mutate(index = row_number()) %>% 
-    filter(index == 1) %>% 
-    select(-index) %>% 
+  # Base JSON events
+  pbp_JSON_events <- events_data_API %>% 
+    group_by(game_period, game_seconds, event_type, event_team) %>% 
+    mutate(group_count = n()) %>% 
     data.frame()
   
   
-  ## Scrape individual game
-  ESPN_game_id_ <- filter(ESPN_games_df, away_team == game_info_data$away_team, home_team == game_info_data$home_team)$game_id
+  ## ----------------------------------- ##
+  ##   Add Coords to HTM Events - Base   ##
+  ## ----------------------------------- ##
   
-  url_ESPN_game <- NULL
-  try_count <- 3
+  combine_events_okay_API <- events_data_HTM %>% 
+    select(eventIdx, game_period, game_seconds, event_type, event_team) %>% 
+    filter(event_type %in% unique(na.omit(pbp_JSON_events$event_type))) %>% 
+    left_join(., pbp_JSON_events %>% 
+                select(-c(event_player_1)) %>% 
+                filter(group_count == 1),  ## filter out concurrent events
+              by = c("game_period", "game_seconds", "event_type", "event_team")
+              ) %>% 
+    filter(!is.na(group_count)) %>% 
+    select(-c(group_count)) %>% 
+    data.frame()
   
-  while(class(url_ESPN_game) != "character" & try_count > 0) {
+  
+  
+  ## ---------------------------------------- ##
+  ##   Add Coords to HTM Events - Reconcile   ##
+  ## ---------------------------------------- ##
+  
+  pbp_JSON_events_prob <- NULL
+  
+  # Reconcile coordinates for concurrent events (same type, same second)
+  if (nrow(filter(pbp_JSON_events, group_count > 1, event_type != "PENL")) > 0) { 
     
-    url_ESPN_game <- try(
-      getURL(.opts = curlOptions(referer = "www.espn.com",
-                                 verbose = FALSE,
-                                 followLocation = TRUE), 
-             # url to scrape
-             paste0("http://www.espn.com/nhl/gamecast/data/masterFeed?lang=en&isAll=true&rand=0&gameId=", 
-                    ESPN_game_id_)
-             )
-      )
+    # Prepare concurrent events data (JSON)
+    pbp_JSON_events_prob <- pbp_JSON_events %>% 
+      filter(group_count > 1,           ## only act on problem rows
+             event_type != "PENL"       ## not adding coordinates for concurrent penalties
+             ) %>%  
+      mutate(index = row_number()) %>% 
+      group_by(game_period, game_seconds, event_type, event_player_1) %>% 
+      mutate(same_check = n()) %>% 
+      data.frame()
     
-    try_count <- try_count - 1
+    
+    # Fix non-penalty events using pbp_JSON_events_prob object
+    if (nrow(pbp_JSON_events_prob) > 0) { 
+      
+      # Add coordinates - each event_player_1 is separate
+      if (max(pbp_JSON_events_prob$same_check) == 1) {   ## check if each event is separate event_player_1
+        
+        combine_events_prob_API <- events_data_HTM %>% 
+          select(eventIdx, game_period, game_seconds, event_type, event_team, event_player_1) %>% 
+          filter(event_type %in% unique(na.omit(pbp_JSON_events$event_type))) %>% 
+          left_join(., pbp_JSON_events_prob, 
+                    by = c("game_period", "game_seconds", "event_type", "event_team", "event_player_1")
+                    ) %>% 
+          filter(!is.na(group_count)) %>% 
+          # Ensure new rows created from join are filtered out (precaution)
+          group_by(eventIdx) %>% 
+          mutate(remove = row_number() - 1) %>%
+          filter(remove == 0) %>% 
+          select(eventIdx, game_period, game_seconds, event_type, event_team, event_description, coords_x, coords_y) %>% 
+          data.frame()
+        
+        } 
+      
+      # Add coordinates - event_player_1 is the same for at least one concurrent event group
+      else if (max(pbp_JSON_events_prob$same_check) == 2) {
+        
+        # handle only same-player concurrent events
+        if (length(unique(pbp_JSON_events_prob$same_check)) == 1) { 
+          
+          combine_events_prob_API <- events_data_HTM %>% 
+            select(eventIdx, game_period, game_seconds, event_type, event_team, event_player_1) %>% 
+            filter(event_type %in% unique(na.omit(pbp_JSON_events$event_type))) %>% 
+            left_join(., pbp_JSON_events_prob, 
+                      by = c("game_period", "game_seconds", "event_type", "event_team", "event_player_1")
+                      ) %>% 
+            filter(!is.na(group_count)) %>% 
+            # Select first and last rows (duplicate rows created, filtered out)
+            group_by(game_period, game_seconds, event_type) %>% 
+            mutate(row =      row_number(),  
+                   filtered = ifelse(row_number() == max(row) | row_number() == min(row), 1, 0)
+                   ) %>% 
+            filter(filtered == 1) %>% 
+            # Ensure new rows created from join are filtered out if something went wrong
+            group_by(eventIdx) %>% 
+            mutate(remove = row_number() - 1) %>%  ##  (any "created" row marked with a 1, 2, 3...)
+            filter(remove == 0) %>%                ##  ("created" rows filtered out)
+            select(eventIdx, game_period, game_seconds, event_type, event_team, event_description, coords_x, coords_y) %>% 
+            data.frame()
+          
+          }
+        
+        # handle combination of same player and multiple player concurrent events
+        else if (length(unique(pbp_JSON_events_prob$same_check)) > 1) { 
+          
+          # Initial join with HTM events
+          hold_df_API <- events_data_HTM %>% 
+            select(eventIdx, game_period, game_seconds, event_type, event_team, event_player_1) %>% 
+            filter(event_type %in% unique(na.omit(pbp_JSON_events$event_type))) %>% 
+            left_join(., pbp_JSON_events_prob, 
+                      by = c("game_period", "game_seconds", "event_type", "event_team", "event_player_1")
+                      ) %>% 
+            filter(!is.na(group_count))
+          
+          # Single player events filtered
+          done_df_API <- hold_df_API %>% 
+            filter(same_check == 1) %>% 
+            select(eventIdx, game_period, game_seconds, event_type, event_team, event_description, coords_x, coords_y)
+          
+          # Multiple player events filtered
+          fix_df_API <- hold_df_API %>% 
+            filter(same_check > 1) %>% 
+            # Select first and last rows (duplicate rows created, filtered out)
+            group_by(game_period, game_seconds, event_type) %>% 
+            mutate(row =      row_number(),  
+                   filtered = ifelse(row_number() == max(row) | row_number() == min(row), 1, 0)
+                   ) %>% 
+            filter(filtered == 1) %>% 
+            # Ensure new rows created from join are filtered out if something went wrong
+            group_by(eventIdx) %>% 
+            mutate(remove = row_number() - 1) %>%  ##  (any "created" row marked with a 1, 2, 3...)
+            filter(remove == 0) %>%                ##  ("created" rows filtered out)
+            ungroup() %>% 
+            select(eventIdx, game_period, game_seconds, event_type, event_team, event_description, coords_x, coords_y) %>% 
+            data.frame()
+          
+          
+          # Combine to final object for joining
+          combine_events_prob_API <- bind_rows(
+            done_df_API, 
+            fix_df_API
+            ) %>% 
+            arrange(eventIdx)
+          
+          }
+        
+        }
+      
+      # Add coordinates - potential for max(pbp_ESPN_events_prob$same_check) == 3 not accounted for at this time (no instances identified)
+      
+      } 
+    
+    
+    # Join to data not effected by concurrent event issues
+    if (exists("combine_events_prob_API")) { 
+      combine_events_reconcile_API <- bind_rows(
+        combine_events_okay_API, 
+        combine_events_prob_API
+        ) %>% 
+        arrange(eventIdx) %>% 
+        data.frame()
+      
+      } else {
+        combine_events_reconcile_API <- combine_events_okay_API
+      
+        }
     
     }
   
   
-  ## Parse xml data
-  xml_ESPN_events <- url_ESPN_game %>% 
-    gsub("\023", "", .) %>%   ## prevent xml parse from erroring
-    read_xml %>% 
-    xml_nodes("Plays") %>% 
-    xml_children() %>% 
-    xml_text() %>% 
-    strsplit("~") %>% 
-    do.call(rbind, .) %>% 
-    data.frame(stringsAsFactors = FALSE)
+  
+  ## ---------------------------------- ##
+  ##   Join JSON Coords w/ HTM Events   ##
+  ## ---------------------------------- ##
+  
+  # Determine object to join
+  if (nrow(filter(pbp_JSON_events, group_count > 1, event_type != "PENL")) == 0) { 
+    combine_events_final_API <- combine_events_okay_API
+    
+    } else {
+      combine_events_final_API <- combine_events_reconcile_API
+    
+      }
   
   
-  # Return data as list 
-  return_list <- list(xml_ESPN_events = xml_ESPN_events, 
-                      ESPN_game_id =    ESPN_game_id_)
+  # Final Join
+  pbp_events_full <- events_data_HTM %>% 
+    left_join(., combine_events_final_API %>% 
+                select(eventIdx, game_period, game_seconds, event_type, coords_x, coords_y, event_team, 
+                       event_description_alt = event_description
+                       ), 
+              by = c("eventIdx", "game_period", "game_seconds", "event_type", "event_team")
+              ) %>% 
+    data.frame()
+  
+  
+  # Override reconciliation process if duplicate rows created
+  if (nrow(events_data_HTM) != nrow(pbp_events_full)) {
+    warning("additional events created in coordinate reconciliation, NAs created in lieu")
+    
+    pbp_events_full <- events_data_HTM %>% 
+      left_join(., combine_events_okay %>% 
+                  select(eventIdx, game_period, game_seconds, event_type, coords_x, coords_y, event_team, 
+                         event_description_alt = event_description
+                         ), 
+                by = c("eventIdx", "game_period", "game_seconds", "event_type", "event_team")
+                ) %>% 
+      data.frame()
+    
+    }
+  
+  
+  return(pbp_events_full)
   
   }
 
-# Combine HTM & ESPN Events (add coordinates)
-sc.join_coordinates <- function(season_id_fun, events_data_ESPN, events_data_HTM, roster_data) { 
+# Join coordinates (ESPN, backup)
+sc.join_coordinates_ESPN <- function(season_id_fun, events_data_ESPN, events_data_HTM, roster_data) { 
   
   # Change WPG to ATL if applicable (same ESPN team ID)
   if (as.numeric(season_id_fun) <= 20102011) { 
     ESPN_team_IDs_update <- ESPN_team_IDs %>% 
       mutate(Team = ifelse(Team == "WPG", "ATL", Team))
     
-    }
-  else {
-    ESPN_team_IDs_update <- ESPN_team_IDs
+    } else {
+      ESPN_team_IDs_update <- ESPN_team_IDs
     
-    }
+      }
   
   
   ## --------------------------- ##
@@ -1058,6 +1458,7 @@ sc.join_coordinates <- function(season_id_fun, events_data_ESPN, events_data_HTM
                  event_type == "SHOT" & game_period < 5 ~  gsub("Shot\\s*on\\s*goal\\s*by\\s*", "", event_description) %>% gsub("\\s*saved by.+|\\s*[(]+.*", "", .), 
                  event_type == "MISS" & game_period < 5 ~  gsub("Shot\\s*missed\\s*by\\s*", "", event_description) %>% gsub("\\s*[(]+.*", "", .), 
                  event_type == "BLOCK" & game_period < 5 ~ gsub("\\s*shot\\s*blocked\\s*by.*", "", event_description), 
+                 ## blocked shots do not have the shooter prior to 2010-2011
                  
                  event_type == "HIT" ~  gsub("\\s*credited\\s*.*", "", event_description), 
                  event_type == "GIVE" ~ gsub("Giveaway\\s*by\\s*", "", event_description) %>% gsub("\\s*\\bin\\b\\s*.*", "", .), 
@@ -1226,20 +1627,17 @@ sc.join_coordinates <- function(season_id_fun, events_data_ESPN, events_data_HTM
   if (nrow(filter(pbp_ESPN_events, group_count > 1, event_type != "PENL")) == 0) { 
     combine_events_final <- combine_events_okay
     
-    } 
-  else {
-    combine_events_final <- combine_events_reconcile
+    } else {
+      combine_events_final <- combine_events_reconcile
     
-    }
+      }
   
   
   # Final Join
   pbp_events_full <- events_data_HTM %>% 
     left_join(., combine_events_final %>% 
                 select(eventIdx, game_period, game_seconds, event_type, coords_x, coords_y, event_team, 
-                       event_description_ESPN = event_description, 
-                       team_ID_ESPN, 
-                       event_type_ESPN = ESPN_type
+                       event_description_alt = event_description
                        ), 
               by = c("eventIdx", "game_period", "game_seconds", "event_type", "event_team")
               ) %>% 
@@ -1253,9 +1651,7 @@ sc.join_coordinates <- function(season_id_fun, events_data_ESPN, events_data_HTM
     pbp_events_full <- events_data_HTM %>% 
       left_join(., combine_events_okay %>% 
                   select(eventIdx, game_period, game_seconds, event_type, coords_x, coords_y, event_team, 
-                         event_description_ESPN = event_description, 
-                         team_ID_ESPN, 
-                         event_type_ESPN = ESPN_type
+                         event_description_alt = event_description
                          ), 
                 by = c("eventIdx", "game_period", "game_seconds", "event_type", "event_team")
                 ) %>% 
@@ -1479,7 +1875,7 @@ sc.pbp_finalize <- function(pbp_data, on_data_home, on_data_away, roster_data, g
       # Additional selections (to be split out)
       changes, home_skaters_alt, away_skaters_alt, game_strength_state_alt, 
       home_G_change, away_G_change, 
-      event_description_ESPN, team_ID_ESPN, event_type_ESPN
+      event_description_alt
       ) %>% 
     arrange(game_id, event_index) %>% 
     data.frame()
@@ -1490,7 +1886,7 @@ sc.pbp_finalize <- function(pbp_data, on_data_home, on_data_away, roster_data, g
     select(season:game_strength_state)
   
   pbp_extras <- pbp_combined %>% 
-    select(game_id, event_index, changes:event_type_ESPN)
+    select(game_id, event_index, changes:event_description_alt)
   
   
   # Return data as a list 
@@ -1501,21 +1897,28 @@ sc.pbp_finalize <- function(pbp_data, on_data_home, on_data_away, roster_data, g
   }
 
 
+#game_id <- "2018020226"
+#season_id <- "20182019"
+
 
 # Run All Functions to Scrape Game Data
 sc.scrape_game <- function(game_id, season_id) { 
   
-  # Scrape HTM events
+  # Scrape events - HTM
   events_HTM <- sc.scrape_events_HTM(game_id_fun = game_id, season_id_fun = season_id, attempts = 3)
   
-  # Scrape HTM shifts
+  # Scrape events - API
+  events_API <- sc.scrape_events_API(game_id_fun = game_id, attempts = 3)
+  
+  # Scrape shifts
   shifts_HTM <- sc.scrape_shifts(game_id_fun = game_id, season_id_fun = season_id, attempts = 3)
   
-  # Scrape HTM rosters
+  # Scrape rosters
   rosters_HTM <- sc.scrape_rosters(game_id_fun = game_id, season_id_fun = season_id, attempts = 3)
   
   # Scrape Event Summary
   event_summary_HTM <- sc.scrape_event_summary(game_id_fun = game_id, season_id_fun = season_id, attempts = 3)
+  
   
   
   # Create game information data frame
@@ -1528,31 +1931,65 @@ sc.scrape_game <- function(game_id, season_id) {
   event_summary_df <- sc.event_summary(game_id_fun = game_id, season_id_fun = season_id, event_summary_data = event_summary_HTM, roster_data = rosters_list$roster_df, game_info_data = game_info_df)
   
   
-  # Prepare Events Data (HTM)
-  prepare_events_df <- sc.prepare_events_HTM(game_id_fun = game_id, season_id_fun = season_id, events_data = events_HTM, game_info_data = game_info_df)
   
-  # Prepare Shifts Data (HTM)
+  # Prepare Shifts Data
   prepare_shifts_list <- sc.prepare_shifts(game_id_fun = game_id, season_id_fun = season_id, shifts_list = shifts_HTM, roster_data = rosters_list$roster_df, game_info_data = game_info_df)
   
+  # Prepare Events Data (HTM)
+  prepare_events_HTM_df <- sc.prepare_events_HTM(game_id_fun = game_id, season_id_fun = season_id, events_data = events_HTM, game_info_data = game_info_df)
   
-  # Scrape Events (ESPN)
-  events_ESPN_list <- sc.scrape_events_ESPN(game_id_fun = game_id, season_id_fun = season_id, game_info_data = game_info_df, attempts = 3)
-  
-  # Combine HTM & ESPN Events (add coordinates)
-  if (nrow(events_ESPN_list$xml_ESPN_events) > 0) { 
-    events_full_df <- sc.join_coordinates(season_id_fun = season_id, events_data_ESPN = events_ESPN_list$xml_ESPN_events, events_data_HTM = prepare_events_df, roster_data = rosters_list$roster_df)
+  # Prepare Events Data (API)
+  if (!is.null(events_API$liveData$plays$allPlays$coordinates)) { 
     
-    } 
-  else { 
-    # if ESPN data is not available
-    events_full_df <- prepare_events_df %>% 
-      mutate(coords_x =               NA, 
-             coords_y =               NA, 
-             event_description_ESPN = NA, 
-             team_ID_ESPN =           NA, 
-             event_type_ESPN =        NA)
+    if (ncol(events_API$liveData$plays$allPlays$coordinates) > 0) { 
+      prepare_events_API_df <- sc.prepare_events_API(game_id_fun = game_id, events_data_API = events_API, game_info_data = game_info_df)
+      coord_type <- "NHL_API"
       
-    }
+      } else {
+        prepare_events_API_df <- NULL
+      
+        }
+    
+    } else {
+      prepare_events_API_df <- NULL
+    
+      }
+  
+  
+  # Join coordinates
+  if (!is.null(prepare_events_API_df)) {  ## NHL API SOURCE
+    events_full_df <- sc.join_coordinates_API(events_data_API = prepare_events_API_df, events_data_HTM = prepare_events_HTM_df)
+    
+    } else {                              ## ESPN XML SOURCE
+      prepare_events_ESPN_df <- sc.scrape_events_ESPN(game_id_fun = game_id, season_id_fun = season_id, game_info_data = game_info_df, attempts = 3)
+      
+      if (class(prepare_events_ESPN_df) == "data.frame") { 
+      
+        if (nrow(prepare_events_ESPN_df) > 0) { 
+          events_full_df <- sc.join_coordinates_ESPN(season_id_fun = season_id, events_data_ESPN = prepare_events_ESPN_df, events_data_HTM = prepare_events_HTM_df, roster_data = rosters_list$roster_df)
+          coord_type <- "ESPN"
+          
+          } else {  ## COORDINATES NOT AVAILABLE
+            events_full_df <- prepare_events_HTM_df %>% 
+              mutate(coords_x =              NA, 
+                     coords_y =              NA, 
+                     event_description_alt = NA)
+            
+            coord_type <- "NO_COORDS"
+        
+            }
+      
+        } else {
+          events_full_df <- prepare_events_HTM_df %>% 
+            mutate(coords_x =              NA, 
+                   coords_y =              NA, 
+                   event_description_alt = NA)
+      
+          coord_type <- "NO_COORDS"
+          
+          }
+    
+      }
   
   
   # Combine / Process Shifts and Events Data 
@@ -1571,7 +2008,7 @@ sc.scrape_game <- function(game_id, season_id) {
                       shifts_raw =       prepare_shifts_list$shifts_raw, 
                       roster_df =        rosters_list$roster_df, 
                       scratches_df =     rosters_list$scratches_df, 
-                      game_info_df =     game_info_df %>% mutate(ESPN_game_id = events_ESPN_list$ESPN_game_id), 
+                      game_info_df =     game_info_df %>% mutate(coord_source = coord_type), 
                       event_summary_df = event_summary_df)
   
   }
@@ -1580,11 +2017,10 @@ sc.scrape_game <- function(game_id, season_id) {
 sc.scrape_pbp <- function(games, sleep = 0) { 
   
   # Label games to be scraped
-  if (length(games) > 1) cat(paste0("Processing ", length(games), " Games: ", min(sort(as.numeric(games))), " - ", max(sort(as.numeric(games))), "\n", "-------------", "\n")) 
-  else cat(paste0("Processing Game:", "\n"))
+  if (length(games) > 1) cat(paste0("Processing ", length(games), " Games: ", min(sort(as.numeric(games))), " - ", max(sort(as.numeric(games))), "\n", "-------------", "\n")) else cat(paste0("Processing Game:", "\n"))
   
   # Create report data frame
-  scrape_report_df <- data.frame()
+  scrape_report_df <- data.frame(matrix(ncol = 9))
   
   # Loop to scrape games 
   for(i in 1:length(games)) {
@@ -1598,7 +2034,9 @@ sc.scrape_pbp <- function(games, sleep = 0) {
     tryCatch({
       
       pbp_list <- sc.scrape_game(game_id =   games[i], 
-                                 season_id = paste0(as.numeric(substr(games[i], 1, 4)), as.numeric(substr(games[i], 1, 4)) + 1)
+                                 season_id = paste0(as.numeric(substr(games[i], 1, 4)), 
+                                                    as.numeric(substr(games[i], 1, 4)) + 1
+                                                    )
                                  )
       
       hold_pbp_base <-         pbp_list$pbp_base
@@ -1609,7 +2047,7 @@ sc.scrape_pbp <- function(games, sleep = 0) {
       hold_game_info_df <-     pbp_list$game_info_df
       hold_event_summary_df <- pbp_list$event_summary_df
       
-      if (i == 1) { 
+      if (i == 1 | !exists("new_pbp_base")) { 
         new_pbp_base <-         pbp_list$pbp_base
         new_pbp_extras <-       pbp_list$pbp_extras
         new_shifts_raw <-       pbp_list$shifts_raw
@@ -1650,21 +2088,19 @@ sc.scrape_pbp <- function(games, sleep = 0) {
         scrape_report_df[i, 8] <- nrow(pbp_list$event_summary_df)
         scrape_report_df[i, 9] <- as.numeric(round(Sys.time() - start_time, 2))
         
-        } 
-      else {
-        scrape_report_df[i, 1] <- games[i]
-        scrape_report_df[i, 2] <- NA
-        scrape_report_df[i, 3] <- NA
-        scrape_report_df[i, 4] <- NA
-        scrape_report_df[i, 5] <- NA
-        scrape_report_df[i, 6] <- NA
-        scrape_report_df[i, 7] <- NA
-        scrape_report_df[i, 8] <- NA
-        scrape_report_df[i, 9] <- as.numeric(round(Sys.time() - start_time, 2))
+        } else {
+          scrape_report_df[i, 1] <-       games[i]
+          scrape_report_df[i, c(2, 8)] <- NA
+          scrape_report_df[i, 9] <-       as.numeric(round(Sys.time() - start_time, 2))
         
-        }
+          }
       
-      }
+      } else {
+        scrape_report_df[i, 1] <-       games[i]
+        scrape_report_df[i, c(2, 8)] <- NA
+        scrape_report_df[i, 9] <-       as.numeric(round(Sys.time() - start_time, 2))
+      
+        }
     
     }
   
