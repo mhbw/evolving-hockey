@@ -1682,13 +1682,13 @@ sc.pbp_combine <- function(events_data, shifts_data, roster_data, game_info_data
            ) %>% 
     # determine priority for arranging events (from Manny Perry's code)
     mutate(priority = 
-             1 * (event_type %in% c("TAKE", "GIVE", "MISS", "HIT", "SHOT", "BLOCK")) +
-             2 * (event_type == "GOAL") +
-             3 * (event_type == "STOP") +
-             4 * (event_type == "PENL") +
-             5 * (event_type == "OFF") +
-             6 * (event_type == "ON") +
-             7 * (event_type == "FAC")
+             1 * (event_type %in% c("TAKE", "GIVE", "MISS", "HIT", "SHOT", "BLOCK") & (game_period < 5 & session == "R")) +
+             2 * (event_type == "GOAL" & (game_period < 5 & session == "R")) +
+             3 * (event_type == "STOP" & (game_period < 5 & session == "R")) +
+             4 * (event_type == "PENL" & (game_period < 5 & session == "R")) +
+             5 * (event_type == "OFF" &  (game_period < 5 & session == "R")) +
+             6 * (event_type == "ON" &   (game_period < 5 & session == "R")) +
+             7 * (event_type == "FAC" &  (game_period < 5 & session == "R"))
            ) %>% 
     arrange(game_period, game_seconds, priority) %>% 
     mutate(event_index = cumsum(!is.na(game_id))) %>%
@@ -1896,9 +1896,6 @@ sc.pbp_finalize <- function(pbp_data, on_data_home, on_data_away, roster_data, g
   
   }
 
-
-#game_id <- "2018020226"
-#season_id <- "20182019"
 
 
 # Run All Functions to Scrape Game Data
@@ -2131,8 +2128,6 @@ sc.scrape_pbp <- function(games, sleep = 0) {
 
 
 ##########################
-
-
 
 
 
