@@ -1102,6 +1102,7 @@ sc.prepare_shifts <- function(game_id_fun, season_id_fun, shifts_list, roster_da
     ungroup() %>% 
     mutate(filtered = ifelse(X3 == "20:00 / 0:00" & lag(X4) == "20:00 / 0:00", 1, 0)) %>% 
     filter(filtered == 0) %>% 
+    select(-filtered) %>% 
     data.frame()
   
   colnames(shifts_parse_full)[4:8] <- c("shift_num", "game_period", "shift_start", "shift_end", "duration")
