@@ -398,7 +398,7 @@ sc.scrape_events_ESPN <- function(game_id_fun, season_id_fun, game_info_data, at
   
   }
 
-# Scrape Shifts
+# Scrape Shifts (HTM)
 sc.scrape_shifts <- function(game_id_fun, season_id_fun, attempts) { 
   
   url_home_shifts <- NULL
@@ -447,6 +447,33 @@ sc.scrape_shifts <- function(game_id_fun, season_id_fun, attempts) {
                        away_shifts_titles = away_shifts_titles, 
                        home_shifts_text =   home_shifts_text, 
                        away_shifts_text =   away_shifts_text)
+  
+  }
+
+# Scrape Shifts (API, unused at this time)
+sc.scrape_shifts_API <- function(game_id_fun, attempts) { 
+  
+  url_shifts <- NULL
+  try_count <-  attempts
+  
+  while (!is.character(url_shifts) & try_count > 0) { 
+    
+    url_shifts <- try(
+      getURL(paste0("http://www.nhl.com/stats/rest/shiftcharts?cayenneExp=gameId=", 
+                    game_id_fun))
+      )
+    
+    try_count <- try_count - 1
+    
+    }
+  
+  if (is.character(url_shifts)) {
+    shifts_list <- jsonlite::fromJSON(url_shifts)
+    } else {
+      shifts_list <- list()
+      }
+  
+  return(shifts_list)
   
   }
 
@@ -740,35 +767,35 @@ sc.event_summary <- function(game_id_fun, season_id_fun, event_summary_data, ros
   home_index <- index[index > index_sep[1] & index < index_sep[2]]
   
   
-  # Away players
-  event_summary_away <- foreach(i = 1:length(away_index), .combine = bind_rows) %do% {
-    
-    event_summary_data[away_index[i]:(away_index[i] + 24)] %>%
-      matrix(ncol = 25, byrow = TRUE) %>%
-      data.frame(stringsAsFactors = FALSE)
-    
-    } %>% 
-    mutate_all(funs(gsub("\\b\\s\\b", 0, .))) %>% 
-    mutate(Team =     game_info_data$away_team, 
-           Opponent = game_info_data$home_team, 
-           is_home =  0)
+  # Loop to parse html
+  event_summary_all <- bind_rows(
+    # Away players
+    foreach(i = 1:length(away_index), .combine = bind_rows) %do% {
+      
+      event_summary_data[away_index[i]:(away_index[i] + 24)] %>%
+        matrix(ncol = 25, byrow = TRUE) %>%
+        data.frame(stringsAsFactors = FALSE)
+      
+      } %>% 
+      mutate_all(funs(gsub("\\b\\s\\b", 0, .))) %>% 
+      mutate(Team =     game_info_data$away_team, 
+             Opponent = game_info_data$home_team, 
+             is_home =  0), 
+    # Home players
+    foreach(i = 1:length(home_index), .combine = bind_rows) %do% {
+      
+      event_summary_data[home_index[i]:(home_index[i] + 24)] %>%
+        matrix(ncol = 25, byrow = TRUE) %>%
+        data.frame(stringsAsFactors = FALSE)
+      
+      } %>% 
+      mutate_all(funs(gsub("\\b\\s\\b", 0, .))) %>% 
+      mutate(Team =     game_info_data$home_team, 
+             Opponent = game_info_data$away_team, 
+             is_home =  1)
+    )
   
-  # Home players
-  event_summary_home <- foreach(i = 1:length(home_index), .combine = bind_rows) %do% {
-    
-    event_summary_data[home_index[i]:(home_index[i] + 24)] %>%
-      matrix(ncol = 25, byrow = TRUE) %>%
-      data.frame(stringsAsFactors = FALSE)
-    
-    } %>% 
-    mutate_all(funs(gsub("\\b\\s\\b", 0, .))) %>% 
-    mutate(Team =     game_info_data$home_team, 
-           Opponent = game_info_data$away_team, 
-           is_home =  1)
-  
-  
-  event_summary_all <- bind_rows(event_summary_away, event_summary_home)
-  
+  # Set column names
   colnames(event_summary_all) <- c("player_num", "position", "player", "G", "A", "P", "P_M", "PEN", "PIM", 
                                    "TOI_all", "SHF", "AVG", "TOI_PP", "TOI_SH", "TOI_EV", 
                                    "S", "A_B", "MS", "HT", "GV", "TK", "BS", "FW", "FL", "FO_perc", 
@@ -1845,13 +1872,18 @@ sc.join_coordinates_ESPN <- function(season_id_fun, events_data_ESPN, events_dat
     mutate_at(vars(coords_x, coords_y, game_period), 
               funs(as.numeric(.))
               ) %>% 
-    mutate(game_seconds = period_to_seconds(ms(time)), 
-           game_seconds = ifelse(game_period == 2, game_seconds + 1200, 
-                                 ifelse(game_period == 3, game_seconds + 2400, 
-                                        ifelse(game_period == 4, game_seconds + 3600, 
-                                               ifelse(game_period == 5, game_seconds + 3900, 
-                                                      game_seconds)))
-                                 ), 
+    mutate(game_seconds = suppressWarnings(period_to_seconds(ms(time))), 
+           game_seconds = 
+             case_when(
+               game_period == 2 ~ game_seconds + 1200, 
+               game_period == 3 ~ game_seconds + 2400, 
+               game_period == 4 ~ game_seconds + 3600, 
+               game_period == 5 & game_info_data$session == "R" ~ game_seconds + 3900, 
+               game_period == 5 & game_info_data$session == "P" ~ game_seconds + 4800, 
+               game_period == 6 & game_info_data$session == "P" ~ game_seconds + 6000, 
+               game_period == 7 & game_info_data$session == "P" ~ game_seconds + 7200, 
+               TRUE ~ game_seconds
+               ), 
            # Join in event types
            event_type = ESPN_codes$event[match(ESPN_type, ESPN_codes$code)], 
            event_type = 
@@ -2498,14 +2530,19 @@ sc.scrape_game <- function(game_id, season_id) {
 # Run sc.scrape_game function in loop for multiple games
 sc.scrape_pbp <- function(games, sleep = 0) { 
   
+  # Combine potential duplicate games and sort
+  games_vec <- sort(unique(games))
+  
+  if (length(games) != length(games_vec)) message("Duplicate game IDs provided - combined for processing", "\n")
+  
   # Label games to be scraped
-  if (length(games) > 1) {
+  if (length(games_vec) > 1) {
     cat(paste0("Processing ", 
-               length(games), 
+               length(games_vec), 
                " Games: ",
-               min(sort(as.numeric(games))), 
+               min(sort(as.numeric(games_vec))), 
                " - ", 
-               max(sort(as.numeric(games))), 
+               max(sort(as.numeric(games_vec))), 
                "\n", "-------------", 
                "\n")
         )
@@ -2518,20 +2555,21 @@ sc.scrape_pbp <- function(games, sleep = 0) {
   # Create report data frame
   scrape_report_df <- data.frame(matrix(ncol = 10))
   
+  
   # Loop to scrape games 
-  for(i in 1:length(games)) {
+  for(i in 1:length(games_vec)) {
     
     Sys.sleep(sleep)
     
-    cat(paste0(games[i], "...", "\n"))
+    cat(paste0(games_vec[i], "...  "))
     
     start_time <- Sys.time()
     
     tryCatch({
       
-      pbp_list <- sc.scrape_game(game_id =   games[i], 
-                                 season_id = paste0(as.numeric(substr(games[i], 1, 4)), 
-                                                    as.numeric(substr(games[i], 1, 4)) + 1
+      pbp_list <- sc.scrape_game(game_id =   games_vec[i], 
+                                 season_id = paste0(as.numeric(substr(games_vec[i], 1, 4)), 
+                                                    as.numeric(substr(games_vec[i], 1, 4)) + 1
                                                     )
                                  )
       
@@ -2576,8 +2614,8 @@ sc.scrape_pbp <- function(games, sleep = 0) {
     # Scrape report data frame
     if (exists("hold_pbp_base")) { 
       
-      if (games[i] == unique(hold_pbp_base$game_id)) { 
-        scrape_report_df[i, 1] <-  games[i]
+      if (games_vec[i] == unique(hold_pbp_base$game_id)) { 
+        scrape_report_df[i, 1] <-  games_vec[i]
         scrape_report_df[i, 2] <-  nrow(pbp_list$pbp_base)
         scrape_report_df[i, 3] <-  nrow(pbp_list$pbp_extras)
         scrape_report_df[i, 4] <-  nrow(pbp_list$player_shifts)
@@ -2589,20 +2627,23 @@ sc.scrape_pbp <- function(games, sleep = 0) {
         scrape_report_df[i, 10] <- as.numeric(round(Sys.time() - start_time, 2))
         
         } else {
-          scrape_report_df[i, 1] <-       games[i]
+          scrape_report_df[i, 1] <-       games_vec[i]
           scrape_report_df[i, c(2, 9)] <- NA
           scrape_report_df[i, 10] <-      as.numeric(round(Sys.time() - start_time, 2))
         
           }
       
       } else {
-        scrape_report_df[i, 1] <-       games[i]
-        scrape_report_df[i, c(2, 8)] <- NA
-        scrape_report_df[i, 9] <-       as.numeric(round(Sys.time() - start_time, 2))
+        scrape_report_df[i, 1] <-       games_vec[i]
+        scrape_report_df[i, c(2, 9)] <- NA
+        scrape_report_df[i, 10] <-       as.numeric(round(Sys.time() - start_time, 1))
       
         }
     
+    cat(paste0(round(scrape_report_df[i, 10], 1), " sec"), "\n")
+    
     }
+  
   
   # Add Names
   names(scrape_report_df) <- c("game_id", names(pbp_list), "time_elapsed")
@@ -2612,11 +2653,12 @@ sc.scrape_pbp <- function(games, sleep = 0) {
       "\n", 
       paste0(length(unique(new_pbp_base$game_id)), 
              " of ", 
-             length(games), 
+             length(games_vec), 
              " games returned // Avg Time Per Game: ", 
-             round(mean(scrape_report_df$time_elapsed), 2), 
+             round(mean(scrape_report_df$time_elapsed), 1), 
              "\n")
       )
+  
   
   # Return List
   return_list <- list(pbp_base =         new_pbp_base %>% arrange(game_id),  
