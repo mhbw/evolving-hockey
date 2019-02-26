@@ -9,7 +9,7 @@ library(RCurl); library(rjson); library(lubridate); library(doMC); library(rvest
 library(Matrix); library(RSQLite)
 library(arm); library(lme4)
 library(caret); library(xgboost); library(glmnet)
-library(ggridges); library(tidyverse)
+library(tidyverse)
 
 options(scipen = 999)
 set.seed(123)
@@ -677,7 +677,8 @@ if (nrow(pbp_new) == nrow(pbp_df) & ncol(pbp_new) == ncol(pbp_df) - 14) {
 # Test
 paste0("Season: ", unique(pbp_df$season), "  //  Games: ", length(unique(pbp_df$game_id)), 
        "  //  Goals: ", sum((pbp_df$event_type == "GOAL")), "  //  xG: ", round(sum(na.omit(pbp_df$pred_XGB_7)), 2), 
-       "  //  NA fenwicks: ", 1 - sum(pbp_df$event_type %in% st.fenwick_events & !is.na(pbp_df$pred_XGB_7)) / sum((pbp_df$event_type %in% st.fenwick_events)))
+       "  //  NA fenwicks: ", 1 - sum(pbp_df$event_type %in% st.fenwick_events & !is.na(pbp_df$pred_XGB_7)) / 
+         sum((pbp_df$event_type %in% st.fenwick_events & pbp_df$game_period < 5)))
 
 
 #######################################
