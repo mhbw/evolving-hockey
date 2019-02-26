@@ -615,15 +615,15 @@ sc.roster_info <- function(game_id_fun, season_id_fun, roster_data, game_info_da
   
   roster_players <- bind_rows(
     bind_cols(
-      player =   roster_data[seq(roster_index[1] + 2, roster_index[1] + 59, by = 3)][1:as.numeric(roster_player_counts[[1]])], 
-      number =   roster_data[seq(roster_index[1]    , roster_index[1] + 57, by = 3)][1:as.numeric(roster_player_counts[[1]])], 
-      position = roster_data[seq(roster_index[1] + 1, roster_index[1] + 58, by = 3)][1:as.numeric(roster_player_counts[[1]])]
+      player =   roster_data[seq(roster_index[1] + 2, roster_index[1] + ((roster_player_counts[[1]] - 1) * 3) + 2, by = 3)][1:(roster_player_counts[[1]])], 
+      number =   roster_data[seq(roster_index[1]    , roster_index[1] + ((roster_player_counts[[1]] - 1) * 3)    , by = 3)][1:(roster_player_counts[[1]])], 
+      position = roster_data[seq(roster_index[1] + 1, roster_index[1] + ((roster_player_counts[[1]] - 1) * 3) + 1, by = 3)][1:(roster_player_counts[[1]])]
       ) %>% 
       mutate(Team = game_info_data$away_team), 
     bind_cols(
-      player =   roster_data[seq(roster_index[2] + 2, roster_index[2] + 59, by = 3)][1:as.numeric(roster_player_counts[[2]])], 
-      number =   roster_data[seq(roster_index[2]    , roster_index[2] + 57, by = 3)][1:as.numeric(roster_player_counts[[2]])], 
-      position = roster_data[seq(roster_index[2] + 1, roster_index[2] + 58, by = 3)][1:as.numeric(roster_player_counts[[2]])]
+      player =   roster_data[seq(roster_index[2] + 2, roster_index[2] + ((roster_player_counts[[2]] - 1) * 3) + 2, by = 3)][1:(roster_player_counts[[2]])], 
+      number =   roster_data[seq(roster_index[2]    , roster_index[2] + ((roster_player_counts[[2]] - 1) * 3)    , by = 3)][1:(roster_player_counts[[2]])], 
+      position = roster_data[seq(roster_index[2] + 1, roster_index[2] + ((roster_player_counts[[2]] - 1) * 3) + 1, by = 3)][1:(roster_player_counts[[2]])]
       ) %>% 
       mutate(Team = game_info_data$home_team)
     ) %>% 
@@ -633,23 +633,23 @@ sc.roster_info <- function(game_id_fun, season_id_fun, roster_data, game_info_da
   
   
   # Find scratches
-  away_scratch_count <- try(roster_player_counts[[3]], silent = TRUE)
-  home_scratch_count <- try(roster_player_counts[[4]], silent = TRUE)
+  away_scratch_count <- try(roster_player_counts[[3]], silent = TRUE)  ## verify both teams provided scratches
+  home_scratch_count <- try(roster_player_counts[[4]], silent = TRUE)  ## verify both teams provided scratches
   
-  if (class(away_scratch_count) != "try-error" & class(home_scratch_count) != "try-error" & game_info_data$session == "R") {  ## not including scratches for playoff games
+  if (class(away_scratch_count) != "try-error" & class(home_scratch_count) != "try-error") {  ## not including scratches for playoff games
     
     roster_scratches <- bind_rows(
       bind_cols(
-        player =   roster_data[seq(roster_index[3] + 2, roster_index[3] + 8, by = 3)][1:away_scratch_count], 
-        number =   roster_data[seq(roster_index[3]    , roster_index[3] + 6, by = 3)][1:away_scratch_count], 
-        position = roster_data[seq(roster_index[3] + 1, roster_index[3] + 7, by = 3)][1:away_scratch_count]
+        player =   roster_data[seq(roster_index[3] + 2, roster_index[3] + ((away_scratch_count - 1) * 3) + 2, by = 3)][1:away_scratch_count], 
+        number =   roster_data[seq(roster_index[3]    , roster_index[3] + ((away_scratch_count - 1) * 3)    , by = 3)][1:away_scratch_count], 
+        position = roster_data[seq(roster_index[3] + 1, roster_index[3] + ((away_scratch_count - 1) * 3) + 1, by = 3)][1:away_scratch_count]
         ) %>% 
         mutate(Team = game_info_data$away_team, 
                venue = "Away"), 
       bind_cols(
-        player =   roster_data[seq(roster_index[4] + 2, roster_index[4] + 8, by = 3)][1:home_scratch_count], 
-        number =   roster_data[seq(roster_index[4]    , roster_index[4] + 6, by = 3)][1:home_scratch_count], 
-        position = roster_data[seq(roster_index[4] + 1, roster_index[4] + 7, by = 3)][1:home_scratch_count]
+        player =   roster_data[seq(roster_index[4] + 2, roster_index[4] + ((home_scratch_count - 1) * 3) + 2, by = 3)][1:home_scratch_count], 
+        number =   roster_data[seq(roster_index[4]    , roster_index[4] + ((home_scratch_count - 1) * 3)    , by = 3)][1:home_scratch_count], 
+        position = roster_data[seq(roster_index[4] + 1, roster_index[4] + ((home_scratch_count - 1) * 3) + 1, by = 3)][1:home_scratch_count]
         ) %>% 
         mutate(Team = game_info_data$home_team, 
                venue = "Home")
@@ -685,7 +685,7 @@ sc.roster_info <- function(game_id_fun, season_id_fun, roster_data, game_info_da
                                      session =         character(), 
                                      Team =            character(), 
                                      Opponent =        character(), 
-                                     is_home =         character(), 
+                                     is_home =         numeric(), 
                                      player_num =      character(), 
                                      player_team_num = character(), 
                                      stringsAsFactors = FALSE)
@@ -854,12 +854,20 @@ sc.prepare_events_HTM <- function(game_id_fun, season_id_fun, events_data, game_
     mutate(eventIdx =     as.numeric(eventIdx),  
            game_id =      as.character(game_id_fun), 
            game_period =  as.numeric(game_period), 
+           # Extract shot types, times, penalty type, and challenge type
            event_detail = 
              case_when(
                event_type %in% c("SHOT", "MISS", "BLOCK", "GOAL") ~ str_extract(event_description, ",\\s*[a-zA-Z|-]+,") %>% gsub(",|\\s|-", "", .), 
                event_type %in% c("PSTR", "PEND", "SOC", "GEND") ~   str_extract(event_description, "[0-9]+:[0-9]+\\s*[A-Z]+"), 
                event_type == "PENL" ~ str_extract(event_description, "[(][0-9]+\\s[a-z]*[)]") %>% gsub("[(]|[)]|\\s*", "", .), 
                event_type == "CHL" ~  str_extract(event_description, "-[a-zA-Z\\s]+-") %>% gsub("\\s*-|-\\s*", "", .)
+               ), 
+           # Fix stupid period & game end recording errors
+           times = 
+             case_when(
+               event_type == "PEND" & game_period == 4 & max(game_period) > 4 & game_info_data$session == "R" & times == "-16:0-120:00" ~             "5:000:00", 
+               event_type %in% c("PEND", "GEND") & game_period == 4 & max(game_period) == 4 & game_info_data$session == "R" & times == "-16:0-120:00" ~ last(na.omit(times)), 
+               TRUE ~ times
                ), 
            time_elapsed = str_extract(times, "[0-9]+:[0-9]{2}"), 
            game_seconds = suppressWarnings(period_to_seconds(ms(time_elapsed))), 
@@ -1082,6 +1090,7 @@ sc.shifts_parse <- function(game_id_fun, season_id_fun, shifts_list, roster_data
   
   # Combine home and away shifts
   shifts_parse_full <- bind_rows(
+    
     # Home Shifts 
     foreach(i = 1:nrow(player_home_df), .combine = bind_rows) %do% {
       
@@ -1123,21 +1132,18 @@ sc.shifts_parse <- function(game_id_fun, season_id_fun, shifts_list, roster_data
       } %>% 
       mutate_all(funs(ifelse(. == "", NA, .))) %>% 
       select(7:9, 1:5)
+    
     ) %>% 
-    # Fix rare shift_end issue (flip shift_end string if duration is over 30 minutes)
-    group_by(player, num_last_first, event_team, X1, X2) %>% 
-    mutate(X4 = ifelse(as.numeric(str_extract(X5, "^[0-9]+")) > 30, 
-                       paste0(str_extract_all(X4, "[0-9]+:[0-9]+")[[1]][2], " / ", str_extract_all(X4, "[0-9]+:[0-9]+")[[1]][1]), 
-                       X4)
+    left_join(roster_data %>% select(num_last_first, player_team_num, position_type, position), 
+              by = "num_last_first"
+              ) %>% 
+    select(player, num_last_first, player_team_num, position, position_type, 
+           everything()
            ) %>% 
-    # Attempt to remove incorrect shifts
-    ungroup() %>% 
-    mutate(filtered = ifelse(X3 == "20:00 / 0:00" & lag(X4) == "20:00 / 0:00", 1, 0)) %>% 
-    filter(filtered == 0) %>% 
-    select(-filtered) %>% 
     data.frame()
   
-  colnames(shifts_parse_full)[4:8] <- c("shift_num", "game_period", "shift_start", "shift_end", "duration")
+  # Rename
+  colnames(shifts_parse_full)[7:11] <- c("shift_num", "game_period", "shift_start", "shift_end", "duration")
   
   
   ## --------------------- ##
@@ -1224,11 +1230,48 @@ sc.shifts_parse <- function(game_id_fun, season_id_fun, shifts_list, roster_data
     data.frame()
   
   
-  ## ---------------------- ##
-  ##   Create Shifts Data   ##
-  ## ---------------------- ##
+  # Return data as list
+  return_list <- list(shifts_parse =        shifts_parse_full, 
+                      player_period_sums =  period_sum_full
+                      )
   
-  shifts_raw <- shifts_parse_full %>% 
+  }
+
+# Finalize Shifts Data
+sc.shifts_finalize <- function(game_id_fun, shifts_parse_data, events_data_HTM, game_info_data) { 
+  
+  ## ------------------------------- ##
+  ##   Correct Skater Shift Errors   ##
+  ## ------------------------------- ##
+  
+  shifts_parse_full <- shifts_parse_data %>% 
+    group_by(player, num_last_first, event_team, shift_num, game_period) %>% 
+    mutate(shift_end = 
+             suppressWarnings(case_when(
+               # Force end of period when shift end is before shift start (and start is within 1 minute of period end)
+               position != "G" & as.numeric(str_extract(duration, "^[0-9]+")) > 30 & as.numeric(str_extract(shift_start, "^[0-9]+")) >= 18 & 
+                 (as.numeric(game_period) <= 3 | game_info_data$session == "P") ~ 
+                 "20:00 / 0:00", 
+               
+               TRUE ~ shift_end
+               )), 
+           shift_mod = 
+             suppressWarnings(ifelse(
+               position != "G" & as.numeric(str_extract(duration, "^[0-9]+")) > 30 & as.numeric(str_extract(shift_start, "^[0-9]+")) >= 18 & 
+                 (as.numeric(game_period) <= 3 | game_info_data$session == "P"), 
+               1, 0
+               ))
+           ) %>% 
+    # Remove "incorrect" shifts
+    ungroup() %>% 
+    mutate(filtered = ifelse(shift_start == "20:00 / 0:00" & lag(shift_end) == "20:00 / 0:00", 1, 0)) %>% 
+    filter(filtered == 0) %>% 
+    select(-filtered) %>% 
+    data.frame()
+  
+  
+  # Further clean & modify shifts data
+  shifts_parsed <- shifts_parse_full %>% 
     mutate(game_id =       as.character(game_id_fun), 
            game_date =     game_info_data$game_date, 
            season =        game_info_data$season, 
@@ -1263,26 +1306,14 @@ sc.shifts_parse <- function(game_id_fun, season_id_fun, shifts_list, roster_data
                ), 
            seconds_duration = seconds_end - seconds_start
            ) %>% 
-    left_join(roster_data %>% select(num_last_first, player_team_num, position_type, position), 
-              by = "num_last_first"
-              ) %>% 
-    select(player, position_type, position, num_last_first, player_team_num, game_id, game_date, season, event_team, game_period, shift_num, 
-           seconds_start, seconds_end, seconds_duration, shift_start, shift_end, duration, 
-           everything()
+    select(player, num_last_first, player_team_num, position, position_type, game_id, game_date, season, 
+           event_team, game_period, shift_num, seconds_start, seconds_end, seconds_duration, shift_start, shift_end, duration, 
+           home_team, away_team, shift_mod
            ) %>% 
     arrange(seconds_start, event_team) %>% 
     data.frame()
   
   
-  # Return data as list
-  return_list <- list(shifts_raw =          shifts_raw, 
-                      player_period_sums =  period_sum_full
-                      )
-  
-  }
-
-# Finalize Shifts Data
-sc.shifts_finalize <- function(shifts_parsed, events_data_HTM, game_info_data) { 
   
   ## ------------------------------- ##
   ##   Correct Goalie Shift Errors   ##
@@ -1394,10 +1425,10 @@ sc.shifts_finalize <- function(shifts_parsed, events_data_HTM, game_info_data) {
   # Impute new goalie shifts if error identified
   if (duration_problem == 1 | order_problem == 1 | period_problem == 1) { 
     
-    # vector indicating periods in game
+    # Vector indicating periods in game
     period_vec <- seq(1:max(shifts_parsed$game_period))
     
-    # find problem periods for each team
+    # Find problem periods for each team
     problem_vec_home <- unique(c(
       unique(filter(hold_goalie_shifts, is_home == 1, check == 0)$game_period),                           ## Locate problem periods for shift duration problems
       unique(filter(hold_check_goalie_shifts, is_home == 1, check == 0)$game_period),                     ## Locate problem periods for shift start/end order problems
@@ -1413,18 +1444,41 @@ sc.shifts_finalize <- function(shifts_parsed, events_data_HTM, game_info_data) {
       ))
     
     
-    ## Determine period(s) to correct
+    ## Create new goalie shifts for periods with identified issues
     if (length(problem_vec_home) > 0 | length(problem_vec_away) > 0) {
       
-      ## Create new HOME goalie shift
+      ## Create new HOME goalie shift(s)
       if (length(problem_vec_home) > 0) { 
-        new_goalie_shift_home <- shifts_parsed %>% 
-          filter(position == "G",  
-                 event_team == game_info_data$home_team, 
-                 game_period == min(problem_vec_home) - 1
-                 ) %>% 
-          filter(dplyr::row_number() == max(dplyr::row_number())) %>%  ## filter to last goalie shift before problem period
-          data.frame()
+        
+        # Check if at least first period is present
+        if (min(problem_vec_home) > 1) { 
+          new_goalie_shift_home <- shifts_parsed %>% 
+            filter(position == "G",  
+                   event_team == game_info_data$home_team, 
+                   game_period == min(problem_vec_home) - 1
+            ) %>% 
+            filter(dplyr::row_number() == max(dplyr::row_number())) %>%  ## filter to last goalie shifts before problem period
+            data.frame()
+          
+          # Verify period 2 is fine if not - use this shift as template
+          } else if (!2 %in% problem_vec_home) { 
+            new_goalie_shift_home <- shifts_parsed %>% 
+              filter(position == "G",  
+                     event_team == game_info_data$home_team, 
+                     game_period == 2
+              ) %>% 
+              data.frame()
+          
+            # Verify period 3 is fine if not - use this shift as template
+            } else if (!3 %in% problem_vec_home) { 
+              new_goalie_shift_home <- shifts_parsed %>% 
+                filter(position == "G",  
+                       event_team == game_info_data$home_team, 
+                       game_period == 3
+                ) %>% 
+                data.frame()
+          
+              }
         
         # Create additional rows if more are needed
         if (length(problem_vec_home) == 2) { 
@@ -1442,17 +1496,15 @@ sc.shifts_finalize <- function(shifts_parsed, events_data_HTM, game_info_data) {
         new_goalie_shift_home <- new_goalie_shift_home %>% 
           mutate(game_period =      problem_vec_home, 
                  shift_num =        NA, 
-                 seconds_start =    
-                   case_when(
-                     game_period <= 3 & game_info_data$session == "R" ~ 1200 * game_period - 1200, 
-                     game_period == 4 & game_info_data$session == "R" ~ 1200 * game_period - 1200, 
-                     game_info_data$session == "P" ~                    1200 * game_period - 1200
-                     ),
+                 seconds_start =    1200 * game_period - 1200, 
                  seconds_end =      
                    case_when(
+                     # Regular Season
                      game_period <= 3 & game_info_data$session == "R" ~ 1200 * game_period, 
                      game_period == 4 & game_info_data$session == "R" ~ max(na.omit(events_data_HTM$game_seconds)), 
-                     game_info_data$session == "P" ~                    1200 * game_period
+                     # Playoffs
+                     game_period <  max(na.omit(events_data_HTM$game_period)) & game_info_data$session == "P" ~ 1200 * game_period, 
+                     game_period == max(na.omit(events_data_HTM$game_period)) & game_info_data$session == "P" ~ max(na.omit(events_data_HTM$game_seconds))
                      ), 
                  seconds_duration = seconds_end - seconds_start, 
                  shift_start =      NA, 
@@ -1460,27 +1512,50 @@ sc.shifts_finalize <- function(shifts_parsed, events_data_HTM, game_info_data) {
                  duration =         NA, 
                  home_team =        game_info_data$home_team, 
                  away_team =        game_info_data$away_team, 
-                 shift_mod =        1  ## indicate shifts were fixed
+                 shift_mod =        1
                  ) %>% 
-          select(colnames(shifts_parsed), shift_mod) %>% 
+          select(colnames(shifts_parsed)) %>% 
           data.frame()
         
         } else {
-          new_goalie_shift_home <- data.frame(matrix(ncol = ncol(shifts_parsed) + 1, nrow = 0))
-          colnames(new_goalie_shift_home) <- c(colnames(shifts_parsed), "shift_mod")
+          new_goalie_shift_home <- data.frame(matrix(ncol = ncol(shifts_parsed), nrow = 0))
+          colnames(new_goalie_shift_home) <- colnames(shifts_parsed)
         
           }
       
       
-      ## Create new AWAY goalie shift
+      ## Create new AWAY goalie shift(s)
       if (length(problem_vec_away) > 0) { 
-        new_goalie_shift_away <- shifts_parsed %>% 
-          filter(position == "G",  
-                 event_team == game_info_data$away_team, 
-                 game_period == problem_vec_away - 1
-                 ) %>% 
-          filter(dplyr::row_number() == max(dplyr::row_number())) %>%  ## filter to last goalie shift before problem period
-          data.frame()
+        
+        # Check if at least first period is present
+        if (min(problem_vec_away) > 1) { 
+          new_goalie_shift_away <- shifts_parsed %>% 
+            filter(position == "G",  
+                   event_team == game_info_data$away_team, 
+                   game_period == min(problem_vec_away) - 1
+            ) %>% 
+            filter(dplyr::row_number() == max(dplyr::row_number())) %>%  ## filter to last goalie shifts before problem period
+            data.frame()
+          
+          # Verify period 2 is fine if not
+          } else if (!2 %in% problem_vec_away) { 
+            new_goalie_shift_away <- shifts_parsed %>% 
+              filter(position == "G",  
+                     event_team == game_info_data$away_team, 
+                     game_period == 2
+              ) %>% 
+              data.frame()
+          
+            # Verify period 3 is fine if not
+            } else if (!3 %in% problem_vec_away) { 
+              new_goalie_shift_away <- shifts_parsed %>% 
+                filter(position == "G",  
+                       event_team == game_info_data$away_team, 
+                       game_period == 3
+                ) %>% 
+                data.frame()
+          
+              }
         
         # Create additional rows if more are needed
         if (length(problem_vec_away) == 2) { 
@@ -1498,17 +1573,15 @@ sc.shifts_finalize <- function(shifts_parsed, events_data_HTM, game_info_data) {
         new_goalie_shift_away <- new_goalie_shift_away %>% 
           mutate(game_period =      problem_vec_away, 
                  shift_num =        NA, 
-                 seconds_start =    
-                   case_when(
-                     game_period <= 3 & game_info_data$session == "R" ~ 1200 * game_period - 1200, 
-                     game_period == 4 & game_info_data$session == "R" ~ 1200 * game_period - 1200, 
-                     game_info_data$session == "P" ~                    1200 * game_period - 1200
-                     ),
+                 seconds_start =    1200 * game_period - 1200, 
                  seconds_end =      
                    case_when(
+                     # Regular Season
                      game_period <= 3 & game_info_data$session == "R" ~ 1200 * game_period, 
                      game_period == 4 & game_info_data$session == "R" ~ max(na.omit(events_data_HTM$game_seconds)), 
-                     game_info_data$session == "P" ~                    1200 * game_period
+                     # Playoffs
+                     game_period <  max(na.omit(events_data_HTM$game_period)) & game_info_data$session == "P" ~ 1200 * game_period, 
+                     game_period == max(na.omit(events_data_HTM$game_period)) & game_info_data$session == "P" ~ max(na.omit(events_data_HTM$game_seconds))
                      ), 
                  seconds_duration = seconds_end - seconds_start, 
                  shift_start =      NA, 
@@ -1516,14 +1589,14 @@ sc.shifts_finalize <- function(shifts_parsed, events_data_HTM, game_info_data) {
                  duration =         NA, 
                  home_team =        game_info_data$home_team, 
                  away_team =        game_info_data$away_team, 
-                 shift_mod =        1  ## indicate shifts were fixed
+                 shift_mod =        1 
                  ) %>% 
-          select(colnames(shifts_parsed), shift_mod) %>% 
+          select(colnames(shifts_parsed)) %>% 
           data.frame()
         
         } else {
-          new_goalie_shift_away <- data.frame(matrix(ncol = ncol(shifts_parsed) + 1, nrow = 0))
-          colnames(new_goalie_shift_away) <- c(colnames(shifts_parsed), "shift_mod")
+          new_goalie_shift_away <- data.frame(matrix(ncol = ncol(shifts_parsed), nrow = 0))
+          colnames(new_goalie_shift_away) <- colnames(shifts_parsed)
         
           }
       
@@ -1562,13 +1635,12 @@ sc.shifts_finalize <- function(shifts_parsed, events_data_HTM, game_info_data) {
     
     }
   
-  
+  # Determine if goalies shifts were corrected
   if (exists("shifts_raw_hold")) { 
     shifts_raw <- shifts_raw_hold
     
     } else {
-      shifts_raw <- shifts_parsed %>% 
-        mutate(shift_mod = 0)
+      shifts_raw <- shifts_parsed
     
       }
   
@@ -1596,15 +1668,15 @@ sc.shifts_finalize <- function(shifts_parsed, events_data_HTM, game_info_data) {
   }
 
 # Create ON/OFF event types
-sc.shifts_create_events <- function(shifts_parsed) { 
+sc.shifts_create_events <- function(shifts_final_data) { 
   
   # Combine ON & OFF Events   
-  shifts_parse_ALL <- bind_rows(
+  shifts_events <- bind_rows(
     
     # Determine Changes - ON Events
-    shifts_parsed %>% 
-      mutate(home_team = unique(filter(shifts_parsed, is_home == 1)$Team), 
-             away_team = unique(filter(shifts_parsed, is_home == 0)$Team)
+    shifts_final_data %>% 
+      mutate(home_team = unique(filter(shifts_final_data, is_home == 1)$Team), 
+             away_team = unique(filter(shifts_final_data, is_home == 0)$Team)
              ) %>% 
       select(player_team_num, event_team = Team, game_id, game_period, seconds_start, home_team, away_team) %>% 
       group_by(event_team, home_team, away_team, game_id, game_period, seconds_start) %>% 
@@ -1617,9 +1689,9 @@ sc.shifts_create_events <- function(shifts_parsed) {
       data.frame(), 
     
     # Determine Changes - OFF Events
-    shifts_parsed %>% 
-      mutate(home_team = unique(filter(shifts_parsed, is_home == 1)$Team), 
-             away_team = unique(filter(shifts_parsed, is_home == 0)$Team)
+    shifts_final_data %>% 
+      mutate(home_team = unique(filter(shifts_final_data, is_home == 1)$Team), 
+             away_team = unique(filter(shifts_final_data, is_home == 0)$Team)
              ) %>% 
       select(player_team_num, event_team = Team, game_id, game_period, seconds_end, home_team, away_team) %>% 
       group_by(event_team, home_team, away_team, game_id, game_period, seconds_end) %>% 
@@ -1639,7 +1711,7 @@ sc.shifts_create_events <- function(shifts_parsed) {
   
   
   # Return data
-  return(shifts_parse_ALL)
+  return(shifts_events)
   
   }
 
@@ -2310,7 +2382,8 @@ sc.pbp_finalize <- function(pbp_data, on_data_home, on_data_away, roster_data, g
            event_length = 
              case_when(
                is.na(event_length) ~ 0, 
-               event_type == "OFF" ~ 0,  ## all OFF events should have no event_length
+               event_length < 0 ~    0, 
+               event_type %in% c("OFF", "PSTR", "PEND", "SOC", "GEND") ~ 0,  ## these events should have no event_length
                TRUE ~ event_length
                ), 
            # Set goalies for shootouts (last regulation goalie for each team)
@@ -2455,10 +2528,10 @@ sc.scrape_game <- function(game_id, season_id) {
   shifts_parsed_list <- sc.shifts_parse(game_id_fun = game_id, season_id_fun = season_id, shifts_list = shifts_HTM, roster_data = rosters_list$roster_df, game_info_data = game_info_df)
   
   # Fix Goalie Shifts & Finalize
-  shifts_final_df <- sc.shifts_finalize(shifts_parsed = shifts_parsed_list$shifts_raw, events_data_HTM = prepare_events_HTM_df, game_info_data = game_info_df)
+  shifts_final_df <- sc.shifts_finalize(game_id_fun = game_id, shifts_parse_data = shifts_parsed_list$shifts_parse, events_data_HTM = prepare_events_HTM_df, game_info_data = game_info_df)
   
   # Create ON/OFF Event Types
-  shifts_event_types_df <- sc.shifts_create_events(shifts_parsed = shifts_final_df)
+  shifts_event_types_df <- sc.shifts_create_events(shifts_final_data = shifts_final_df)
   
   
   ## -------------------- ##
@@ -2533,8 +2606,6 @@ sc.scrape_pbp <- function(games, sleep = 0) {
   # Combine potential duplicate games and sort
   games_vec <- sort(unique(games))
   
-  if (length(games) != length(games_vec)) message("Duplicate game IDs provided - combined for processing", "\n")
-  
   # Label games to be scraped
   if (length(games_vec) > 1) {
     cat(paste0("Processing ", 
@@ -2551,6 +2622,8 @@ sc.scrape_pbp <- function(games, sleep = 0) {
       cat(paste0("Processing Game:", 
                  "\n"))
       }
+  
+  if (length(games) != length(games_vec)) message("Duplicate game IDs provided - combined for processing", "\n")
   
   # Create report data frame
   scrape_report_df <- data.frame(matrix(ncol = 10))
@@ -2587,7 +2660,7 @@ sc.scrape_pbp <- function(games, sleep = 0) {
         new_pbp_extras <-       pbp_list$pbp_extras
         new_player_shifts <-    pbp_list$player_shifts
         new_player_periods <-   pbp_list$player_periods
-        new_roster_df <-        pbp_list$roster_df 
+        new_roster_df <-        pbp_list$roster_df
         new_scratches_df <-     pbp_list$scratches_df 
         new_game_info_df <-     pbp_list$game_info_df
         new_event_summary_df <- pbp_list$event_summary_df
@@ -2607,7 +2680,7 @@ sc.scrape_pbp <- function(games, sleep = 0) {
       
       }, 
       
-      error = function(e) cat("ERROR :", conditionMessage(e), "\n")
+      error = function(e) cat("ERROR :", conditionMessage(e), " ... ")
       
       )
     
@@ -2642,6 +2715,12 @@ sc.scrape_pbp <- function(games, sleep = 0) {
     
     cat(paste0(round(scrape_report_df[i, 10], 1), " sec"), "\n")
     
+    # Garbage collect every 200 games
+    if (isTRUE(all.equal(i / 200, as.integer(i / 200), check.attributes = FALSE))) {
+      invisible(gc())
+      
+      }
+    
     }
   
   
@@ -2649,14 +2728,10 @@ sc.scrape_pbp <- function(games, sleep = 0) {
   names(scrape_report_df) <- c("game_id", names(pbp_list), "time_elapsed")
   
   # Print results
-  cat("-------------", 
-      "\n", 
-      paste0(length(unique(new_pbp_base$game_id)), 
-             " of ", 
-             length(games_vec), 
+  cat("-------------", "\n", 
+      paste0(length(unique(new_pbp_base$game_id)), " of ", length(games_vec), 
              " games returned // Avg Time Per Game: ", 
-             round(mean(scrape_report_df$time_elapsed), 1), 
-             "\n")
+             round(mean(scrape_report_df$time_elapsed), 1), "\n")
       )
   
   
