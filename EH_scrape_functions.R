@@ -600,19 +600,13 @@ sc.player_info_API <- function(season_id_fun) {
            seasonId = as.character(seasonId), 
            playerTeamsPlayedFor = ifelse(grepl(", ", playerTeamsPlayedFor), gsub(", ", "/", playerTeamsPlayedFor), playerTeamsPlayedFor), 
            
-           # Name Corrections
-           #player = ifelse(grepl("ALEXANDER", player), gsub("ALEXANDER", "ALEX", player), player), 
-           #player = ifelse(grepl("ALEXANDRE", player), gsub("ALEXANDRE", "ALEX", player), player), 
-           
+           ## Name corrections
            player = ifelse(grepl("^ALEXANDER.|^ALEXANDRE.", player), gsub("^ALEXANDER.|^ALEXANDRE.", "ALEX.", player), player), 
            player = ifelse(grepl("^CHRISTOPHER.", player), gsub("^CHRISTOPHER.", "CHRIS.", player), player), 
-           
            player = ifelse(player == "BEN.ONDRUS", "BENJAMIN.ONDRUS", player),
            player = ifelse(player == "BRYCE.VAN.BRABANT", "BRYCE.VAN BRABANT", player),
            player = ifelse(player == "CALVIN.DE.HAAN", "CALVIN.DE HAAN", player), 
            player = ifelse(player == "CHASE.DE.LEO", "CHASE.DE LEO", player),
-           #player = ifelse(player == "CHRISTOPHER.DIDOMENICO", "CHRIS.DIDOMENICO", player), 
-           #player = ifelse(player == "CHRISTOPHER.TANEV", "CHRIS.TANEV", player), 
            player = ifelse(player == "DANIEL.CARCILLO", "DAN.CARCILLO", player),
            player = ifelse(player == "DANNY.O'REGAN", "DANIEL.O'REGAN", player), 
            player = ifelse(player == "DAVID.VAN.DER.GULIK", "DAVID.VAN DER GULIK", player),
@@ -650,9 +644,6 @@ sc.player_info_API <- function(season_id_fun) {
            
            # Updates
            player = ifelse(player == "SEBASTIAN.AHO" & birthday == "1996-02-17", "5EBASTIAN.AHO", player), 
-           #player = ifelse(player == "ALEXANDRE.FORTIN", "ALEX.FORTIN", player), 
-           #player = ifelse(player == "ALEXANDER.PECHURSKIY", "ALEX.PECHURSKI", player), 
-           #player = ifelse(player == "ALEXANDER.SALAK", "ALEX.SALAK", player), 
            player = ifelse(player == "MARTIN.ST PIERRE", "MARTIN.ST. PIERRE", player)
            ) %>% 
     rename(season = seasonId) %>% 
@@ -719,6 +710,98 @@ sc.player_info_API <- function(season_id_fun) {
     NHL_goalie_data
     ) %>% 
     arrange(player)
+  
+  }
+
+# Scrape & Process Player Names Only (from HTM shifts source)
+sc.get_names_combine <- function(games_vec) { 
+  
+  # Get names function
+  sc.get_names <- function(game, attempts) { 
+    
+    url_home_shifts <- NULL
+    try_count <-  attempts
+    
+    while (!is.character(url_home_shifts) & try_count > 0) { 
+      
+      url_home_shifts <- try(
+        getURL(paste0("http://www.nhl.com/scores/htmlreports/", 
+                      paste0(as.numeric(substr(game, 1, 4)), as.numeric(substr(game, 1, 4)) + 1), 
+                      "/TH0", 
+                      as.character(substr(game, 6, 10)), 
+                      ".HTM"))
+        )
+      
+      try_count <- try_count - 1
+      
+      }
+    
+    url_away_shifts <- NULL
+    try_count <- attempts
+    
+    while (!is.character(url_away_shifts) & try_count > 0) { 
+      
+      url_away_shifts <- try(
+        getURL(paste0("http://www.nhl.com/scores/htmlreports/", 
+                      paste0(as.numeric(substr(game, 1, 4)), as.numeric(substr(game, 1, 4)) + 1), 
+                      "/TV0", 
+                      as.character(substr(game, 6, 10)), 
+                      ".HTM"))
+        )
+      
+      try_count <- try_count - 1
+      
+      }
+    
+    # Pull out scraped shifts data
+    home_shifts_titles <- rvest::html_text(rvest::html_nodes(xml2::read_html(url_home_shifts), ".border"))
+    away_shifts_titles <- rvest::html_text(rvest::html_nodes(xml2::read_html(url_away_shifts), ".border"))
+    
+    
+    return_df <- bind_rows(
+      data.frame(num_last_first = home_shifts_titles[-1], 
+                 fullTeam =       home_shifts_titles[1], 
+                 stringsAsFactors = FALSE), 
+      data.frame(num_last_first = away_shifts_titles[-1], 
+                 fullTeam =       away_shifts_titles[1], 
+                 stringsAsFactors = FALSE)
+      ) %>% 
+      group_by(num_last_first) %>% 
+      mutate(firstName =  strsplit(gsub("^[0-9]+ ", "", num_last_first), ", ")[[1]][2], 
+             lastName =   strsplit(gsub("^[0-9]+ ", "", num_last_first), ", ")[[1]][1], 
+             player =     paste0(firstName, ".", lastName), 
+             player_num = parse_number(num_last_first), 
+             game_id = game
+             ) %>% 
+      data.frame() 
+    
+    }
+  
+  # Loop get names function
+  player_names <- foreach(i = 1:length(games_vec), .combine = bind_rows) %do% {
+    
+    print(games_vec[i])
+    
+    hold_df <- try(sc.get_names(game = games_vec[i], attempts = 3), silent = TRUE)
+    
+    if (class(hold_df) == "data.frame") {
+      hold_df
+      } else {
+        data.frame(num_last_first = character(), 
+                   fullTeam = character(), 
+                   firstName = character(), 
+                   lastName = character(), 
+                   player = character(), 
+                   player_num = numeric(), 
+                   game_id = character(), 
+                   stringsAsFactors = FALSE)
+      
+        }
+    
+    }
+  
+  # Return data
+  return(player_names)
   
   }
 
@@ -809,16 +892,15 @@ sc.update_names <- function(data, col_name) {
   # Find and modify incorrect player names
   fixed_names_df <- data %>% 
     mutate(player_name = 
-             ## First name global changes
+             ## Global name changes
              case_when(
                grepl("^ALEXANDER.|^ALEXANDRE.", player_name) ~ gsub("^ALEXANDER.|^ALEXANDRE.", "ALEX.", player_name), 
                grepl("^CHRISTOPHER.", player_name) ~ gsub("^CHRISTOPHER.", "CHRIS.", player_name), 
                TRUE ~ player_name
-             ), 
+               ), 
            player_name = 
              ## Specific name changes
              case_when(
-               # Combined name corrections
                player_name == "ANDREI.KASTSITSYN" ~ "ANDREI.KOSTITSYN",
                player_name == "ANDREW.MILLER" ~ "DREW.MILLER", 
                player_name == "AJ.GREER" ~ "A.J..GREER",
@@ -833,7 +915,6 @@ sc.update_names <- function(data, col_name) {
                player_name == "CRISTOVAL.NIEVES" ~ "BOO.NIEVES",
                player_name == "CHRIS.VANDE VELDE" ~ "CHRIS.VANDEVELDE", 
                player_name == "DANNY.BRIERE" ~ "DANIEL.BRIERE",
-               #player_name == "DANIEL.CLEARY" ~ "DAN.CLEARY", 
                player_name %in% c("DAN.CLEARY", "DANNY.CLEARY") ~ "DANIEL.CLEARY",
                player_name == "DANIEL.GIRARDI" ~ "DAN.GIRARDI", 
                player_name == "DANNY.O'REGAN" ~ "DANIEL.O'REGAN",
@@ -874,10 +955,8 @@ sc.update_names <- function(data, col_name) {
                player_name == "MARC.POULIOT" ~ "MARC-ANTOINE.POULIOT",
                player_name == "MARTIN.ST LOUIS" ~ "MARTIN.ST. LOUIS", 
                player_name == "MARTIN.ST PIERRE" ~ "MARTIN.ST. PIERRE",
-               #player_name == "MARTIN.ST. PIERRE" ~ "MARTIN.ST PIERRE", 
                player_name == "MARTY.HAVLAT" ~ "MARTIN.HAVLAT",
                player_name == "MATTHEW.CARLE" ~ "MATT.CARLE", 
-               #player_name == "MATTHEW.DUMBA" ~ "MATT.DUMBA", 
                player_name == "MATHEW.DUMBA" ~ "MATT.DUMBA",
                player_name == "MATTHEW.BENNING" ~ "MATT.BENNING", 
                player_name == "MATTHEW.IRWIN" ~ "MATT.IRWIN",
@@ -914,7 +993,6 @@ sc.update_names <- function(data, col_name) {
                player_name %in% c("P. J..AXELSSON", "PER JOHAN.AXELSSON") ~ "P.J..AXELSSON",
                player_name %in% c("PK.SUBBAN", "P.K.SUBBAN") ~ "P.K..SUBBAN", 
                player_name %in% c("PIERRE.PARENTEAU", "PIERRE-ALEX.PARENTEAU", "PIERRE-ALEXANDRE.PARENTEAU", "PA.PARENTEAU", "P.A.PARENTEAU", "P-A.PARENTEAU") ~ "P.A..PARENTEAU", 
-               #player_name == "PIERRE-ALEX.PARENTEAU" ~ "P.A..PARENTEAU",  ## combined in prior line
                player_name == "PHILIP.VARONE" ~ "PHIL.VARONE",
                player_name == "RAYMOND.MACIAS" ~ "RAY.MACIAS",
                player_name == "RJ.UMBERGER" ~ "R.J..UMBERGER",
@@ -1483,14 +1561,28 @@ sc.prepare_events_API <- function(game_id_fun, events_data_API, game_info_data) 
   # Final Join
   events_join_API <- events_join_API_raw %>% 
     left_join(., events_players_raw_API, by = "eventIdx") %>% 
-    ## Correct event players and event team for blocked shots
-    mutate(hold_player_1 =  ifelse(event_type == "BLOCK", event_player_2, NA), 
-           hold_player_2 =  ifelse(event_type == "BLOCK", event_player_1, NA), 
-           event_player_1 = ifelse(event_type == "BLOCK", hold_player_1, event_player_1), 
-           event_player_2 = ifelse(event_type == "BLOCK", hold_player_2, event_player_2), 
+    ## Correct event players and event team for blocked shots and faceoffs
+    mutate(hold_block_1 = ifelse(event_type == "BLOCK", event_player_2, NA), 
+           hold_block_2 = ifelse(event_type == "BLOCK", event_player_1, NA), 
+           hold_face_1 =  
+             case_when(
+               event_type == "FAC" & event_team == game_info_data$away_team ~ event_player_1, 
+               event_type == "FAC" & event_team == game_info_data$home_team ~ event_player_2
+               ), 
+           hold_face_2 =  
+             case_when(
+               event_type == "FAC" & event_team == game_info_data$away_team ~ event_player_2, 
+               event_type == "FAC" & event_team == game_info_data$home_team ~ event_player_1
+               ), 
+           event_player_1 = ifelse(event_type == "BLOCK", hold_block_1, event_player_1), 
+           event_player_2 = ifelse(event_type == "BLOCK", hold_block_2, event_player_2), 
+           event_player_1 = ifelse(event_type == "FAC", hold_face_1, event_player_1), 
+           event_player_2 = ifelse(event_type == "FAC", hold_face_2, event_player_2), 
+           
            event_team =     ifelse(event_type == "BLOCK", 
                                    ifelse(event_team == game_info_data$home_team, game_info_data$away_team, game_info_data$home_team), 
-                                   event_team)
+                                   event_team
+                                   )
            ) %>% 
     select(game_period, game_seconds, event_type, event_team, event_description, coords_x, coords_y, event_player_1) %>% 
     data.frame()
@@ -3325,12 +3417,162 @@ sc.scrape_pbp <- function(games, scrape_type = "full", live_scrape = FALSE, verb
   }
 
 
+
+
+## *** Still in testing *** 
+
+## ------------------------ ##
+##   Expand PBP Functions   ##
+## ------------------------ ##
+
+# Expand event information
+sc.pbp_expand <- function(data) {
+  
+  print("expand", quote = F) 
+  
+  hold <- data %>% 
+    mutate(event_circle = 
+             1 * (coords_x <= -25 & coords_y > 0) + 
+             2 * (coords_x <= -25 & coords_y < 0) + 
+             3 * (coords_x < 0 & coords_x > 25 & coords_y > 0) + 
+             4 * (coords_x < 0 & coords_x > 25 & coords_y < 0) +
+             5 * (abs(coords_x) < 5 & abs(coords_y) < 5) + 
+             6 * (coords_x > 0 & coords_x < 25 & coords_y > 0) +
+             7 * (coords_x > 0 & coords_x < 25 & coords_y < 0) + 
+             8 * (coords_x >= 25 & coords_y > 0) +
+             9 * (coords_x >= 25 & coords_y < 0), 
+           event_rinkside = 
+             case_when(
+               coords_x <= -25 ~ "L", 
+               coords_x > -25 & coords_x < 25 ~ "N", 
+               coords_x >= 25 ~ "R"
+               ), 
+           home_zone = ifelse(event_team == away_team & event_zone == "Off", "Def", 
+                              ifelse(event_team == away_team & event_zone == "Def", "Off", event_zone)), 
+           
+           # Initial distance / angle calculation
+           pbp_distance = suppressWarnings(as.numeric(sub(".*Zone, *(.*?) * ft.*", "\\1", event_description))), 
+           pbp_distance = ifelse(event_type %in% st.fenwick_events & is.na(pbp_distance), 0, pbp_distance), 
+           event_distance = sqrt((89 - abs(coords_x))^2 + coords_y^2), 
+           event_angle = abs(atan(coords_y / (89 - abs(coords_x))) * (180 / pi)), 
+           
+           # Update distance calc for long shots (and various mistakes)
+           event_distance = ifelse(event_type %in% st.fenwick_events & pbp_distance > 89 & coords_x < 0 & 
+                                     event_detail != "Tip-In" & event_detail != "Wrap-around" & event_detail != "Deflected" & !(pbp_distance > 89 & event_zone == "Off"), 
+                                   sqrt((abs(coords_x) + 89)^2 + coords_y^2), 
+                                   
+                                   ifelse(event_type %in% st.fenwick_events & pbp_distance > 89 & coords_x > 0 & 
+                                            event_detail != "Tip-In" & event_detail != "Wrap-around" & event_detail != "Deflected" & !(pbp_distance > 89 & event_zone == "Off"), 
+                                          sqrt((coords_x + 89)^2 + coords_y^2), 
+                                          event_distance)),  
+           
+           event_angle = ifelse(event_type %in% st.fenwick_events & pbp_distance > 89 & coords_x < 0 & 
+                                  event_detail != "Tip-In" & event_detail != "Wrap-around" & event_detail != "Deflected" & !(pbp_distance > 89 & event_zone == "Off"), 
+                                abs( atan(coords_y / (abs(coords_x) + 89)) * (180 / pi)), 
+                                
+                                ifelse(event_type %in% st.fenwick_events & pbp_distance > 89 & coords_x > 0 & 
+                                         event_detail != "Tip-In" & event_detail != "Wrap-around" & event_detail != "Deflected" & !(pbp_distance > 89 & event_zone == "Off"), 
+                                       abs(atan(coords_y / (coords_x + 89)) * (180 / pi)), 
+                                       event_angle)), 
+           
+           # Flip event_zone for blocked shot errors / distance less than 64 feet
+           event_zone = ifelse(event_zone == "Def" & event_type == "BLOCK", "Off", event_zone), 
+           event_zone = ifelse(event_type %in% st.fenwick_events & event_zone == "Def" & pbp_distance <= 64, "Off", event_zone)
+           )
+  
+  print("face_ID", quote = F)  
+  
+  # Add home_zonestart for corsi events
+  face_index <- hold %>% 
+    filter(event_type %in% c(st.corsi_events, "FAC"),
+           game_period < 5
+           ) %>%
+    arrange(game_id, event_index) %>%
+    mutate(face_index = cumsum(event_type == "FAC")) %>%
+    group_by(game_id, face_index) %>%
+    arrange(event_index) %>% 
+    mutate(test = first(home_zone),  
+           home_zonestart = ifelse(first(home_zone) == "Def", 1, 
+                                   ifelse(first(home_zone) == "Neu", 2, 
+                                          ifelse(first(home_zone) == "Off", 3, NA)))
+           ) %>%
+    ungroup() %>% 
+    select(game_id, event_index, home_zonestart) %>% 
+    data.frame()
+  
+  # Join
+  print("join", quote = F) 
+  print("---", quote = F)
+  
+  hold <- hold %>% 
+    left_join(., face_index, by = c("game_id", "event_index")) %>% 
+    data.frame()
+  
+  }
+
+# Add faceoff, penalty, and shift indexes
+sc.pbp_index <- function(data) { 
+  
+  # Add shift/face/pen indexes & shift IDs
+  
+  print("index", quote = F)
+  
+  pbp_hold <- data %>% 
+    arrange(game_id, event_index) %>% 
+    mutate(face_index =  cumsum(event_type == "FAC"), 
+           shift_index = cumsum(event_type == "ON"), 
+           pen_index =   cumsum(event_type == "PENL"))
+  
+  
+  print("shift_ID", quote = F)
+  
+  hold <- pbp_hold %>% 
+    filter(event_type %in% c("FAC", "GOAL", "BLOCK", "SHOT", "MISS", "HIT", "TAKE", "GIVE"), 
+           game_period < 5
+           ) %>% 
+    group_by(game_id, game_period, season,
+             home_on_1, home_on_2, home_on_3, home_on_4, home_on_5, home_on_6, 
+             away_on_1, away_on_2, away_on_3, away_on_4, away_on_5, away_on_6, 
+             home_goalie, away_goalie, 
+             face_index, shift_index, pen_index
+             ) %>% 
+    mutate(shift_ID = round(first(event_index) * as.numeric(game_id))) %>% 
+    summarise(shift_ID =     first(shift_ID), 
+              shift_length = last(game_seconds) - first(game_seconds)
+              ) %>% 
+    ungroup() %>% 
+    select(game_id, game_period, season, shift_ID, face_index, 
+           shift_index, pen_index, shift_length, home_on_1:away_goalie
+           ) %>% 
+    data.frame()
+  
+  
+  print("join", quote = F)
+  print("---", quote = F)
+  
+  join <- pbp_hold %>% 
+    left_join(., hold, 
+              by = c("game_id", "game_period", "season",
+                     "home_on_1", "home_on_2", "home_on_3", 
+                     "home_on_4", "home_on_5", "home_on_6", 
+                     "away_on_1", "away_on_2", "away_on_3", 
+                     "away_on_4","away_on_5", "away_on_6", 
+                     "home_goalie", "away_goalie", 
+                     "face_index", "shift_index", "pen_index")
+              ) %>% 
+    data.frame()
+  
+  }
+
+
 ###########################
 
 
 
 
+
 ## ------------------------------------------ ##
+
 
 
 
@@ -3374,14 +3616,13 @@ sc.scrape_pbp <- function(games, scrape_type = "full", live_scrape = FALSE, verb
 #
 #
 #
-
-
+#
+#
 ## ------------------ ##
 ##   Example Scrape   ##
 ## ------------------ ##
 #
 # *** Scrape the first 100 games from the 20182019 regular season
-#
 #
 # games_vec <- c(as.character(seq(2018020001, 2018020100, by = 1)))
 #
@@ -3398,14 +3639,21 @@ sc.scrape_pbp <- function(games, scrape_type = "full", live_scrape = FALSE, verb
 # event_summary_df_new <- pbp_scrape$events_summary_df
 # scrape_report <-        pbp_scrape$report
 #
+#
 ## Get API info
 # player_info_df_new <- sc.player_info_API(season_id_fun = "20182019")
 #
+## Join NHL player IDs with roster data
 # roster_df_new_add <- roster_df_new %>% 
 #   left_join(., player_info_df_new %>% select(player, NHL_ID, birthday), 
 #             by = "player"
 #            ) %>% 
 #   data.frame()
+#
+#
+## Add additional information to pbp data
+# pbp_expand <- sc.pbp_expand(data = pbp_base_new)
+# pbp_expand <- sc.pbp_index(data = pbp_expand)
 
 
 
