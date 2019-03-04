@@ -3371,6 +3371,42 @@ sc.scrape_pbp <- function(games, scrape_type = "full", live_scrape = FALSE, verb
 ## 'sleep':
 # time to wait between each game being scraped (in seconds)
 # default is 0
+#
+#
+#
+
+
+## ------------------ ##
+##   Example Scrape   ##
+## ------------------ ##
+#
+# *** Scrape the first 100 games from the 20182019 regular season
+#
+#
+# games_vec <- c(as.character(seq(2018020001, 2018020100, by = 1)))
+#
+# pbp_scrape <- sc.scrape_pbp(games = games_vec)
+#
+## Pull out of list
+# game_info_df_new <-     pbp_scrape$game_info_df
+# pbp_base_new <-         pbp_scrape$pbp_base
+# pbp_extras_new <-       pbp_scrape$pbp_extras
+# player_shifts_new <-    pbp_scrape$player_shifts
+# player_periods_new <-   pbp_scrape$player_periods
+# roster_df_new <-        pbp_scrape$roster_df
+# scratches_df_new <-     pbp_scrape$scratches_df
+# event_summary_df_new <- pbp_scrape$events_summary_df
+# scrape_report <-        pbp_scrape$report
+#
+## Get API info
+# player_info_df_new <- sc.player_info_API(season_id_fun = "20182019")
+#
+# roster_df_new_add <- roster_df_new %>% 
+#   left_join(., player_info_df_new %>% select(player, NHL_ID, birthday), 
+#             by = "player"
+#            ) %>% 
+#   data.frame()
+
 
 
 
