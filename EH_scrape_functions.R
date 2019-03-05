@@ -46,7 +46,7 @@
 ########################
 
 # Dead NHL games (html source)
-dead_games <- c("2007020011", 
+dead_games <- c("2007020011", "2007021178", 
                 "2008020259", "2008020409", "2008021077", 
                 "2009020081", "2009020658", "2009020885", 
                 "2010020124"
@@ -716,7 +716,7 @@ sc.player_info_API <- function(season_id_fun) {
 # Scrape & Process Player Names Only (from HTM shifts source)
 sc.get_names_combine <- function(games_vec) { 
   
-  # Get names function
+  # Get names function (from html shifts data)
   sc.get_names <- function(game, attempts) { 
     
     url_home_shifts <- NULL
@@ -758,14 +758,15 @@ sc.get_names_combine <- function(games_vec) {
     away_shifts_titles <- rvest::html_text(rvest::html_nodes(xml2::read_html(url_away_shifts), ".border"))
     
     
-    return_df <- bind_rows(
-      data.frame(num_last_first = home_shifts_titles[-1], 
-                 fullTeam =       home_shifts_titles[1], 
-                 stringsAsFactors = FALSE), 
-      data.frame(num_last_first = away_shifts_titles[-1], 
-                 fullTeam =       away_shifts_titles[1], 
-                 stringsAsFactors = FALSE)
-      ) %>% 
+    return_df <- 
+      bind_rows(
+        data.frame(num_last_first = home_shifts_titles[-1], 
+                   fullTeam =       home_shifts_titles[1], 
+                   stringsAsFactors = FALSE), 
+        data.frame(num_last_first = away_shifts_titles[-1], 
+                   fullTeam =       away_shifts_titles[1], 
+                   stringsAsFactors = FALSE)
+        ) %>% 
       group_by(num_last_first) %>% 
       mutate(firstName =  strsplit(gsub("^[0-9]+ ", "", num_last_first), ", ")[[1]][2], 
              lastName =   strsplit(gsub("^[0-9]+ ", "", num_last_first), ", ")[[1]][1], 
@@ -1123,12 +1124,10 @@ sc.roster_info <- function(game_id_fun, season_id_fun, roster_data, game_info_da
              Opponent =        ifelse(Team == game_info_data$home_team, game_info_data$away_team, game_info_data$home_team), 
              is_home =         1 * (Team == game_info_data$home_team)
              ) %>% 
-      sc.update_names(., col_name = "player") %>%  ## update player names
-      
-      ## Manual name corrections
-      mutate(player =   ifelse(player == "SEBASTIAN.AHO" & Team == "NYI", "5EBASTIAN.AHO", player)
+      # Name Corrections
+      sc.update_names(., col_name = "player") %>% 
+      mutate(player = ifelse(player == "SEBASTIAN.AHO" & Team == "NYI", "5EBASTIAN.AHO", player)  ## manual name corrections
              ) %>% 
-      
       select(player, position_type, position, game_id, game_date, season, session, Team, Opponent, is_home, 
              player_num = number, 
              player_team_num
@@ -1138,17 +1137,17 @@ sc.roster_info <- function(game_id_fun, season_id_fun, roster_data, game_info_da
     
     } else {
       
-      roster_scratches <- data.frame(player =          character(), 
-                                     position_type =   character(), 
-                                     position =        character(), 
-                                     game_id =         character(), 
-                                     game_date =       character(), 
-                                     season =          character(), 
-                                     session =         character(), 
-                                     Team =            character(), 
-                                     Opponent =        character(), 
-                                     is_home =         numeric(), 
-                                     player_num =      character(), 
+      roster_scratches <- data.frame(player = character(), 
+                                     position_type = character(), 
+                                     position = character(), 
+                                     game_id = character(), 
+                                     game_date = character(), 
+                                     season = character(), 
+                                     session = character(), 
+                                     Team = character(), 
+                                     Opponent = character(), 
+                                     is_home = numeric(), 
+                                     player_num = character(), 
                                      player_team_num = character(), 
                                      stringsAsFactors = FALSE)
       
@@ -1171,7 +1170,7 @@ sc.roster_info <- function(game_id_fun, season_id_fun, roster_data, game_info_da
                )
     ) %>%
     data.frame() %>% 
-    filter(grepl("[A-Z0-9]", num_last_first)) %>%  ## ensure string start with player number
+    filter(grepl("[A-Z0-9]", num_last_first)) %>%  ## ensure string starts with player number
     mutate(game_date =       game_info_data$game_date,
            game_id =         as.character(game_id_fun),
            season =          as.character(season_id_fun),
@@ -1180,23 +1179,22 @@ sc.roster_info <- function(game_id_fun, season_id_fun, roster_data, game_info_da
            player_team_num = paste0(Team, player_num)
            ) %>% 
     group_by(player_team_num) %>% 
-    mutate(firstName =     strsplit(gsub("^[0-9]+ ", "", num_last_first), ", ")[[1]][2], 
-           lastName =      strsplit(gsub("^[0-9]+ ", "", num_last_first), ", ")[[1]][1], 
-           player =        paste0(firstName, ".", lastName)
+    mutate(firstName = strsplit(gsub("^[0-9]+ ", "", num_last_first), ", ")[[1]][2], 
+           lastName =  strsplit(gsub("^[0-9]+ ", "", num_last_first), ", ")[[1]][1], 
+           player =    paste0(firstName, ".", lastName)
            ) %>% 
     ungroup() %>% 
-    left_join(., roster_players %>% 
-                select(player_team_num, position), 
+    left_join(., roster_players %>% select(player_team_num, position), 
               by = "player_team_num"
               ) %>% 
     mutate(position_type = ifelse(position == "G", "G", 
                                   ifelse(position == "D", "D", 
                                          "F"))
            ) %>%
-    ## Manual name corrections
-    mutate(player =   ifelse(player == "SEBASTIAN.AHO" & Team == "NYI", "5EBASTIAN.AHO", player)
+    ## Name Corrections
+    sc.update_names(., col_name = "player") %>% 
+    mutate(player =   ifelse(player == "SEBASTIAN.AHO" & Team == "NYI", "5EBASTIAN.AHO", player)  ## manual name corrections
            ) %>% 
-    
     select(player, player_num, Team, game_id, game_date, season, session, num_last_first, 
            player_team_num, firstName, lastName, venue, position_type, position
            ) %>% 
@@ -1236,7 +1234,6 @@ sc.roster_info <- function(game_id_fun, season_id_fun, roster_data, game_info_da
   
   # Roster data to be returned from final compile function
   roster_df_return <- roster_df %>% 
-    sc.update_names(., col_name = "player") %>%  ## update player names
     mutate(Opponent = ifelse(Team == game_info_data$home_team, game_info_data$away_team, game_info_data$home_team), 
            is_home =  1 * (Team == game_info_data$home_team)
            ) %>% 
@@ -1841,6 +1838,38 @@ sc.shifts_finalize <- function(game_id_fun, shifts_parse_data, events_data_HTM, 
     arrange(seconds_start, event_team) %>% 
     data.frame()
   
+  
+  # Fix OT shift_end issue (shift_end recorded as "0:00")
+  if (fix_shifts == TRUE & min(shifts_parsed$seconds_duration) < 0) { 
+    shifts_parsed <- shifts_parsed %>% 
+      mutate(shift_mod =        ifelse(seconds_duration < 0 & game_period == 4, 1, 0), 
+             seconds_end =      ifelse(seconds_duration < 0 & game_period == 4, 
+                                       seconds_start + period_to_seconds(ms(duration)), 
+                                       seconds_end), 
+             seconds_end =      ifelse(seconds_end > max(events_data_HTM$game_seconds) & shift_mod == 1, 
+                                       max(events_data_HTM$game_seconds), 
+                                       seconds_end), 
+             seconds_duration = ifelse(seconds_duration < 0 & game_period == 4,
+                                       seconds_end - seconds_start, 
+                                       seconds_duration)
+             )
+    
+    }
+  
+  # Fix shift_end missing issue (very rare)
+  if (fix_shifts == TRUE & sum(is.na(shifts_parsed$seconds_end)) > 0 & sum(is.na(shifts_parsed$seconds_duration)) > 0) { 
+    shifts_parsed <- shifts_parsed %>% 
+      mutate(shift_mod =        ifelse(is.na(seconds_end) & is.na(seconds_duration) & !is.na(duration), 1, shift_mod), 
+             seconds_end =      ifelse(is.na(seconds_end) & !is.na(duration), 
+                                       seconds_start + period_to_seconds(ms(duration)), 
+                                       seconds_end), 
+             seconds_duration = ifelse(is.na(seconds_duration) & !is.na(duration), 
+                                       seconds_end - seconds_start, 
+                                       seconds_duration)
+             ) %>% 
+      data.frame()
+    
+    }
   
   
   ## ------------------------------- ##
@@ -2503,13 +2532,13 @@ sc.join_coordinates_ESPN <- function(season_id_fun, events_data_ESPN, events_dat
            # Account for ESPN's strange method of recording coordinates 
            coords_x = 
              case_when(
-               game_info_data$season %in% c("20072008", "20082009") ~ coords_x - 1, 
+               game_info_data$season %in% c("20072008", "20082009") ~ round((coords_x - 1.5) * (198 / 197), 1),  ## ESPN min/max was -97/100, center and expand to match NHL API scale
                as.numeric(game_info_data$season) >= 20162017 ~ coords_x + 1, 
                TRUE ~ coords_x
                ), 
            coords_y = 
              case_when(
-               game_info_data$season %in% c("20072008", "20082009") ~ coords_y + 1, 
+               game_info_data$season %in% c("20072008", "20082009") ~ round((coords_y + 1.5) * (84 / 83), 1),    ## ESPN min/max was -43/40, center and expand to match NHL API scale
                as.numeric(game_info_data$season) >= 20162017 ~ coords_y - 1, 
                TRUE ~ coords_y
                )
@@ -2561,11 +2590,14 @@ sc.join_coordinates_ESPN <- function(season_id_fun, events_data_ESPN, events_dat
                  # Normal Strengths
                  event_type == "SHOT" & game_period < 5 ~  gsub("Shot\\s*on\\s*goal\\s*by\\s*", "", event_description) %>% gsub("\\s*saved by.+|\\s*[(]+.*", "", .), 
                  event_type == "MISS" & game_period < 5 ~  gsub("Shot\\s*missed\\s*by\\s*", "", event_description) %>% gsub("\\s*[(]+.*", "", .), 
-                 event_type == "BLOCK" & game_period < 5 ~ gsub("\\s*shot\\s*blocked\\s*by.*", "", event_description), 
-                 ## blocked shots do not have the shooter prior to 2010-2011
+                 event_type == "BLOCK" & game_period < 5 ~ gsub("\\s*shot\\s*blocked\\s*by.*", "", event_description), ## blocked shots do not have the shooter prior to 2010-2011
                  
-                 event_type == "HIT" ~  gsub("\\s*credited\\s*.*", "", event_description), 
+                 event_type == "HIT" ~  gsub("\\s*credited\\s*.*", "", event_description),  ## ~ 160 games missing HIT events in the ESPN source for '07-08
                  event_type == "GIVE" ~ gsub("Giveaway\\s*by\\s*", "", event_description) %>% gsub("\\s*\\bin\\b\\s*.*", "", .), 
+                 
+                 ## NOTE: Faceoffs are missing the player who lost the faceoff after certain season (unclear at this point)
+                 event_type == "FAC" & event_team == game_info_data$away_team ~ gsub("\\s*won\\s*faceoff.*", "", event_description), 
+                 event_type == "FAC" & event_team == game_info_data$home_team ~ gsub(".*won\\s*faceoff\\s*against\\s*", "", event_description), 
                  
                  # Shootouts
                  event_type %in% c("SHOT", "MISS") & game_period == 5 & grepl("Shootout\\s*attempt\\s*by\\s*", event_description) ~ gsub("Shootout\\s*attempt\\s*by\\s*", "", event_description) %>% gsub("\\s*saved by.+", "", .), 
@@ -2577,8 +2609,12 @@ sc.join_coordinates_ESPN <- function(season_id_fun, events_data_ESPN, events_dat
              ) %>% 
       group_by(index) %>% 
       mutate(last_name =      toupper(strsplit(player_match, "\\s")[[1]][2]), 
-             event_player_1 = roster_data$player_team_num[match(paste0(event_team, last_name), paste0(roster_data$Team, roster_data$lastName))],  ## match by team and player last name
-             
+             # Match players accounting for faceoffs
+             event_player_1 = 
+               case_when(
+                 event_type != "FAC" ~ roster_data$player_team_num[match(paste0(event_team, last_name), paste0(roster_data$Team, roster_data$lastName))],
+                 event_type == "FAC" ~ roster_data$player_team_num[match(paste0(game_info_data$away_team, last_name), paste0(roster_data$Team, roster_data$lastName))]
+                 ), 
              # Attempt to address two-string last names
              name_length =    max(as.numeric(lapply(strsplit(player_match, "\\s"), length))), 
              event_player_1 = ifelse(is.na(event_player_1) & name_length > 2, 
@@ -3613,8 +3649,6 @@ sc.pbp_index <- function(data) {
 ## 'sleep':
 # time to wait between each game being scraped (in seconds)
 # default is 0
-#
-#
 #
 #
 #
