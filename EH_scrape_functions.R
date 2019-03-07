@@ -562,9 +562,17 @@ sc.game_info <- function(game_id_fun, season_id_fun, events_data, roster_data) {
   
   
   # Find referees (french format / standard format)
-  if (roster_data[grep("^Referee|^Arbitre/Referee", roster_data)] %in% c("Referee", "Arbitre/Referee") & 
+  if (roster_data[grep("^Referee|^Arbitre/Referee", roster_data)    ] %in% c("Referee", "Arbitre/Referee") & 
       roster_data[grep("^Referee|^Arbitre/Referee", roster_data) + 1] %in% c("Linesman", "JL/Linesman")) { 
+    
     referee_index <- grep("^Linesman|^JL/Linesman|^Referee:\\s*", roster_data) + 2
+    
+    ## fix one-off formatting issue
+    if (roster_data[referee_index] == "\r\n") {
+      referee_index <- referee_index + 4
+      
+      }
+    
     referee_1 <-     na_if_null(toupper(gsub("#[0-9]*\\s", "", roster_data[referee_index    ]) %>% gsub("\\s", ".", .)))
     referee_2 <-     na_if_null(toupper(gsub("#[0-9]*\\s", "", roster_data[referee_index + 1]) %>% gsub("\\s", ".", .)))
     linesman_1 <-    na_if_null(toupper(gsub("#[0-9]*\\s", "", roster_data[referee_index + 3]) %>% gsub("\\s", ".", .)))
@@ -618,7 +626,15 @@ sc.game_info <- function(game_id_fun, season_id_fun, events_data, roster_data) {
            away_team = ifelse(away_team == "PHX", "ARI", away_team), 
            
            ## Fix wrong game date in source
-           game_date = ifelse(game_id == "2007020003", "2007-10-03", game_date)
+           game_date = ifelse(game_id == "2007020003", "2007-10-03", game_date), 
+           
+           ## Fix missing data issues
+           game_time_start = ifelse(game_id == "2009020874", "7:38 MST", game_time_start), 
+           game_time_end =   ifelse(game_id == "2009020874", "10:02 MST", game_time_end), 
+           venue =           ifelse(game_id == "2009020874", "Jobing.com Arena", venue), 
+           attendance =      ifelse(game_id == "2009020874", 13421, attendance), 
+           home_score =      ifelse(game_id == "2009020874", 6, home_score), 
+           away_score =      ifelse(game_id == "2009020874", 1, away_score)
            ) 
   
   }
@@ -870,7 +886,9 @@ sc.roster_info <- function(game_id_fun, season_id_fun, roster_data, game_info_da
              ) %>% 
       # Name Corrections
       sc.update_names_HTM(., col_name = "player") %>% 
-      mutate(player = ifelse(player == "SEBASTIAN.AHO" & Team == "NYI", "5EBASTIAN.AHO", player)  ## manual name corrections
+      # Manula Name Updates
+      mutate(player = ifelse(player == "SEBASTIAN.AHO" & Team == "NYI", "5EBASTIAN.AHO", player), 
+             player = ifelse(player == "ALEX.PICARD" & position == "L", "ALEXANDRE.PICARD", player)  ## Left Wing, 8471221 ID
              ) %>% 
       select(player, position, position_type, game_id, game_date, season, session, Team, Opponent, is_home, player_num, player_team_num) %>% 
       arrange(is_home, player) %>% 
@@ -879,8 +897,8 @@ sc.roster_info <- function(game_id_fun, season_id_fun, roster_data, game_info_da
     } else {
       
       roster_scratches <- data.frame(player = character(), 
-                                     position_type = character(), 
                                      position = character(), 
+                                     position_type = character(), 
                                      game_id = character(), 
                                      game_date = character(), 
                                      season = character(), 
@@ -932,9 +950,11 @@ sc.roster_info <- function(game_id_fun, season_id_fun, roster_data, game_info_da
                                   ifelse(position == "D", "D", 
                                          "F"))
            ) %>%
-    ## Name Corrections
+    # Name Corrections
     sc.update_names_HTM(., col_name = "player") %>% 
-    mutate(player =   ifelse(player == "SEBASTIAN.AHO" & Team == "NYI", "5EBASTIAN.AHO", player)  ## manual name corrections
+    # Manual Name Corrections
+    mutate(player = ifelse(player == "SEBASTIAN.AHO" & Team == "NYI", "5EBASTIAN.AHO", player), 
+           player = ifelse(player == "ALEX.PICARD" & position == "L", "ALEXANDRE.PICARD", player)  ## Left Wing, 8471221 ID
            ) %>% 
     select(player, player_num, Team, game_id, game_date, season, session, num_last_first, 
            player_team_num, firstName, lastName, venue, position_type, position
@@ -1582,19 +1602,25 @@ sc.shifts_finalize <- function(game_id_fun, shifts_parse_data, events_data_HTM, 
   
   
   # Fix OT shift_end issue (shift_end recorded as "0:00")
-  if (fix_shifts == TRUE & min(shifts_parsed$seconds_duration) < 0) { 
+  if (fix_shifts == TRUE & min(na.omit(shifts_parsed$seconds_duration)) < 0) { 
     shifts_parsed <- shifts_parsed %>% 
-      mutate(shift_mod =        ifelse(seconds_duration < 0 & game_period == 4, 1, 0), 
-             seconds_end =      ifelse(seconds_duration < 0 & game_period == 4, 
-                                       seconds_start + period_to_seconds(ms(duration)), 
-                                       seconds_end), 
-             seconds_end =      ifelse(seconds_end > max(events_data_HTM$game_seconds) & shift_mod == 1, 
+      mutate(shift_mod_hold =   ifelse(seconds_duration < 0, 1, 0), 
+             
+             seconds_end =      ifelse(seconds_duration < 0, 
+                                       seconds_start + suppressWarnings(period_to_seconds(ms(duration))), 
+                                       seconds_end
+                                       ), 
+             seconds_end =      ifelse(seconds_end > max(events_data_HTM$game_seconds) & shift_mod_hold == 1 & game_period > 3, 
                                        max(events_data_HTM$game_seconds), 
-                                       seconds_end), 
-             seconds_duration = ifelse(seconds_duration < 0 & game_period == 4,
+                                       seconds_end
+                                       ), 
+             seconds_duration = ifelse(seconds_duration < 0 & shift_mod_hold == 1,
                                        seconds_end - seconds_start, 
-                                       seconds_duration)
-             )
+                                       seconds_duration
+                                       ), 
+             shift_mod =        ifelse(shift_mod_hold == 1, 1, shift_mod)
+             ) %>% 
+      select(-shift_mod_hold)
     
     }
   
@@ -1602,16 +1628,27 @@ sc.shifts_finalize <- function(game_id_fun, shifts_parse_data, events_data_HTM, 
   if (fix_shifts == TRUE & sum(is.na(shifts_parsed$seconds_end)) > 0 & sum(is.na(shifts_parsed$seconds_duration)) > 0) { 
     shifts_parsed <- shifts_parsed %>% 
       mutate(shift_mod =        ifelse(is.na(seconds_end) & is.na(seconds_duration) & !is.na(duration), 1, shift_mod), 
+             
              seconds_end =      ifelse(is.na(seconds_end) & !is.na(duration), 
-                                       seconds_start + period_to_seconds(ms(duration)), 
-                                       seconds_end), 
+                                       seconds_start + suppressWarnings(period_to_seconds(ms(duration))), 
+                                       seconds_end
+                                       ), 
              seconds_duration = ifelse(is.na(seconds_duration) & !is.na(duration), 
                                        seconds_end - seconds_start, 
-                                       seconds_duration)
+                                       seconds_duration
+                                       )
              ) %>% 
       data.frame()
     
     }
+  
+  # Final seconds_end check (NAs and negative shift lengths): "zero" shift
+  shifts_parsed <- shifts_parsed %>% 
+    mutate(shift_mod =        ifelse(is.na(seconds_end) | seconds_end < 0, 1, shift_mod), 
+           seconds_duration = ifelse(is.na(seconds_end) | seconds_end < 0, 0, seconds_duration),  
+           seconds_end =      ifelse(is.na(seconds_end) | seconds_end < 0, seconds_start, seconds_end)
+           ) %>% 
+    data.frame()
   
   
   ## ------------------------------- ##
@@ -2275,13 +2312,15 @@ sc.join_coordinates_ESPN <- function(season_id_fun, events_data_ESPN, events_dat
            coords_x = 
              case_when(
                game_info_data$season %in% c("20072008", "20082009") ~ round((coords_x - 1.5) * (198 / 197), 1),  ## ESPN min/max was -97/100, center and expand to match NHL API scale
-               as.numeric(game_info_data$season) >= 20162017 ~ coords_x + 1, 
+               as.numeric(game_info_data$season) >= 20162017 ~ coords_x + 1,  ## ESPN adjusts other way as of 20162017
+               game_info_data$season == "20092010" & coords_x > 99 ~ 99,      ## handful of coordinates greater than 99
                TRUE ~ coords_x
                ), 
            coords_y = 
              case_when(
-               game_info_data$season %in% c("20072008", "20082009") ~ round((coords_y + 1.5) * (84 / 83), 1),    ## ESPN min/max was -43/40, center and expand to match NHL API scale
-               as.numeric(game_info_data$season) >= 20162017 ~ coords_y - 1, 
+               game_info_data$season %in% c("20072008", "20082009") ~ round((coords_y + 1.5) * (84 / 83), 1),  ## ESPN min/max was -43/40, center and expand to match NHL API scale
+               as.numeric(game_info_data$season) >= 20162017 ~ coords_y - 1,  ## ESPN adjusts other way as of 20162017
+               game_info_data$season == "20092010" & coords_y < -42 ~ -42,      ## handful of coordinates less than -42
                TRUE ~ coords_y
                )
            ) %>% 
@@ -3255,6 +3294,7 @@ sc.update_names_API <- function(data, col_name) {
            player_name = 
              ## Specific name changes
              case_when(
+               player_name == "ALEX.PECHURSKIY" ~ "ALEX.PECHURSKI", 
                player_name == "BEN.ONDRUS" ~ "BENJAMIN.ONDRUS", 
                player_name == "BRYCE.VAN.BRABANT" ~ "BRYCE.VAN BRABANT", 
                player_name == "CALVIN.DE.HAAN" ~ "CALVIN.DE HAAN", 
@@ -3277,7 +3317,8 @@ sc.update_names_API <- function(data, col_name) {
                player_name == "JOEL.ERIKSSON.EK" ~ "JOEL.ERIKSSON EK", 
                player_name == "MARK.VAN.GUILDER" ~ "MARK.VAN GUILDER", 
                player_name == "MARTIN.ST..LOUIS" ~ "MARTIN.ST. LOUIS", 
-               player_name == "MARTIN.ST.PIERRE" ~ "MARTIN.ST PIERRE", 
+               player_name == "MARTIN.ST.PIERRE" ~ "MARTIN.ST. PIERRE", 
+               player_name == "MARTIN.ST PIERRE" ~ "MARTIN.ST. PIERRE", 
                player_name == "MICHAEL.CAMMALLERI" ~ "MIKE.CAMMALLERI", 
                player_name == "MICHAEL.DAL.COLLE" ~ "MICHAEL.DAL COLLE", 
                player_name == "MICHAEL.DEL.ZOTTO" ~ "MICHAEL.DEL ZOTTO", 
@@ -3294,10 +3335,9 @@ sc.update_names_API <- function(data, col_name) {
                player_name == "TOBY.ENSTROM" ~ "TOBIAS.ENSTROM",  
                player_name == "TREVOR.VAN.RIEMSDYK" ~ "TREVOR.VAN RIEMSDYK", 
                player_name == "ZACK.FITZGERALD" ~ "ZACH.FITZGERALD", 
-               # Updates
-               player_name == "MARTIN.ST PIERRE" ~ "MARTIN.ST. PIERRE", 
-               # AHO issue
+               # Duplicate player names
                player_name == "SEBASTIAN.AHO" & birthday == "1996-02-17" ~ "5EBASTIAN.AHO", 
+               player_name == "ALEX.PICARD" & birthday == "1985-10-09" ~ "ALEXANDRE.PICARD",  ## Left Wing, 8471221 ID
                
                TRUE ~ player_name
                ) 
@@ -3351,9 +3391,10 @@ sc.player_info_API <- function(season_id_fun) {
     mutate(position =    ifelse(PositionCode == "D", 2, 1),
            current_age = floor((Sys.Date() - birthday) / 365.25)
            ) %>% 
-    select(player, NHL_ID = playerId, PositionCode, ShootsCatches, birthday, TeamsPlayedFor, 
+    select(player, NHL_ID = playerId, position, PositionCode, ShootsCatches, birthday, TeamsPlayedFor, 
            BirthCity, BirthCountry, DraftOverallPickNo, DraftRoundNo, 
-           DraftYear, Height, Weight, position, season_age, current_age
+           DraftYear, Height, Weight, 
+           season, season_age, current_age
            ) %>% 
     data.frame()
   
@@ -3390,9 +3431,10 @@ sc.player_info_API <- function(season_id_fun) {
     mutate(position =    3,
            current_age = floor((Sys.Date() - birthday) / 365.25)
            ) %>% 
-    select(player, NHL_ID = playerId, PositionCode, ShootsCatches, birthday, TeamsPlayedFor, 
+    select(player, NHL_ID = playerId, position, PositionCode, ShootsCatches, birthday, TeamsPlayedFor, 
            BirthCity, BirthCountry, DraftOverallPickNo, DraftRoundNo, 
-           DraftYear, Height, Weight, position, season_age, current_age
+           DraftYear, Height, Weight, 
+           season, season_age, current_age
            ) %>% 
     data.frame()
   
@@ -3630,7 +3672,10 @@ sc.pbp_index <- function(data) {
     #mutate(shift_ID = round(first(event_index) * as.numeric(game_id))) %>% 
     mutate(shift_ID = 
              paste0(
-               paste0((as.numeric(substr(game_id, 3, 4)) + 1), ".", substr(game_id, 6, 10)), 
+               str_pad((as.numeric(substr(game_id, 3, 4)) + 1), 2, "left", pad = "0"), 
+               ".", 
+               substr(game_id, 6, 10), 
+               #paste0((as.numeric(substr(game_id, 3, 4)) + 1), ".", substr(game_id, 6, 10)), 
                ".", 
                str_pad(first(event_index), 4, "left", pad = "0")
                )
@@ -3722,15 +3767,15 @@ sc.pbp_index <- function(data) {
 # pbp_scrape <- sc.scrape_pbp(games = games_vec)
 #
 ## Pull out of list
-# game_info_df_new <-     pbp_scrape$game_info_df
-# pbp_base_new <-         pbp_scrape$pbp_base
-# pbp_extras_new <-       pbp_scrape$pbp_extras
-# player_shifts_new <-    pbp_scrape$player_shifts
-# player_periods_new <-   pbp_scrape$player_periods
-# roster_df_new <-        pbp_scrape$roster_df
-# scratches_df_new <-     pbp_scrape$scratches_df
-# event_summary_df_new <- pbp_scrape$events_summary_df
-# scrape_report <-        pbp_scrape$report
+# game_info_df_new <-     pbp_scrape$game_info_df               ## game information data
+# pbp_base_new <-         pbp_scrape$pbp_base                   ## main play-by-play data
+# pbp_extras_new <-       pbp_scrape$pbp_extras                 ## extra play-by-play data
+# player_shifts_new <-    pbp_scrape$player_shifts              ## full player shifts data
+# player_periods_new <-   pbp_scrape$player_periods             ## player TOI sums per period (from the shifts source)
+# roster_df_new <-        pbp_scrape$roster_df                  ## roster data
+# scratches_df_new <-     pbp_scrape$scratches_df               ## scratches data
+# event_summary_df_new <- pbp_scrape$events_summary_df          ## event summary data (box score stats, etc.)
+# scrape_report <-        pbp_scrape$report                     ## report showing number of rows and time to scrape game
 #
 #
 ## Get API info
