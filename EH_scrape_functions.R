@@ -2749,15 +2749,9 @@ sc.pbp_finalize <- function(pbp_data, on_data_home, on_data_away, roster_data, g
              1 * (!is.na(away_goalie)),
            home_score =   cumsum(event_type == "GOAL" & event_team == home_team) - 1 * (event_type == "GOAL" & event_team == home_team),
            away_score =   cumsum(event_type == "GOAL" & event_team == away_team) - 1 * (event_type == "GOAL" & event_team == away_team),
-           # Determine event length (remove time in specific instances)
+           # Determine event length and check potential issues
            event_length = lead(game_seconds, 1) - game_seconds, 
-           event_length = 
-             case_when(
-               is.na(event_length) ~ 0, 
-               event_length < 0 ~    0, 
-               event_type %in% c("OFF", "PSTR", "PEND", "SOC", "GEND") ~ 0,  ## these events should have no event_length
-               TRUE ~ event_length
-               )
+           event_length = ifelse(is.na(event_length) | event_length < 0, 0, event_length)
            ) %>% 
     # Indicate a goalie changed (ON / OFF event types)
     group_by(event_index) %>% 
