@@ -34,9 +34,10 @@ options(scipen = 999)
 # event summary: http://www.nhl.com/scores/htmlreports/20182019/ES020001.HTM
 
 ## NHL API:
-# events source: https://statsapi.web.nhl.com/api/v1/game/2018020001/feed/live?site=en_nhl
-# shifts source: http://www.nhl.com/stats/rest/shiftcharts?cayenneExp=gameId=2018020001 (not used at this time)
-# shifts charts: http://www.nhl.com/stats/shiftcharts?id=2018020001
+# events source:  https://statsapi.web.nhl.com/api/v1/game/2018020001/feed/live?site=en_nhl
+# shifts source:  http://www.nhl.com/stats/rest/shiftcharts?cayenneExp=gameId=2018020001 (not used at this time)
+# shifts charts:  http://www.nhl.com/stats/shiftcharts?id=2018020001
+# schedule soure: https://statsapi.web.nhl.com/api/v1/schedule?startDate=2018-10-03&endDate=2018-10-03
 
 ## ESPN links:
 # ESPN game IDs source: http://www.espn.com/nhl/scoreboard?date=20181003
@@ -56,7 +57,10 @@ options(scipen = 999)
 dead_games <- c("2007020011", "2007021178", 
                 "2008020259", "2008020409", "2008021077", 
                 "2009020081", "2009020658", "2009020885", 
-                "2010020124"
+                "2010020124", 
+                ## shifts available in API, not processed at this time.
+                "2016020272", "2016020312", "2016020701", "2016021112", 
+                "2017020796"
                 )
 
 
@@ -662,10 +666,9 @@ sc.update_names_HTM <- function(data, col_name) {
              ## Specific name changes
              case_when(
                player_name == "ANDREI.KASTSITSYN" ~ "ANDREI.KOSTITSYN",
-               player_name == "ANDREW.MILLER" ~ "DREW.MILLER", 
                player_name == "AJ.GREER" ~ "A.J..GREER",
                player_name == "ANDREW.GREENE" ~ "ANDY.GREENE",
-               player_name == "ANDREW.WOZNIEWSKI" ~ "ANDY.WOZNIEWSKI",
+               player_name == "ANDREW.WOZNIEWSKI" ~ "ANDY.WOZNIEWSKI", 
                player_name == "ANTHONY.DEANGELO" ~ "TONY.DEANGELO",
                player_name == "BATES (JON).BATTAGLIA" ~ "BATES.BATTAGLIA",
                player_name %in% c("BJ.CROMBEEN", "B.J.CROMBEEN", "BRANDON.CROMBEEN") ~ "B.J..CROMBEEN", 
