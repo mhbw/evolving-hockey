@@ -1056,8 +1056,10 @@ fun.NHL_info_scrape <- function(season_) {
   
   
   # Join Data
-  return_joined <- NHL_skater_data %>% 
-    rbind(., NHL_goalie_data) %>% 
+  return_joined <- bind_rows(
+      NHL_skater_data, 
+      NHL_goalie_data
+      ) %>% 
     arrange(player)
   
   }
@@ -6908,6 +6910,893 @@ fun.teammate <- function(pbp_data, strength) {
 
 
 #####################################
+
+
+## -------------------------- ##
+##    TOI Against Opponents   ## *** NOT USED ON SITE
+## -------------------------- ##
+
+################################
+
+# Combos: On Ice Corsi For / Against, TOI, Team - per game
+fun.get_time <- function(data) {
+  
+  hold_player <- data %>% 
+    summarise(TOI = sum(event_length) / 60)
+  
+  return(hold_player)
+  
+  }
+
+# For all on-ice pairs
+fun.opponent_player_H <- function(data, player) {
+  
+  if (player == "home_on_1") {
+    
+    h1 <- data %>% 
+      group_by(game_id, game_date, season, home_on_1, away_on_1, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_1, 
+             opponent = away_on_1) %>% 
+      data.frame()
+    
+    h2 <- data %>% 
+      group_by(game_id, game_date, season, home_on_1, away_on_2, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_1, 
+             opponent = away_on_2) %>% 
+      data.frame()
+    
+    h3 <- data %>% 
+      group_by(game_id, game_date, season, home_on_1, away_on_3, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_1, 
+             opponent = away_on_3) %>% 
+      data.frame()
+    
+    h4 <- data %>% 
+      group_by(game_id, game_date, season, home_on_1, away_on_4, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_1, 
+             opponent = away_on_4) %>% 
+      data.frame()
+    
+    h5 <- data %>% 
+      group_by(game_id, game_date, season, home_on_1, away_on_5, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_1, 
+             opponent = away_on_5) %>% 
+      data.frame()
+    
+    h6 <- data %>% 
+      group_by(game_id, game_date, season, home_on_1, away_on_6, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_1, 
+             opponent = away_on_6) %>% 
+      data.frame()
+    
+    
+    hbind <- bind_rows(
+      h1, h2, h3, h4, h5, h6
+    ) %>% 
+      group_by(player, opponent, game_id, game_date, season, home_team) %>% 
+      summarise_at(vars(TOI), funs(sum)) %>%
+      ungroup() %>% 
+      filter(!is.na(player),  
+             !is.na(opponent),  
+             TOI > 0) %>% 
+      data.frame()
+    
+    return(hbind)
+    
+  }
+  else if (player == "home_on_2") {
+    
+    h1 <- data %>% 
+      group_by(game_id, game_date, season, home_on_2, away_on_1, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_2, 
+             opponent = away_on_1) %>% 
+      data.frame()
+    
+    h2 <- data %>% 
+      group_by(game_id, game_date, season, home_on_2, away_on_2, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_2, 
+             opponent = away_on_2) %>% 
+      data.frame()
+    
+    h3 <- data %>% 
+      group_by(game_id, game_date, season, home_on_2, away_on_3, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_2, 
+             opponent = away_on_3) %>% 
+      data.frame()
+    
+    h4 <- data %>% 
+      group_by(game_id, game_date, season, home_on_2, away_on_4, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_2, 
+             opponent = away_on_4) %>% 
+      data.frame()
+    
+    h5 <- data %>% 
+      group_by(game_id, game_date, season, home_on_2, away_on_5, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_2, 
+             opponent = away_on_5) %>% 
+      data.frame()
+    
+    h6 <- data %>% 
+      group_by(game_id, game_date, season, home_on_2, away_on_6, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_2, 
+             opponent = away_on_6) %>% 
+      data.frame()
+    
+    
+    hbind <- bind_rows(h1, h2, h3, h4, h5, h6) %>% 
+      group_by(player, opponent, game_id, game_date, season, home_team) %>% 
+      summarise_at(vars(TOI), funs(sum)) %>%
+      ungroup() %>% 
+      filter(!is.na(player),  
+             !is.na(opponent),  
+             TOI > 0) %>% 
+      data.frame()
+    
+    return(hbind)
+    
+  }
+  else if (player == "home_on_3") {
+    
+    h1 <- data %>% 
+      group_by(game_id, game_date, season, home_on_3, away_on_1, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_3, 
+             opponent = away_on_1) %>% 
+      data.frame()
+    
+    h2 <- data %>% 
+      group_by(game_id, game_date, season, home_on_3, away_on_2, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_3, 
+             opponent = away_on_2) %>% 
+      data.frame()
+    
+    h3 <- data %>% 
+      group_by(game_id, game_date, season, home_on_3, away_on_3, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_3, 
+             opponent = away_on_3) %>% 
+      data.frame()
+    
+    h4 <- data %>% 
+      group_by(game_id, game_date, season, home_on_3, away_on_4, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_3, 
+             opponent = away_on_4) %>% 
+      data.frame()
+    
+    h5 <- data %>% 
+      group_by(game_id, game_date, season, home_on_3, away_on_5, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_3, 
+             opponent = away_on_5) %>% 
+      data.frame()
+    
+    h6 <- data %>% 
+      group_by(game_id, game_date, season, home_on_3, away_on_6, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_3, 
+             opponent = away_on_6) %>% 
+      data.frame()
+    
+    
+    hbind <- bind_rows(h1, h2, h3, h4, h5, h6) %>% 
+      group_by(player, opponent, game_id, game_date, season, home_team) %>% 
+      summarise_at(vars(TOI), funs(sum)) %>%
+      ungroup() %>% 
+      filter(!is.na(player),  
+             !is.na(opponent),  
+             TOI > 0) %>% 
+      data.frame()
+    
+    return(hbind)
+    
+  }
+  else if (player == "home_on_4") {
+    
+    h1 <- data %>% 
+      group_by(game_id, game_date, season, home_on_4, away_on_1, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_4, 
+             opponent = away_on_1) %>% 
+      data.frame()
+    
+    h2 <- data %>% 
+      group_by(game_id, game_date, season, home_on_4, away_on_2, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_4, 
+             opponent = away_on_2) %>% 
+      data.frame()
+    
+    h3 <- data %>% 
+      group_by(game_id, game_date, season, home_on_4, away_on_3, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_4, 
+             opponent = away_on_3) %>% 
+      data.frame()
+    
+    h4 <- data %>% 
+      group_by(game_id, game_date, season, home_on_4, away_on_4, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_4, 
+             opponent = away_on_4) %>% 
+      data.frame()
+    
+    h5 <- data %>% 
+      group_by(game_id, game_date, season, home_on_4, away_on_5, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_4, 
+             opponent = away_on_5) %>% 
+      data.frame()
+    
+    h6 <- data %>% 
+      group_by(game_id, game_date, season, home_on_4, away_on_6, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_4, 
+             opponent = away_on_6) %>% 
+      data.frame()
+    
+    
+    hbind <- bind_rows(h1, h2, h3, h4, h5, h6) %>% 
+      group_by(player, opponent, game_id, game_date, season, home_team) %>% 
+      summarise_at(vars(TOI), funs(sum)) %>%
+      ungroup() %>% 
+      filter(!is.na(player),  
+             !is.na(opponent),  
+             TOI > 0) %>% 
+      data.frame()
+    
+    return(hbind)
+    
+  }
+  else if (player == "home_on_5") {
+    
+    h1 <- data %>% 
+      group_by(game_id, game_date, season, home_on_5, away_on_1, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_5, 
+             opponent = away_on_1) %>% 
+      data.frame()
+    
+    h2 <- data %>% 
+      group_by(game_id, game_date, season, home_on_5, away_on_2, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_5, 
+             opponent = away_on_2) %>% 
+      data.frame()
+    
+    h3 <- data %>% 
+      group_by(game_id, game_date, season, home_on_5, away_on_3, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_5, 
+             opponent = away_on_3) %>% 
+      data.frame()
+    
+    h4 <- data %>% 
+      group_by(game_id, game_date, season, home_on_5, away_on_4, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_5, 
+             opponent = away_on_4) %>% 
+      data.frame()
+    
+    h5 <- data %>% 
+      group_by(game_id, game_date, season, home_on_5, away_on_5, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_5, 
+             opponent = away_on_5) %>% 
+      data.frame()
+    
+    h6 <- data %>% 
+      group_by(game_id, game_date, season, home_on_5, away_on_6, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_5, 
+             opponent = away_on_6) %>% 
+      data.frame()
+    
+    
+    hbind <- bind_rows(h1, h2, h3, h4, h5, h6) %>% 
+      group_by(player, opponent, game_id, game_date, season, home_team) %>% 
+      summarise_at(vars(TOI), funs(sum)) %>%
+      ungroup() %>% 
+      filter(!is.na(player),  
+             !is.na(opponent),  
+             TOI > 0) %>% 
+      data.frame()
+    
+    return(hbind)
+    
+  }
+  else if (player == "home_on_6") {
+    
+    h1 <- data %>% 
+      group_by(game_id, game_date, season, home_on_6, away_on_1, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_6, 
+             opponent = away_on_1) %>% 
+      data.frame()
+    
+    h2 <- data %>% 
+      group_by(game_id, game_date, season, home_on_6, away_on_2, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_6, 
+             opponent = away_on_2) %>% 
+      data.frame()
+    
+    h3 <- data %>% 
+      group_by(game_id, game_date, season, home_on_6, away_on_3, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_6, 
+             opponent = away_on_3) %>% 
+      data.frame()
+    
+    h4 <- data %>% 
+      group_by(game_id, game_date, season, home_on_6, away_on_4, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_6, 
+             opponent = away_on_4) %>% 
+      data.frame()
+    
+    h5 <- data %>% 
+      group_by(game_id, game_date, season, home_on_6, away_on_5, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_6, 
+             opponent = away_on_5) %>% 
+      data.frame()
+    
+    h6 <- data %>% 
+      group_by(game_id, game_date, season, home_on_6, away_on_6, home_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = home_on_6, 
+             opponent = away_on_6) %>% 
+      data.frame()
+    
+    
+    hbind <- bind_rows(h1, h2, h3, h4, h5, h6) %>% 
+      group_by(player, opponent, game_id, game_date, season, home_team) %>% 
+      summarise_at(vars(TOI), funs(sum)) %>%
+      ungroup() %>% 
+      filter(!is.na(player),  
+             !is.na(opponent),  
+             TOI > 0) %>% 
+      data.frame()
+    
+    return(hbind)
+    
+  }
+  
+}
+fun.opponent_player_A <- function(data, player) {
+  
+  if (player == "away_on_1") {
+    
+    a1 <- data %>% 
+      group_by(game_id, game_date, season, away_on_1, home_on_1, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_1, 
+             opponent = home_on_1) %>% 
+      data.frame()
+    
+    a2 <- data %>% 
+      group_by(game_id, game_date, season, away_on_1, home_on_2, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_1, 
+             opponent = home_on_2) %>% 
+      data.frame()
+    
+    a3 <- data %>% 
+      group_by(game_id, game_date, season, away_on_1, home_on_3, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_1, 
+             opponent = home_on_3) %>% 
+      data.frame()
+    
+    a4 <- data %>% 
+      group_by(game_id, game_date, season, away_on_1, home_on_4, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_1, 
+             opponent = home_on_4) %>% 
+      data.frame()
+    
+    a5 <- data %>% 
+      group_by(game_id, game_date, season, away_on_1, home_on_5, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_1, 
+             opponent = home_on_5) %>% 
+      data.frame()
+    
+    a6 <- data %>% 
+      group_by(game_id, game_date, season, away_on_1, home_on_6, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_1, 
+             opponent = home_on_6) %>% 
+      data.frame()
+    
+    
+    abind <- bind_rows(
+      a1, a2, a3, a4, a5, a6) %>% 
+      group_by(player, opponent, game_id, game_date, season, away_team) %>% 
+      summarise_at(vars(TOI), funs(sum)) %>%
+      ungroup() %>% 
+      filter(!is.na(player),  
+             !is.na(opponent),  
+             TOI > 0) %>% 
+      data.frame()
+    
+    return(abind)
+    
+  }
+  else if (player == "away_on_2") {
+    
+    a1 <- data %>% 
+      group_by(game_id, game_date, season, away_on_2, home_on_1, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_2, 
+             opponent = home_on_1) %>% 
+      data.frame()
+    
+    a2 <- data %>% 
+      group_by(game_id, game_date, season, away_on_2, home_on_2, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_2, 
+             opponent = home_on_2) %>% 
+      data.frame()
+    
+    a3 <- data %>% 
+      group_by(game_id, game_date, season, away_on_2, home_on_3, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_2, 
+             opponent = home_on_3) %>% 
+      data.frame()
+    
+    a4 <- data %>% 
+      group_by(game_id, game_date, season, away_on_2, home_on_4, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_2, 
+             opponent = home_on_4) %>% 
+      data.frame()
+    
+    a5 <- data %>% 
+      group_by(game_id, game_date, season, away_on_2, home_on_5, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_2, 
+             opponent = home_on_5) %>% 
+      data.frame()
+    
+    a6 <- data %>% 
+      group_by(game_id, game_date, season, away_on_2, home_on_6, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_2, 
+             opponent = home_on_6) %>% 
+      data.frame()
+    
+    
+    abind <- bind_rows(
+      a1, a2, a3, a4, a5, a6) %>% 
+      group_by(player, opponent, game_id, game_date, season, away_team) %>% 
+      summarise_at(vars(TOI), funs(sum)) %>%
+      ungroup() %>% 
+      filter(!is.na(player),  
+             !is.na(opponent),  
+             TOI > 0) %>% 
+      data.frame()
+    
+    return(abind)
+    
+  }
+  else if (player == "away_on_3") {
+    
+    a1 <- data %>% 
+      group_by(game_id, game_date, season, away_on_3, home_on_1, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_3, 
+             opponent = home_on_1) %>% 
+      data.frame()
+    
+    a2 <- data %>% 
+      group_by(game_id, game_date, season, away_on_3, home_on_2, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_3, 
+             opponent = home_on_2) %>% 
+      data.frame()
+    
+    a3 <- data %>% 
+      group_by(game_id, game_date, season, away_on_3, home_on_3, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_3, 
+             opponent = home_on_3) %>% 
+      data.frame()
+    
+    a4 <- data %>% 
+      group_by(game_id, game_date, season, away_on_3, home_on_4, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_3, 
+             opponent = home_on_4) %>% 
+      data.frame()
+    
+    a5 <- data %>% 
+      group_by(game_id, game_date, season, away_on_3, home_on_5, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_3, 
+             opponent = home_on_5) %>% 
+      data.frame()
+    
+    a6 <- data %>% 
+      group_by(game_id, game_date, season, away_on_3, home_on_6, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_3, 
+             opponent = home_on_6) %>% 
+      data.frame()
+    
+    
+    abind <- bind_rows(
+      a1, a2, a3, a4, a5, a6) %>% 
+      group_by(player, opponent, game_id, game_date, season, away_team) %>% 
+      summarise_at(vars(TOI), funs(sum)) %>%
+      ungroup() %>% 
+      filter(!is.na(player),  
+             !is.na(opponent),  
+             TOI > 0) %>% 
+      data.frame()
+    
+    return(abind)
+    
+  }
+  else if (player == "away_on_4") {
+    
+    a1 <- data %>% 
+      group_by(game_id, game_date, season, away_on_4, home_on_1, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_4, 
+             opponent = home_on_1) %>% 
+      data.frame()
+    
+    a2 <- data %>% 
+      group_by(game_id, game_date, season, away_on_4, home_on_2, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_4, 
+             opponent = home_on_2) %>% 
+      data.frame()
+    
+    a3 <- data %>% 
+      group_by(game_id, game_date, season, away_on_4, home_on_3, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_4, 
+             opponent = home_on_3) %>% 
+      data.frame()
+    
+    a4 <- data %>% 
+      group_by(game_id, game_date, season, away_on_4, home_on_4, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_4, 
+             opponent = home_on_4) %>% 
+      data.frame()
+    
+    a5 <- data %>% 
+      group_by(game_id, game_date, season, away_on_4, home_on_5, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_4, 
+             opponent = home_on_5) %>% 
+      data.frame()
+    
+    a6 <- data %>% 
+      group_by(game_id, game_date, season, away_on_4, home_on_6, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_4, 
+             opponent = home_on_6) %>% 
+      data.frame()
+    
+    
+    abind <- bind_rows(
+      a1, a2, a3, a4, a5, a6) %>% 
+      group_by(player, opponent, game_id, game_date, season, away_team) %>% 
+      summarise_at(vars(TOI), funs(sum)) %>%
+      ungroup() %>% 
+      filter(!is.na(player),  
+             !is.na(opponent),  
+             TOI > 0) %>% 
+      data.frame()
+    
+    return(abind)
+    
+    }
+  else if (player == "away_on_5") {
+    
+    a1 <- data %>% 
+      group_by(game_id, game_date, season, away_on_5, home_on_1, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_5, 
+             opponent = home_on_1) %>% 
+      data.frame()
+    
+    a2 <- data %>% 
+      group_by(game_id, game_date, season, away_on_5, home_on_2, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_5, 
+             opponent = home_on_2) %>% 
+      data.frame()
+    
+    a3 <- data %>% 
+      group_by(game_id, game_date, season, away_on_5, home_on_3, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_5, 
+             opponent = home_on_3) %>% 
+      data.frame()
+    
+    a4 <- data %>% 
+      group_by(game_id, game_date, season, away_on_5, home_on_4, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_5, 
+             opponent = home_on_4) %>% 
+      data.frame()
+    
+    a5 <- data %>% 
+      group_by(game_id, game_date, season, away_on_5, home_on_5, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_5, 
+             opponent = home_on_5) %>% 
+      data.frame()
+    
+    a6 <- data %>% 
+      group_by(game_id, game_date, season, away_on_5, home_on_6, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_5, 
+             opponent = home_on_6) %>% 
+      data.frame()
+    
+    
+    abind <- bind_rows(
+      a1, a2, a3, a4, a5, a6) %>% 
+      group_by(player, opponent, game_id, game_date, season, away_team) %>% 
+      summarise_at(vars(TOI), funs(sum)) %>%
+      ungroup() %>% 
+      filter(!is.na(player),  
+             !is.na(opponent),  
+             TOI > 0) %>% 
+      data.frame()
+    
+    return(abind)
+    
+    }
+  else if (player == "away_on_6") {
+    
+    a1 <- data %>% 
+      group_by(game_id, game_date, season, away_on_6, home_on_1, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_6, 
+             opponent = home_on_1) %>% 
+      data.frame()
+    
+    a2 <- data %>% 
+      group_by(game_id, game_date, season, away_on_6, home_on_2, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_6, 
+             opponent = home_on_2) %>% 
+      data.frame()
+    
+    a3 <- data %>% 
+      group_by(game_id, game_date, season, away_on_6, home_on_3, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_6, 
+             opponent = home_on_3) %>% 
+      data.frame()
+    
+    a4 <- data %>% 
+      group_by(game_id, game_date, season, away_on_6, home_on_4, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_6, 
+             opponent = home_on_4) %>% 
+      data.frame()
+    
+    a5 <- data %>% 
+      group_by(game_id, game_date, season, away_on_6, home_on_5, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_6, 
+             opponent = home_on_5) %>% 
+      data.frame()
+    
+    a6 <- data %>% 
+      group_by(game_id, game_date, season, away_on_6, home_on_6, away_team) %>% 
+      fun.get_time(.) %>% 
+      rename(player = away_on_6, 
+             opponent = home_on_6) %>% 
+      data.frame()
+    
+    
+    abind <- bind_rows(
+      a1, a2, a3, a4, a5, a6) %>% 
+      group_by(player, opponent, game_id, game_date, season, away_team) %>% 
+      summarise_at(vars(TOI), funs(sum)) %>%
+      ungroup() %>% 
+      filter(!is.na(player),  
+             !is.na(opponent),  
+             TOI > 0) %>% 
+      data.frame()
+    
+    return(abind)
+    
+    }
+  
+  }
+
+# Combine 
+fun.opponent_TOI <- function(pbp_data, strength) {
+  
+  print(paste("season:", unique(pbp_data$season)), quote = F)
+  
+  # Home data strength state filter
+  if (strength == "even") { 
+    data_home <- pbp_data %>% 
+      filter(game_strength_state %in% st.even_strength, 
+             game_period < 5)
+    
+    }
+  else if (strength == "5v5") { 
+    data_home <- pbp_data %>% 
+      filter(game_strength_state == "5v5", 
+             game_period < 5)
+    
+    }
+  
+  else if (strength == "powerplay") { 
+    data_home <- pbp_data %>% 
+      filter(game_strength_state %in% c("5v4", "5v3", "4v3"), 
+             game_period < 5)
+    
+    }
+  else if (strength == "5v4") { 
+    data_home <- pbp_data %>% 
+      filter(game_strength_state %in% c("5v4"), 
+             game_period < 5)
+    
+    }
+  
+  else if (strength == "shorthanded") { 
+    data_home <- pbp_data %>% 
+      filter(game_strength_state %in% c("4v5", "3v5", "3v4"), 
+             game_period < 5)
+    
+    }
+  else if (strength == "4v5") { 
+    data_home <- pbp_data %>% 
+      filter(game_strength_state %in% c("4v5"), 
+             game_period < 5)
+    
+    }
+  
+  # Away data strength state filter
+  if (strength == "even") { 
+    data_away <- pbp_data %>% 
+      filter(game_strength_state %in% st.even_strength, 
+             game_period < 5)
+    
+    }
+  else if (strength == "5v5") { 
+    data_away <- pbp_data %>% 
+      filter(game_strength_state == "5v5", 
+             game_period < 5)
+    
+    }
+  
+  else if (strength == "powerplay") { 
+    data_away <- pbp_data %>% 
+      filter(game_strength_state %in%  c("4v5", "3v5", "3v4"), 
+             game_period < 5)
+    
+    }
+  else if (strength == "5v4") { 
+    data_away <- pbp_data %>% 
+      filter(game_strength_state %in%  c("4v5"), 
+             game_period < 5)
+    
+    }
+  
+  else if (strength == "shorthanded") { 
+    data_away <- pbp_data %>%
+      filter(game_strength_state %in% c("5v4", "5v3", "4v3"), 
+             game_period < 5)
+    
+    }
+  else if (strength == "4v5") { 
+    data_away <- pbp_data %>%
+      filter(game_strength_state %in% c("5v4"), 
+             game_period < 5)
+    
+    }
+  
+  
+  # Home functions
+  print("home_on_1", quote = F)
+  home1 <- fun.opponent_player_H(data_home, "home_on_1")
+  
+  print("home_on_2", quote = F)
+  home2 <- fun.opponent_player_H(data_home, "home_on_2")
+  
+  print("home_on_3", quote = F)
+  home3 <- fun.opponent_player_H(data_home, "home_on_3")
+  
+  print("home_on_4", quote = F)
+  home4 <- fun.opponent_player_H(data_home, "home_on_4")
+  
+  print("home_on_5", quote = F)
+  home5 <- fun.opponent_player_H(data_home, "home_on_5")
+  
+  print("home_on_6", quote = F)
+  home6 <- fun.opponent_player_H(data_home, "home_on_6")
+  
+  
+  # Away functions
+  print("away_on_1", quote = F)
+  away1 <- fun.opponent_player_A(data_away, "away_on_1")
+  
+  print("away_on_2", quote = F)
+  away2 <- fun.opponent_player_A(data_away, "away_on_2")
+  
+  print("away_on_3", quote = F)
+  away3 <- fun.opponent_player_A(data_away, "away_on_3")
+  
+  print("away_on_4", quote = F)
+  away4 <- fun.opponent_player_A(data_away, "away_on_4")
+  
+  print("away_on_5", quote = F)
+  away5 <- fun.opponent_player_A(data_away, "away_on_5")
+  
+  print("away_on_6", quote = F)
+  away6 <- fun.opponent_player_A(data_away, "away_on_6")
+  
+  
+  # Bind 
+  print("bind", quote = F)
+  
+  home_all <- bind_rows(home1, home2, home3, home4, home5, home6) %>% 
+    group_by(player, opponent, game_id, game_date, season, home_team) %>% 
+    summarise(TOI = sum(TOI)) %>% 
+    rename(Team = home_team) %>% 
+    data.frame()
+  
+  away_all <- bind_rows(away1, away2, away3, away4, away5, away6) %>% 
+    group_by(player, opponent, game_id, game_date, season, away_team) %>% 
+    summarise(TOI = sum(TOI)) %>% 
+    rename(Team = away_team) %>% 
+    data.frame()
+  
+  # Get goalies
+  goalie_vec <- sort(unique(c(
+    sort(unique(na.omit(pbp_data$home_goalie))), 
+    sort(unique(na.omit(pbp_data$away_goalie)))
+    )))
+  
+  # Combine
+  print("combine", quote = F)
+  
+  return_df <- bind_rows(
+    home_all, 
+    away_all
+    ) %>% 
+    filter(!player %in% goalie_vec, 
+           !opponent %in% goalie_vec
+           ) %>% 
+    select(player, opponent, game_id, game_date, season, Team, TOI) %>% 
+    arrange(player, opponent, game_id) %>% 
+    data.frame()
+  
+  return(return_df)
+  
+  }
+
+
+################################
 
 
 ## -------------------------- ##

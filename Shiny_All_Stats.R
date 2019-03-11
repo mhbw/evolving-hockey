@@ -688,7 +688,6 @@ paste0("Season: ", unique(pbp_df$season), "  //  Games: ", length(unique(pbp_df$
 
 
 
-
 ## -------------------- RUN GAME BY GAME FUNCTIONS --------------------- ##
 
 
@@ -779,7 +778,7 @@ team_games_all_sit_new <- fun.team_games_all_sit(data = pbp_df)
 
 team_games_EV_new <- fun.team_games_EV(data = pbp_df, strength = "EV", scr_adj_list = score_adj_EV)
 team_games_PP_new <- fun.team_games_PP(data = pbp_df, strength = "PP", scr_adj_list = score_adj_PP)
-team_games_SH_new <- fun.team_games_SH(data = pbp_df, strength = "SH", scr_adj_list = score_adj_SH)
+team_games_SH_new <- fun.team_games_SH(data = pbp_df, strength = "SH", scr_adj_list = score_adj_PP)
 
 team_games_5v5_new <- fun.team_games_EV(data = pbp_df, strength = "5v5", scr_adj_list = score_adj_5v5)
 team_games_4v4_new <- fun.team_games_EV(data = pbp_df, strength = "4v4", scr_adj_list = score_adj_4v4)
@@ -1097,7 +1096,6 @@ dbDisconnect(db)
 
 
 ###############################
-
 
 
 
