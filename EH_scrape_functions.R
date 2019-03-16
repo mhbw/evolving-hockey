@@ -887,12 +887,19 @@ sc.roster_info <- function(game_id_fun, season_id_fun, roster_data, game_info_da
              Opponent =        ifelse(Team == game_info_data$home_team, game_info_data$away_team, game_info_data$home_team), 
              is_home =         1 * (Team == game_info_data$home_team)
              ) %>% 
+      
       # Name Corrections
       sc.update_names_HTM(., col_name = "player") %>% 
       # Manula Name Updates
-      mutate(player = ifelse(player == "SEBASTIAN.AHO" & Team == "NYI", "5EBASTIAN.AHO", player), 
-             player = ifelse(player == "ALEX.PICARD" & position == "L", "ALEXANDRE.PICARD", player)  ## Left Wing, 8471221 ID
+      mutate(player = 
+               case_when(
+                 player == "SEBASTIAN.AHO" & Team == "NYI" ~ "5EBASTIAN.AHO",    
+                 player == "ALEX.PICARD" & position == "L" ~ "ALEXANDRE.PICARD",   ## Left Wing, 8471221 ID
+                 player == "ANDREW.MILLER" & season == "20072008" ~ "DREW.MILLER", ## DREW.MILLER 8470778 ID
+                 TRUE ~ player
+                 )
              ) %>% 
+      
       select(player, position, position_type, game_id, game_date, season, session, Team, Opponent, is_home, player_num, player_team_num) %>% 
       arrange(is_home, player) %>% 
       data.frame()
@@ -953,12 +960,19 @@ sc.roster_info <- function(game_id_fun, season_id_fun, roster_data, game_info_da
                                   ifelse(position == "D", "D", 
                                          "F"))
            ) %>%
+    
     # Name Corrections
     sc.update_names_HTM(., col_name = "player") %>% 
     # Manual Name Corrections
-    mutate(player = ifelse(player == "SEBASTIAN.AHO" & Team == "NYI", "5EBASTIAN.AHO", player), 
-           player = ifelse(player == "ALEX.PICARD" & position == "L", "ALEXANDRE.PICARD", player)  ## Left Wing, 8471221 ID
+    mutate(player = 
+             case_when(
+               player == "SEBASTIAN.AHO" & Team == "NYI" ~ "5EBASTIAN.AHO",    
+               player == "ALEX.PICARD" & position == "L" ~ "ALEXANDRE.PICARD",   ## Left Wing, 8471221 ID
+               player == "ANDREW.MILLER" & season == "20072008" ~ "DREW.MILLER", ## DREW.MILLER 8470778 ID
+               TRUE ~ player
+               )
            ) %>% 
+    
     select(player, player_num, Team, game_id, game_date, season, session, num_last_first, 
            player_team_num, firstName, lastName, venue, position_type, position
            ) %>% 
