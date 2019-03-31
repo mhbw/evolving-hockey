@@ -2027,43 +2027,86 @@ sc.shifts_finalize <- function(game_id_fun, shifts_parse_data, events_data_HTM, 
 # Create ON/OFF event types
 sc.shifts_create_events <- function(shifts_final_data) { 
   
-  # Combine ON & OFF Events   
-  shifts_events <- bind_rows(
-    
-    # Determine Changes - ON Events
+  ## Combine ON & OFF Events   
+  # shifts_events <- bind_rows(
+  #   
+  #   # Determine Changes - ON Events
+  #   shifts_final_data %>% 
+  #     mutate(home_team = unique(filter(shifts_final_data, is_home == 1)$Team), 
+  #            away_team = unique(filter(shifts_final_data, is_home == 0)$Team)
+  #            ) %>% 
+  #     select(player_team_num, event_team = Team, game_id, game_period, seconds_start, home_team, away_team) %>% 
+  #     group_by(event_team, home_team, away_team, game_id, game_period, seconds_start) %>% 
+  #     mutate(changes = as.numeric(n()), 
+  #            players_substituted = paste(unique(player_team_num), collapse = ", ")
+  #            ) %>% 
+  #     summarise_at(vars(changes, players_substituted), funs(first(.))) %>% 
+  #     mutate(event_type = "ON") %>% 
+  #     rename(game_seconds = seconds_start) %>% 
+  #     data.frame(), 
+  #   
+  #   # Determine Changes - OFF Events
+  #   shifts_final_data %>% 
+  #     mutate(home_team = unique(filter(shifts_final_data, is_home == 1)$Team), 
+  #            away_team = unique(filter(shifts_final_data, is_home == 0)$Team)
+  #            ) %>% 
+  #     select(player_team_num, event_team = Team, game_id, game_period, seconds_end, home_team, away_team) %>% 
+  #     group_by(event_team, home_team, away_team, game_id, game_period, seconds_end) %>% 
+  #     mutate(changes = as.numeric(n()), 
+  #            players_substituted = paste(unique(player_team_num), collapse = ", ")
+  #            ) %>% 
+  #     summarise_at(vars(changes, players_substituted), funs(first(.))) %>% 
+  #     mutate(event_type = "OFF") %>% 
+  #     rename(game_seconds = seconds_end) %>% 
+  #     data.frame()
+  #   
+  #   ) %>% 
+  #   mutate(index = 1 * (event_team == home_team)) %>%  ## ensure away team changes first
+  #   arrange(game_seconds, event_type, index) %>% 
+  #   select(game_id, game_period, game_seconds, event_team, event_type, changes, players_substituted) %>% 
+  #   data.frame()
+  
+  
+  ## Create "CHANGE" Event Type
+  shifts_events <- full_join(
+    ## ON Shift Changes
     shifts_final_data %>% 
-      mutate(home_team = unique(filter(shifts_final_data, is_home == 1)$Team), 
+      mutate(home_team = unique(filter(shifts_final_data, is_home == 1)$Team),
              away_team = unique(filter(shifts_final_data, is_home == 0)$Team)
-             ) %>% 
+             ) %>%
       select(player_team_num, event_team = Team, game_id, game_period, seconds_start, home_team, away_team) %>% 
       group_by(event_team, home_team, away_team, game_id, game_period, seconds_start) %>% 
-      mutate(changes = as.numeric(n()), 
-             players_substituted = paste(unique(player_team_num), collapse = ", ")
+      mutate(num = as.numeric(n()), 
+             players = paste(unique(player_team_num), collapse = ", ")
              ) %>% 
-      summarise_at(vars(changes, players_substituted), funs(first(.))) %>% 
+      summarise_at(vars(num, players), funs(first(.))) %>% 
       mutate(event_type = "ON") %>% 
       rename(game_seconds = seconds_start) %>% 
       data.frame(), 
-    
-    # Determine Changes - OFF Events
+    ## OFF Shift Changes
     shifts_final_data %>% 
-      mutate(home_team = unique(filter(shifts_final_data, is_home == 1)$Team), 
+      mutate(home_team = unique(filter(shifts_final_data, is_home == 1)$Team),
              away_team = unique(filter(shifts_final_data, is_home == 0)$Team)
-             ) %>% 
+             ) %>%
       select(player_team_num, event_team = Team, game_id, game_period, seconds_end, home_team, away_team) %>% 
       group_by(event_team, home_team, away_team, game_id, game_period, seconds_end) %>% 
-      mutate(changes = as.numeric(n()), 
-             players_substituted = paste(unique(player_team_num), collapse = ", ")
+      mutate(num = as.numeric(n()), 
+             players = paste(unique(player_team_num), collapse = ", ")
              ) %>% 
-      summarise_at(vars(changes, players_substituted), funs(first(.))) %>% 
+      summarise_at(vars(num, players), funs(first(.))) %>% 
       mutate(event_type = "OFF") %>% 
       rename(game_seconds = seconds_end) %>% 
-      data.frame()
-    
+      data.frame(), 
+    by = c("event_team", "home_team", "away_team", "game_id", "game_period", "game_seconds"), 
+    suffix = c("_on", "_off")
     ) %>% 
-    mutate(index = 1 * (event_team == home_team)) %>%  ## ensure away team changes first
-    arrange(game_seconds, event_type, index) %>% 
-    select(game_id, game_period, game_seconds, event_team, event_type, changes, players_substituted) %>% 
+    mutate(num_on = ifelse(is.na(num_on), 0, num_on), 
+           num_off = ifelse(is.na(num_off), 0, num_off), 
+           is_home = 1 * (event_team == home_team), 
+           event_type = "CHANGE"
+           ) %>% 
+    arrange(game_period, game_seconds, is_home) %>% 
+    select(game_id, game_seconds, game_period, event_team, event_type, num_on, num_off, players_on, players_off) %>% 
     data.frame()
   
   
@@ -2600,51 +2643,89 @@ sc.pbp_combine <- function(events_data, shifts_data, roster_data, game_info_data
            away_team = game_info_data$away_team
            ) %>% 
     # determine priority for arranging events, shootouts excluded (modified from Manny Perry's code)
+    # mutate(priority = 
+    #          1 * (event_type %in% c("TAKE", "GIVE", "MISS", "HIT", "SHOT", "BLOCK") & !(game_period == 5 & session == "R")) +
+    #          2 * (event_type == "GOAL" & !(game_period == 5 & session == "R")) +
+    #          3 * (event_type == "STOP" & !(game_period == 5 & session == "R")) +
+    #          4 * (event_type == "PENL" & !(game_period == 5 & session == "R")) +
+    #          5 * (event_type == "OFF" &  !(game_period == 5 & session == "R")) +
+    #          6 * (event_type == "PEND" & !(game_period == 5 & session == "R")) +
+    #          7 * (event_type == "GEND" & !(game_period == 5 & session == "R")) +
+    #          8 * (event_type == "ON" &   !(game_period == 5 & session == "R")) +
+    #          9 * (event_type == "FAC" &  !(game_period == 5 & session == "R"))
+    #        ) %>% 
     mutate(priority = 
              1 * (event_type %in% c("TAKE", "GIVE", "MISS", "HIT", "SHOT", "BLOCK") & !(game_period == 5 & session == "R")) +
              2 * (event_type == "GOAL" & !(game_period == 5 & session == "R")) +
              3 * (event_type == "STOP" & !(game_period == 5 & session == "R")) +
              4 * (event_type == "PENL" & !(game_period == 5 & session == "R")) +
-             5 * (event_type == "OFF" &  !(game_period == 5 & session == "R")) +
+             5 * (event_type == "CHANGE" & !(game_period == 5 & session == "R")) +
              6 * (event_type == "PEND" & !(game_period == 5 & session == "R")) +
              7 * (event_type == "GEND" & !(game_period == 5 & session == "R")) +
-             8 * (event_type == "ON" &   !(game_period == 5 & session == "R")) +
-             9 * (event_type == "FAC" &  !(game_period == 5 & session == "R"))
+             8 * (event_type == "FAC" &  !(game_period == 5 & session == "R"))
            ) %>% 
-    arrange(game_period, game_seconds, priority) %>% 
+    arrange(game_period, 
+            game_seconds, 
+            priority
+            ) %>% 
     mutate(event_index = as.numeric(cumsum(!is.na(game_id)))) %>%
-    select(-c(priority)) %>% 
+    select(-priority) %>% 
     data.frame()
   
   
   # Loop to construct home matrix for players on ice
+  # is_on_matrix_home <- foreach(i = 1:length(roster_data$player_team_num), .combine = cbind) %do% { 
+  #   
+  #   vec <- cumsum(
+  #     1 * (grepl(paste0("\\b", roster_data$player_team_num[i], "\\b"), pbp_df$players_substituted) &  ## "\\b" forces exact match
+  #            pbp_df$event_type == "ON" &  
+  #            pbp_df$event_team == pbp_df$home_team) - 
+  #       1 * (grepl(paste0("\\b", roster_data$player_team_num[i], "\\b"), pbp_df$players_substituted) &  ## "\\b" forces exact match
+  #              pbp_df$event_type == "OFF" & 
+  #              pbp_df$event_team == pbp_df$home_team)
+  #     )
+  #   
+  #   }
+  
   is_on_matrix_home <- foreach(i = 1:length(roster_data$player_team_num), .combine = cbind) %do% { 
     
     vec <- cumsum(
-      1 * (grepl(paste0("\\b", roster_data$player_team_num[i], "\\b"), pbp_df$players_substituted) &  ## "\\b" forces exact match
-             pbp_df$event_type == "ON" &  
+      1 * (grepl(paste0("\\b", roster_data$player_team_num[i], "\\b"), pbp_df$players_on) &  ## "\\b" forces exact match
+             pbp_df$event_type == "CHANGE" &  
              pbp_df$event_team == pbp_df$home_team) - 
-        1 * (grepl(paste0("\\b", roster_data$player_team_num[i], "\\b"), pbp_df$players_substituted) &  ## "\\b" forces exact match
-               pbp_df$event_type == "OFF" & 
+        1 * (grepl(paste0("\\b", roster_data$player_team_num[i], "\\b"), pbp_df$players_off) &  ## "\\b" forces exact match
+               pbp_df$event_type == "CHANGE" & 
                pbp_df$event_team == pbp_df$home_team)
       )
     
     }
   
   # Loop to construct away matrix for players on ice
+  # is_on_matrix_away <- foreach(i = 1:length(roster_data$player_team_num), .combine = cbind) %do% { 
+  #   
+  #   vec <- cumsum(
+  #     1 * (grepl(paste0("\\b", roster_data$player_team_num[i], "\\b"), pbp_df$players_substituted) &  ## "\\b" forces exact match
+  #            pbp_df$event_type == "ON" &  
+  #            pbp_df$event_team == pbp_df$away_team) - 
+  #       1 * (grepl(paste0("\\b", roster_data$player_team_num[i], "\\b"), pbp_df$players_substituted) &  ## "\\b" forces exact match
+  #              pbp_df$event_type == "OFF" & 
+  #              pbp_df$event_team == pbp_df$away_team)
+  #     )
+  #   
+  #   }
+  
   is_on_matrix_away <- foreach(i = 1:length(roster_data$player_team_num), .combine = cbind) %do% { 
     
     vec <- cumsum(
-      1 * (grepl(paste0("\\b", roster_data$player_team_num[i], "\\b"), pbp_df$players_substituted) &  ## "\\b" forces exact match
-             pbp_df$event_type == "ON" &  
+      1 * (grepl(paste0("\\b", roster_data$player_team_num[i], "\\b"), pbp_df$players_on) &  ## "\\b" forces exact match
+             pbp_df$event_type == "CHANGE" &  
              pbp_df$event_team == pbp_df$away_team) - 
-        1 * (grepl(paste0("\\b", roster_data$player_team_num[i], "\\b"), pbp_df$players_substituted) &  ## "\\b" forces exact match
-               pbp_df$event_type == "OFF" & 
+        1 * (grepl(paste0("\\b", roster_data$player_team_num[i], "\\b"), pbp_df$players_off) &  ## "\\b" forces exact match
+               pbp_df$event_type == "CHANGE" & 
                pbp_df$event_team == pbp_df$away_team)
       )
     
     }
-  
   
   # Set column names of matrices
   colnames(is_on_matrix_home) <- roster_data$player
@@ -2662,7 +2743,8 @@ sc.pbp_combine <- function(events_data, shifts_data, roster_data, game_info_data
               home_on_3 = colnames(is_on_matrix_home)[unique(col)[3]],
               home_on_4 = colnames(is_on_matrix_home)[unique(col)[4]],
               home_on_5 = colnames(is_on_matrix_home)[unique(col)[5]],
-              home_on_6 = colnames(is_on_matrix_home)[unique(col)[6]]
+              home_on_6 = colnames(is_on_matrix_home)[unique(col)[6]], 
+              home_on_7 = colnames(is_on_matrix_home)[unique(col)[7]]
               ) %>%
     data.frame()
   
@@ -2676,7 +2758,8 @@ sc.pbp_combine <- function(events_data, shifts_data, roster_data, game_info_data
               away_on_3 = colnames(is_on_matrix_away)[unique(col)[3]],
               away_on_4 = colnames(is_on_matrix_away)[unique(col)[4]],
               away_on_5 = colnames(is_on_matrix_away)[unique(col)[5]],
-              away_on_6 = colnames(is_on_matrix_away)[unique(col)[6]]
+              away_on_6 = colnames(is_on_matrix_away)[unique(col)[6]], 
+              away_on_7 = colnames(is_on_matrix_away)[unique(col)[7]]
               ) %>%
     data.frame()
   
@@ -2694,7 +2777,8 @@ sc.pbp_combine <- function(events_data, shifts_data, roster_data, game_info_data
                home_on_3 %in% goalie_vec ~ home_on_3, 
                home_on_4 %in% goalie_vec ~ home_on_4, 
                home_on_5 %in% goalie_vec ~ home_on_5, 
-               home_on_6 %in% goalie_vec ~ home_on_6
+               home_on_6 %in% goalie_vec ~ home_on_6, 
+               home_on_7 %in% goalie_vec ~ home_on_7
                )
            ) %>% 
     rename(event_index = row) %>%  ## row determined above in matrix construction, renamed for joining
@@ -2709,7 +2793,8 @@ sc.pbp_combine <- function(events_data, shifts_data, roster_data, game_info_data
                away_on_3 %in% goalie_vec ~ away_on_3, 
                away_on_4 %in% goalie_vec ~ away_on_4, 
                away_on_5 %in% goalie_vec ~ away_on_5, 
-               away_on_6 %in% goalie_vec ~ away_on_6
+               away_on_6 %in% goalie_vec ~ away_on_6, 
+               away_on_7 %in% goalie_vec ~ away_on_7
                )
            ) %>% 
     rename(event_index = row) %>%  ## row determined above in matrix construction, renamed for joining
@@ -2737,8 +2822,8 @@ sc.pbp_finalize <- function(pbp_data, on_data_home, on_data_away, roster_data, g
   
   # Combine and modify to form final pbp data frame
   pbp_combined <- pbp_data %>% 
-    left_join(., on_data_home, by = "event_index") %>% 
-    left_join(., on_data_away, by = "event_index") %>% 
+    left_join(on_data_home, by = "event_index") %>% 
+    left_join(on_data_away, by = "event_index") %>% 
     group_by(game_id) %>%
     arrange(event_index) %>%
     mutate(event_player_1 = roster_data$player[match(event_player_1, roster_data$player_team_num)], 
@@ -2753,17 +2838,25 @@ sc.pbp_finalize <- function(pbp_data, on_data_home, on_data_away, roster_data, g
            away_on_2 =    ifelse(game_period == 5 & game_info_data$session == "R", away_goalie, away_on_2)
            ) %>% 
     # Fix skaters for penalty shots
-    mutate_at(vars(home_on_1:home_on_6, away_on_1:away_on_6), 
+    mutate_at(vars(home_on_1:home_on_7, away_on_1:away_on_7), 
               funs(ifelse(grepl("penalty shot", tolower(event_description)) & . != event_player_1 & . != home_goalie & . != away_goalie, NA, .))
               ) %>% 
-    mutate(home_skaters = 6 - 
+    mutate(home_skaters = 7 - 
              1 * (is.na(home_on_1)) - 1 * (is.na(home_on_2)) - 1 * (is.na(home_on_3)) - 
-             1 * (is.na(home_on_4)) - 1 * (is.na(home_on_5)) - 1 * (is.na(home_on_6)) - 
+             1 * (is.na(home_on_4)) - 1 * (is.na(home_on_5)) - 1 * (is.na(home_on_6)) - 1 * (is.na(home_on_7)) - 
              1 * (!is.na(home_goalie)), 
-           away_skaters = 6 - 
+           away_skaters = 7 - 
              1 * (is.na(away_on_1)) - 1 * (is.na(away_on_2)) - 1 * (is.na(away_on_3)) - 
-             1 * (is.na(away_on_4)) - 1 * (is.na(away_on_5)) - 1 * (is.na(away_on_6)) - 
-             1 * (!is.na(away_goalie)),
+             1 * (is.na(away_on_4)) - 1 * (is.na(away_on_5)) - 1 * (is.na(away_on_6)) - 1 * (is.na(away_on_7)) - 
+             1 * (!is.na(away_goalie)), 
+           # home_skaters = 6 - 
+           #   1 * (is.na(home_on_1)) - 1 * (is.na(home_on_2)) - 1 * (is.na(home_on_3)) - 
+           #   1 * (is.na(home_on_4)) - 1 * (is.na(home_on_5)) - 1 * (is.na(home_on_6)) - 
+           #   1 * (!is.na(home_goalie)), 
+           # away_skaters = 6 - 
+           #   1 * (is.na(away_on_1)) - 1 * (is.na(away_on_2)) - 1 * (is.na(away_on_3)) - 
+           #   1 * (is.na(away_on_4)) - 1 * (is.na(away_on_5)) - 1 * (is.na(away_on_6)) - 
+           #   1 * (!is.na(away_goalie)),
            home_score =   cumsum(event_type == "GOAL" & event_team == home_team) - 1 * (event_type == "GOAL" & event_team == home_team),
            away_score =   cumsum(event_type == "GOAL" & event_team == away_team) - 1 * (event_type == "GOAL" & event_team == away_team),
            # Determine event length and check potential issues
@@ -2772,43 +2865,55 @@ sc.pbp_finalize <- function(pbp_data, on_data_home, on_data_away, roster_data, g
            ) %>% 
     # Indicate a goalie changed (ON / OFF event types)
     group_by(event_index) %>% 
-    mutate(home_G_change =   ifelse(sum(1 * (goalie_vec %in% strsplit(players_substituted, ", ")[[1]])) == 1, 
-                                    ifelse(goalie_vec[goalie_vec %in% strsplit(players_substituted, ", ")[[1]]] %in% goalie_vec_home,
-                                           goalie_vec[goalie_vec %in% strsplit(players_substituted, ", ")[[1]]], NA), 
+    # mutate(home_G_change =   ifelse(sum(1 * (goalie_vec %in% strsplit(players_substituted, ", ")[[1]])) == 1, 
+    #                                 ifelse(goalie_vec[goalie_vec %in% strsplit(players_substituted, ", ")[[1]]] %in% goalie_vec_home,
+    #                                        goalie_vec[goalie_vec %in% strsplit(players_substituted, ", ")[[1]]], NA), 
+    #                                 NA), 
+    #        away_G_change =   ifelse(sum(1 * (goalie_vec %in% strsplit(players_substituted, ", ")[[1]])) == 1, 
+    #                                 ifelse(goalie_vec[goalie_vec %in% strsplit(players_substituted, ", ")[[1]]] %in% goalie_vec_away,
+    #                                        goalie_vec[goalie_vec %in% strsplit(players_substituted, ", ")[[1]]], NA), 
+    #                                 NA), 
+    #        home_G_change =   roster_data$player[match(home_G_change, roster_data$player_team_num)], 
+    #        away_G_change =   roster_data$player[match(away_G_change, roster_data$player_team_num)]
+    #        ) %>%
+    mutate(home_G_change =   ifelse(sum(1 * (goalie_vec %in% strsplit(paste(players_on, players_off, sep = ", "), ", ")[[1]])) == 1, 
+                                    ifelse(goalie_vec[goalie_vec %in% strsplit(paste(players_on, players_off, sep = ", "), ", ")[[1]]] %in% goalie_vec_home,
+                                           goalie_vec[goalie_vec %in% strsplit(paste(players_on, players_off, sep = ", "), ", ")[[1]]], NA), 
                                     NA), 
-           away_G_change =   ifelse(sum(1 * (goalie_vec %in% strsplit(players_substituted, ", ")[[1]])) == 1, 
-                                    ifelse(goalie_vec[goalie_vec %in% strsplit(players_substituted, ", ")[[1]]] %in% goalie_vec_away,
-                                           goalie_vec[goalie_vec %in% strsplit(players_substituted, ", ")[[1]]], NA), 
+           away_G_change =   ifelse(sum(1 * (goalie_vec %in% strsplit(paste(players_on, players_off, sep = ", "), ", ")[[1]])) == 1, 
+                                    ifelse(goalie_vec[goalie_vec %in% strsplit(paste(players_on, players_off, sep = ", "), ", ")[[1]]] %in% goalie_vec_away,
+                                           goalie_vec[goalie_vec %in% strsplit(paste(players_on, players_off, sep = ", "), ", ")[[1]]], NA), 
                                     NA), 
            home_G_change =   roster_data$player[match(home_G_change, roster_data$player_team_num)], 
            away_G_change =   roster_data$player[match(away_G_change, roster_data$player_team_num)]
-           ) %>%
+           ) %>% 
     group_by(game_id) %>%
     mutate(game_strength_state = paste(ifelse(is.na(home_goalie), "E", home_skaters), 
                                        ifelse(is.na(away_goalie), "E", away_skaters), 
                                        sep = "v"
                                        ),
+           game_strength_state = ifelse((home_skaters == 6 & !is.na(home_goalie)) | (away_skaters == 6 & !is.na(away_goalie)), "illegal", game_strength_state), ## Determine if strength state is illegal
            game_score_state =    paste(home_score, away_score, sep = "v"), 
            # Alternate strength state calculation (disregards goalies)
            home_skaters_alt = 
              1 * (home_on_1 %in% skater_vec_home) + 1 * (home_on_2 %in% skater_vec_home) + 1 * (home_on_3 %in% skater_vec_home) +
-             1 * (home_on_4 %in% skater_vec_home) + 1 * (home_on_5 %in% skater_vec_home) + 1 * (home_on_6 %in% skater_vec_home), 
+             1 * (home_on_4 %in% skater_vec_home) + 1 * (home_on_5 %in% skater_vec_home) + 1 * (home_on_6 %in% skater_vec_home) + 1 * (home_on_7 %in% skater_vec_home), 
            away_skaters_alt = 
              1 * (away_on_1 %in% skater_vec_away) + 1 * (away_on_2 %in% skater_vec_away) + 1 * (away_on_3 %in% skater_vec_away) +
-             1 * (away_on_4 %in% skater_vec_away) + 1 * (away_on_5 %in% skater_vec_away) + 1 * (away_on_6 %in% skater_vec_away), 
-           game_strength_state_alt = gsub("6", "E", paste0(home_skaters_alt, "v", away_skaters_alt))
+             1 * (away_on_4 %in% skater_vec_away) + 1 * (away_on_5 %in% skater_vec_away) + 1 * (away_on_6 %in% skater_vec_away) + 1 * (away_on_7 %in% skater_vec_away), 
+           game_strength_state_alt = gsub("6|7", "E", paste0(home_skaters_alt, "v", away_skaters_alt))
            ) %>% 
-    select(# Main selections 
-           season, game_id, game_date, session, event_index, game_period, game_seconds, event_type, 
-           event_description, event_detail, event_zone, event_team, event_player_1:event_player_3, event_length, coords_x, 
-           coords_y, players_substituted, home_on_1:home_on_6, away_on_1:away_on_6, home_goalie, away_goalie, 
-           home_team, away_team, home_skaters, away_skaters, home_score, away_score, game_score_state, game_strength_state,
-      
-           # Additional selections (to be split out)
-           changes, home_skaters_alt, away_skaters_alt, game_strength_state_alt, 
-           home_G_change, away_G_change, 
-           event_description_alt
-           ) %>% 
+    select(
+      # Main selections
+      season, game_id, game_date, session, event_index, game_period, game_seconds, event_type, 
+      event_description, event_detail, event_zone, event_team, event_player_1:event_player_3, event_length, coords_x, coords_y, 
+      num_on, num_off, players_on, players_off, home_on_1:home_on_7, away_on_1:away_on_7, home_goalie, away_goalie, 
+      home_team, away_team, home_skaters, away_skaters, home_score, away_score, game_score_state, game_strength_state, 
+      # Additional selections (to be split out)
+      home_skaters_alt, away_skaters_alt, game_strength_state_alt, 
+      home_G_change, away_G_change, 
+      event_description_alt
+      ) %>% 
     arrange(game_id, event_index) %>% 
     data.frame()
   
@@ -2818,7 +2923,7 @@ sc.pbp_finalize <- function(pbp_data, on_data_home, on_data_away, roster_data, g
     select(season:game_strength_state)
   
   pbp_extras <- pbp_combined %>% 
-    select(game_id, event_index, changes:event_description_alt)
+    select(game_id, event_index, home_skaters_alt:event_description_alt)
   
   
   # Return data as a list 
@@ -3655,6 +3760,8 @@ sc.pbp_expand <- function(data) {
 # Add faceoff, penalty, and shift indexes
 sc.pbp_index <- function(data) { 
   
+  data <- pbp_base_new
+  
   # Add shift/face/pen indexes & shift IDs
   
   print("index", quote = F)
@@ -3662,22 +3769,24 @@ sc.pbp_index <- function(data) {
   pbp_hold <- data %>% 
     arrange(game_id, event_index) %>% 
     mutate(face_index =  cumsum(event_type == "FAC"), 
-           shift_index = cumsum(event_type == "ON"), 
-           pen_index =   cumsum(event_type == "PENL"))
+           shift_index = cumsum(event_type == "CHANGE"), 
+           pen_index =   cumsum(event_type == "PENL")
+           ) %>% 
+    data.frame()
   
   
   print("shift_ID", quote = F)
   
   hold <- pbp_hold %>% 
-    filter(event_type %in% c("ON", "OFF", ## testing these
-                             "FAC", "GOAL", "BLOCK", "SHOT", "MISS", "HIT", "TAKE", "GIVE"
+    filter(event_type %in% c("CHANGE", ## testing
+                             "FAC", "GOAL", "BLOCK", "SHOT", "MISS", "HIT", "TAKE", "GIVE", "PENL"
                              ), 
-           game_period < 5
+           !(game_period == 5 & session == "R")
            ) %>% 
     group_by(game_id, game_period, season,
-             home_on_1, home_on_2, home_on_3, home_on_4, home_on_5, home_on_6, 
-             away_on_1, away_on_2, away_on_3, away_on_4, away_on_5, away_on_6, 
-             home_goalie, away_goalie, 
+             # home_on_1, home_on_2, home_on_3, home_on_4, home_on_5, home_on_6, home_on_7, 
+             # away_on_1, away_on_2, away_on_3, away_on_4, away_on_5, away_on_6, away_on_7, 
+             # home_goalie, away_goalie, 
              face_index, shift_index, pen_index
              ) %>% 
     #mutate(shift_ID = round(first(event_index) * as.numeric(game_id))) %>% 
@@ -3691,11 +3800,11 @@ sc.pbp_index <- function(data) {
                str_pad(first(event_index), 4, "left", pad = "0")
                )
            ) %>% 
-    summarise(shift_ID =     first(shift_ID), 
-              shift_length = last(game_seconds) - first(game_seconds)
-              ) %>% 
+    summarise(shift_ID =     first(shift_ID),
+              shift_length = sum(event_length)
+              ) %>%
     ungroup() %>% 
-    select(game_id, game_period, season, shift_ID, face_index, shift_index, pen_index, shift_length, home_on_1:away_goalie) %>% 
+    select(game_id, game_period, season, shift_ID, face_index, shift_index, pen_index, shift_length) %>% 
     data.frame()
   
   
@@ -3705,9 +3814,9 @@ sc.pbp_index <- function(data) {
   join <- pbp_hold %>% 
     left_join(., hold, 
               by = c("game_id", "game_period", "season",
-                     "home_on_1", "home_on_2", "home_on_3", "home_on_4", "home_on_5", "home_on_6", 
-                     "away_on_1", "away_on_2", "away_on_3", "away_on_4","away_on_5", "away_on_6", 
-                     "home_goalie", "away_goalie", 
+                     # "home_on_1", "home_on_2", "home_on_3", "home_on_4", "home_on_5", "home_on_6", 
+                     # "away_on_1", "away_on_2", "away_on_3", "away_on_4","away_on_5", "away_on_6", 
+                     # "home_goalie", "away_goalie", 
                      "face_index", "shift_index", "pen_index"
                      )
               ) %>% 
