@@ -784,6 +784,7 @@ sc.update_names_HTM <- function(data, col_name) {
                player_name %in% c("PK.SUBBAN", "P.K.SUBBAN") ~ "P.K..SUBBAN", 
                player_name %in% c("PIERRE.PARENTEAU", "PIERRE-ALEX.PARENTEAU", "PIERRE-ALEXANDRE.PARENTEAU", "PA.PARENTEAU", "P.A.PARENTEAU", "P-A.PARENTEAU") ~ "P.A..PARENTEAU", 
                player_name == "PHILIP.VARONE" ~ "PHIL.VARONE",
+               player_name == "QUINTIN.HUGHES" ~ "QUINN.HUGHES",
                player_name == "RAYMOND.MACIAS" ~ "RAY.MACIAS",
                player_name == "RJ.UMBERGER" ~ "R.J..UMBERGER",
                player_name == "ROBERT.BLAKE" ~ "ROB.BLAKE",
