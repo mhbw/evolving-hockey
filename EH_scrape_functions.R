@@ -258,7 +258,7 @@ sc.scrape_schedule <- function(start_date, end_date, print_sched = TRUE) {
     data.frame()
   
   # Arrange if playoff games
-  if (unique(schedule_current$session == "P")) { 
+  if ("P" %in% unique(schedule_current$session)) { 
     schedule_current <- arrange(schedule_current, game_date, EST_time_convert)
     
     }
@@ -272,7 +272,7 @@ sc.scrape_schedule <- function(start_date, end_date, print_sched = TRUE) {
   }
 
 # Scrape Events (HTM)
-sc.scrape_events_HTM <- function(game_id_fun, season_id_fun, attempts) { 
+sc.scrape_events_HTM <- function(game_id_fun, season_id_fun, attempts = 3) { 
   
   url_events_HTM <- NULL
   try_count <-  attempts
@@ -297,7 +297,7 @@ sc.scrape_events_HTM <- function(game_id_fun, season_id_fun, attempts) {
   }
 
 # Scrape Events (API)
-sc.scrape_events_API <- function(game_id_fun, attempts) { 
+sc.scrape_events_API <- function(game_id_fun, attempts = 3) { 
   
   url_events_API <- NULL
   try_count <-  attempts
@@ -344,7 +344,7 @@ sc.scrape_events_API <- function(game_id_fun, attempts) {
   }
 
 # Scrape Events (ESPN)
-sc.scrape_events_ESPN <- function(game_id_fun, season_id_fun, game_info_data, attempts) { 
+sc.scrape_events_ESPN <- function(game_id_fun, season_id_fun, game_info_data, attempts = 3) { 
   
   ## Scrape ESPN to locate game IDs for the specified date
   url_ESPN_page <- NULL
@@ -452,7 +452,7 @@ sc.scrape_events_ESPN <- function(game_id_fun, season_id_fun, game_info_data, at
   }
 
 # Scrape Shifts (HTM)
-sc.scrape_shifts <- function(game_id_fun, season_id_fun, attempts) { 
+sc.scrape_shifts <- function(game_id_fun, season_id_fun, attempts = 3) { 
   
   url_home_shifts <- NULL
   try_count <-  attempts
@@ -504,7 +504,7 @@ sc.scrape_shifts <- function(game_id_fun, season_id_fun, attempts) {
   }
 
 # Scrape Shifts (API)
-sc.scrape_shifts_API <- function(game_id_fun, attempts) { 
+sc.scrape_shifts_API <- function(game_id_fun, attempts = 3) { 
   
   url_shifts <- NULL
   try_count <-  attempts
@@ -531,7 +531,7 @@ sc.scrape_shifts_API <- function(game_id_fun, attempts) {
   }
 
 # Scrape Rosters
-sc.scrape_rosters <- function(game_id_fun, season_id_fun, attempts) { 
+sc.scrape_rosters <- function(game_id_fun, season_id_fun, attempts = 3) { 
   
   url_rosters <- NULL
   try_count <- attempts
@@ -556,7 +556,7 @@ sc.scrape_rosters <- function(game_id_fun, season_id_fun, attempts) {
   }
 
 # Scrape Event Summary
-sc.scrape_event_summary <- function(game_id_fun, season_id_fun, attempts) { 
+sc.scrape_event_summary <- function(game_id_fun, season_id_fun, attempts = 3) { 
   
   url_event_summary <- NULL
   try_count <- attempts
@@ -3317,6 +3317,17 @@ sc.scrape_game <- function(game_id, season_id, scrape_type_, live_scrape_) {
       data.frame()
     
     
+    # Ensure database friendly column names
+    colnames(pbp_finalize_list$pbp_base) <- tolower(colnames(pbp_finalize_list$pbp_base))
+    colnames(pbp_finalize_list$pbp_extras) <- tolower(colnames(pbp_finalize_list$pbp_extras))
+    colnames(shifts_final_df) <- tolower(colnames(shifts_final_df))
+    colnames(shifts_parsed_list$player_period_sums) <- tolower(colnames(shifts_parsed_list$player_period_sums))
+    colnames(rosters_list$roster_df_final) <- tolower(colnames(rosters_list$roster_df_final))
+    colnames(rosters_list$scratches_df) <- tolower(colnames(rosters_list$scratches_df))
+    colnames(game_info_df_return) <- tolower(colnames(game_info_df_return))
+    colnames(event_summary_df) <- tolower(colnames(event_summary_df))
+    
+    
     # Return all data as a list
     return_list <- list(pbp_base =         pbp_finalize_list$pbp_base, 
                         pbp_extras =       pbp_finalize_list$pbp_extras, 
@@ -3331,15 +3342,29 @@ sc.scrape_game <- function(game_id, season_id, scrape_type_, live_scrape_) {
   
   # Return data is not full scrape
   if (scrape_type_ == "event_summary") { 
+    
+    # Ensure database friendly column names
+    colnames(rosters_list$roster_df_final) <- tolower(colnames(rosters_list$roster_df_final))
+    colnames(rosters_list$scratches_df) <- tolower(colnames(rosters_list$scratches_df))
+    colnames(event_summary_df) <- tolower(colnames(event_summary_df))
+    
+    # Return as list
     return_list <- list(roster_df =        rosters_list$roster_df_final, 
                         scratches_df =     rosters_list$scratches_df, 
                         event_summary_df = event_summary_df)
     
     } else if (scrape_type_ == "rosters") { 
+      
+      # Ensure database friendly column names
+      colnames(rosters_list$roster_df_final) <- tolower(colnames(rosters_list$roster_df_final))
+      colnames(rosters_list$scratches_df) <- tolower(colnames(rosters_list$scratches_df))
+      
+      # Return as list
       return_list <- list(roster_df =        rosters_list$roster_df_final, 
                           scratches_df =     rosters_list$scratches_df)
     
       }
+  
   
   # Return data
   return(return_list)
@@ -3762,6 +3787,13 @@ sc.player_info_API <- function(season_id_fun) {
     sc.update_names_API(., col_name = "player") %>% 
     arrange(player) %>% 
     data.frame()
+  
+  
+  # Ensure database friendly column names
+  colnames(return_joined) <- tolower(colnames(return_joined))
+  
+  
+  return(return_joined)
   
   }
 
