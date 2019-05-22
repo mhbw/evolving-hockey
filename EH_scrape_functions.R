@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 #################################################################################
 #####         Evolving-Hockey Scraper         ||          02/14/19          #####
 #################################################################################
@@ -9,6 +10,22 @@
 
 
 # Set for numeric/text formatting within scraper
+=======
+###################################################################################
+#####         Evolving-Hockey Scraper         ||          2019-05-18          #####
+###################################################################################
+
+## Current as of: R version 3.6.0 (2019-04-26)
+
+
+## Dependencies
+ library(RCurl); library(xml2); library(rvest); library(jsonlite); library(foreach)
+ library(lubridate)
+ library(tidyverse) ## specifically: stringr, readr, tidyr, and dplyr
+
+
+## Set for numeric/text formatting within scraper
+>>>>>>> Updated with stylistic edits
 options(scipen = 999)
 
 
@@ -54,6 +71,7 @@ options(scipen = 999)
 ########################
 
 # Dead NHL games (html source)
+<<<<<<< HEAD
 dead_games <- c("2007020011", "2007021178", 
                 "2008020259", "2008020409", "2008021077", 
                 "2009020081", "2009020658", "2009020885", 
@@ -62,6 +80,14 @@ dead_games <- c("2007020011", "2007021178",
                 #"2016020272", "2016020312", "2016020701", "2016021112", 
                 #"2017020796"
                 )
+=======
+dead_games <- c(
+  "2007020011", "2007021178", 
+  "2008020259", "2008020409", "2008021077", "2008030311", 
+  "2009020081", "2009020658", "2009020885", 
+  "2010020124" 
+  )
+>>>>>>> Updated with stylistic edits
 
 
 # Create Team IDs (to use for API team triCodes)
@@ -79,10 +105,18 @@ Team_ID <-
                             ifelse(ID == 33, 54, ID))))
 
 # For identifying event_team in HTM events
+<<<<<<< HEAD
 Team_ID_vec <- c("ANA", "ARI", "BOS", "BUF", "CAR", "CBJ", "CGY", "CHI", "COL", "DAL", "DET", "EDM", "FLA", "L.A", "MIN", 
                  "MTL", "N.J", "NSH", "NYI", "NYR", "OTT", "PHI", "PIT", "S.J", "STL", "T.B", "TOR", "VAN", "WPG", "WSH", 
                  "PHX", "ATL", "VGK", "L.V"
                  )
+=======
+Team_ID_vec <- c(
+  "ANA", "ARI", "BOS", "BUF", "CAR", "CBJ", "CGY", "CHI", "COL", "DAL", "DET", "EDM", "FLA", "L.A", "MIN", 
+  "MTL", "N.J", "NSH", "NYI", "NYR", "OTT", "PHI", "PIT", "S.J", "STL", "T.B", "TOR", "VAN", "WPG", "WSH", 
+  "PHX", "ATL", "VGK", "L.V"
+  )
+>>>>>>> Updated with stylistic edits
 
 full_team_names <- 
   data.frame(fullTeam = 
@@ -677,7 +711,11 @@ sc.update_names_HTM <- function(data, col_name) {
   hold_name <- as.name(col_name)
   
   data <- data %>% 
+<<<<<<< HEAD
     mutate(player_name = rlang::UQ(hold_name))
+=======
+    mutate(player_name = !!hold_name)
+>>>>>>> Updated with stylistic edits
   
   
   # Find and modify incorrect player names
@@ -2391,7 +2429,11 @@ sc.join_coordinates_API <- function(events_data_API, events_data_HTM) {
         # Determine rows to keep
         group_by(game_period, game_seconds, event_type) %>% 
         mutate(row =      row_number(),  
+<<<<<<< HEAD
                filtered = ifelse(row_number() == max(row) | row_number() == min(row), 1, 0)
+=======
+               filtered = suppressWarnings(ifelse(row_number() == max(row) | row_number() == min(row), 1, 0))
+>>>>>>> Updated with stylistic edits
                ) %>% 
         filter(filtered == 1) %>% 
         # Ensure new rows created from join are filtered out if something went wrong
@@ -2408,7 +2450,11 @@ sc.join_coordinates_API <- function(events_data_API, events_data_HTM) {
         # Determine rows to keep
         group_by(game_period, game_seconds, event_type) %>% 
         mutate(row =      row_number(),  
+<<<<<<< HEAD
                filtered = ifelse(row_number() == max(row) | row_number() == min(row) | row_number() == min(row) + 4, 1, 0)
+=======
+               filtered = suppressWarnings(ifelse(row_number() == max(row) | row_number() == min(row) | row_number() == min(row) + 4, 1, 0))
+>>>>>>> Updated with stylistic edits
                ) %>% 
         filter(filtered == 1) %>% 
         # Ensure new rows created from join are filtered out if something went wrong
@@ -2425,7 +2471,11 @@ sc.join_coordinates_API <- function(events_data_API, events_data_HTM) {
         # Determine rows to keep
         group_by(game_period, game_seconds, event_type) %>% 
         mutate(row =      row_number(),  
+<<<<<<< HEAD
                filtered = ifelse(row_number() == max(row) | row_number() == min(row) | row_number() == min(row) + 5 | row_number() == min(row) + 10, 1, 0)
+=======
+               filtered = suppressWarnings(ifelse(row_number() == max(row) | row_number() == min(row) | row_number() == min(row) + 5 | row_number() == min(row) + 10, 1, 0))
+>>>>>>> Updated with stylistic edits
                ) %>% 
         filter(filtered == 1) %>% 
         # Ensure new rows created from join are filtered out if something went wrong
@@ -2699,7 +2749,11 @@ sc.join_coordinates_ESPN <- function(season_id_fun, events_data_ESPN, events_dat
         # Determine rows to keep
         group_by(game_period, game_seconds, event_type) %>% 
         mutate(row =      row_number(),  
+<<<<<<< HEAD
                filtered = ifelse(row_number() == max(row) | row_number() == min(row), 1, 0)
+=======
+               filtered = suppressWarnings(ifelse(row_number() == max(row) | row_number() == min(row), 1, 0))
+>>>>>>> Updated with stylistic edits
                ) %>% 
         filter(filtered == 1) %>% 
         # Ensure new rows created from join are filtered out if something went wrong
@@ -2716,7 +2770,11 @@ sc.join_coordinates_ESPN <- function(season_id_fun, events_data_ESPN, events_dat
         # Determine rows to keep
         group_by(game_period, game_seconds, event_type) %>% 
         mutate(row =      row_number(),  
+<<<<<<< HEAD
                filtered = ifelse(row_number() == max(row) | row_number() == min(row) | row_number() == min(row) + 4, 1, 0)
+=======
+               filtered = suppressWarnings(ifelse(row_number() == max(row) | row_number() == min(row) | row_number() == min(row) + 4, 1, 0))
+>>>>>>> Updated with stylistic edits
                ) %>% 
         filter(filtered == 1) %>% 
         # Ensure new rows created from join are filtered out if something went wrong
@@ -2733,7 +2791,11 @@ sc.join_coordinates_ESPN <- function(season_id_fun, events_data_ESPN, events_dat
         # Determine rows to keep
         group_by(game_period, game_seconds, event_type) %>% 
         mutate(row =      row_number(),  
+<<<<<<< HEAD
                filtered = ifelse(row_number() == max(row) | row_number() == min(row) | row_number() == min(row) + 5 | row_number() == min(row) + 10, 1, 0)
+=======
+               filtered = suppressWarnings(ifelse(row_number() == max(row) | row_number() == min(row) | row_number() == min(row) + 5 | row_number() == min(row) + 10, 1, 0))
+>>>>>>> Updated with stylistic edits
                ) %>% 
         filter(filtered == 1) %>% 
         # Ensure new rows created from join are filtered out if something went wrong
@@ -3076,6 +3138,7 @@ sc.pbp_finalize <- function(pbp_data, on_data_home, on_data_away, roster_data, g
     #        home_G_change =   roster_data$player[match(home_G_change, roster_data$player_team_num)], 
     #        away_G_change =   roster_data$player[match(away_G_change, roster_data$player_team_num)]
     #        ) %>%
+<<<<<<< HEAD
     mutate(home_G_change =   ifelse(sum(1 * (goalie_vec %in% strsplit(paste(players_on, players_off, sep = ", "), ", ")[[1]])) == 1, 
                                     ifelse(goalie_vec[goalie_vec %in% strsplit(paste(players_on, players_off, sep = ", "), ", ")[[1]]] %in% goalie_vec_home,
                                            goalie_vec[goalie_vec %in% strsplit(paste(players_on, players_off, sep = ", "), ", ")[[1]]], NA), 
@@ -3086,6 +3149,18 @@ sc.pbp_finalize <- function(pbp_data, on_data_home, on_data_away, roster_data, g
                                     NA), 
            home_G_change =   roster_data$player[match(home_G_change, roster_data$player_team_num)], 
            away_G_change =   roster_data$player[match(away_G_change, roster_data$player_team_num)]
+=======
+    mutate(home_g_change =   ifelse(sum(1 * (goalie_vec %in% strsplit(paste(players_on, players_off, sep = ", "), ", ")[[1]])) == 1, 
+                                    ifelse(goalie_vec[goalie_vec %in% strsplit(paste(players_on, players_off, sep = ", "), ", ")[[1]]] %in% goalie_vec_home,
+                                           goalie_vec[goalie_vec %in% strsplit(paste(players_on, players_off, sep = ", "), ", ")[[1]]], NA), 
+                                    NA), 
+           away_g_change =   ifelse(sum(1 * (goalie_vec %in% strsplit(paste(players_on, players_off, sep = ", "), ", ")[[1]])) == 1, 
+                                    ifelse(goalie_vec[goalie_vec %in% strsplit(paste(players_on, players_off, sep = ", "), ", ")[[1]]] %in% goalie_vec_away,
+                                           goalie_vec[goalie_vec %in% strsplit(paste(players_on, players_off, sep = ", "), ", ")[[1]]], NA), 
+                                    NA), 
+           home_g_change =   roster_data$player[match(home_g_change, roster_data$player_team_num)], 
+           away_g_change =   roster_data$player[match(away_g_change, roster_data$player_team_num)]
+>>>>>>> Updated with stylistic edits
            ) %>% 
     group_by(game_id) %>%
     mutate(game_strength_state = paste(ifelse(is.na(home_goalie), "E", home_skaters), 
@@ -3111,7 +3186,11 @@ sc.pbp_finalize <- function(pbp_data, on_data_home, on_data_away, roster_data, g
       home_team, away_team, home_skaters, away_skaters, home_score, away_score, game_score_state, game_strength_state, 
       # Additional selections (to be split out)
       home_skaters_alt, away_skaters_alt, game_strength_state_alt, 
+<<<<<<< HEAD
       home_G_change, away_G_change, 
+=======
+      home_g_change, away_g_change, 
+>>>>>>> Updated with stylistic edits
       event_description_alt
       ) %>% 
     arrange(game_id, event_index) %>% 
@@ -3407,22 +3486,40 @@ sc.scrape_pbp <- function(games, scrape_type = "full", live_scrape = FALSE, verb
   if (length(games_vec) > 1) {
     cat(paste0("Processing ", length(games_vec), " Games: ", min(sort(as.numeric(games_vec))), "-", max(sort(as.numeric(games_vec)))))
     
+<<<<<<< HEAD
     switch (scrape_type, 
             "full" =          cat(" // Full Scrape"), 
             "event_summary" = cat(" // Event Summary and Rosters"), 
             "rosters" =       cat(" // Rosters Only")
             )
+=======
+    switch (
+      scrape_type, 
+      "full" =          cat(" // Full Scrape"), 
+      "event_summary" = cat(" // Event Summary and Rosters"), 
+      "rosters" =       cat(" // Rosters Only")
+      )
+>>>>>>> Updated with stylistic edits
     
     cat(paste0("\n", "-------------", "\n"))
     
     } else {
       cat(paste0("Processing Game... "))
       
+<<<<<<< HEAD
       switch (scrape_type, 
               "full" =          cat(" // Full Scrape"), 
               "event_summary" = cat(" // Event Summary and Rosters"), 
               "rosters" =       cat(" // Rosters Only")
               )
+=======
+      switch (
+        scrape_type, 
+        "full" =          cat(" // Full Scrape"), 
+        "event_summary" = cat(" // Event Summary and Rosters"), 
+        "rosters" =       cat(" // Rosters Only")
+        )
+>>>>>>> Updated with stylistic edits
       
       cat(paste0("\n", "-------------", "\n"))
       
@@ -3614,7 +3711,11 @@ sc.update_names_API <- function(data, col_name) {
   hold_name <- as.name(col_name)
   
   data <- data %>% 
+<<<<<<< HEAD
     mutate(player_name = rlang::UQ(hold_name))
+=======
+    mutate(player_name = !!hold_name)
+>>>>>>> Updated with stylistic edits
   
   
   # Find and modify incorrect player names
@@ -4074,7 +4175,11 @@ sc.pbp_index <- function(data) {
 # This function is used to scrape one or more games from the NHL's publicly available data
 # A list is returned with data that is requested
 # Example:
+<<<<<<< HEAD
 # pbp_scrape <- sc.scrape_pbp(games = c("2018020001", "2018020002"))
+=======
+ pbp_scrape <- sc.scrape_pbp(games = c("2018020001", "2018020002"))
+>>>>>>> Updated with stylistic edits
 #
 #
 ## 'games':
@@ -4112,6 +4217,7 @@ sc.pbp_index <- function(data) {
 #
 # *** Scrape the first 100 games from the 20182019 regular season
 #
+<<<<<<< HEAD
 # games_vec <- c(as.character(seq(2018020001, 2018020100, by = 1)))
 #
 # pbp_scrape <- sc.scrape_pbp(games = games_vec)
@@ -4142,6 +4248,38 @@ sc.pbp_index <- function(data) {
 ## Add additional information to pbp data
 # pbp_expand <- sc.pbp_expand(data = pbp_base_new)
 # pbp_expand <- sc.pbp_index(data = pbp_expand)
+=======
+ games_vec <- c(as.character(seq(2018020001, 2018020100, by = 1)))
+#
+ pbp_scrape <- sc.scrape_pbp(games = games_vec)
+#
+## Pull out of list
+ game_info_df_new <-     pbp_scrape$game_info_df               ## game information data
+ pbp_base_new <-         pbp_scrape$pbp_base                   ## main play-by-play data
+ pbp_extras_new <-       pbp_scrape$pbp_extras                 ## extra play-by-play data
+ player_shifts_new <-    pbp_scrape$player_shifts              ## full player shifts data
+ player_periods_new <-   pbp_scrape$player_periods             ## player TOI sums per period (from the shifts source)
+ roster_df_new <-        pbp_scrape$roster_df                  ## roster data
+ scratches_df_new <-     pbp_scrape$scratches_df               ## scratches data
+ event_summary_df_new <- pbp_scrape$events_summary_df          ## event summary data (box score stats, etc.)
+ scrape_report <-        pbp_scrape$report                     ## report showing number of rows and time to scrape game
+#
+#
+## Get API info
+player_info_df_new <- sc.player_info_API(season_id_fun = "20182019")
+#
+## Join NHL player IDs with roster data
+ roster_df_new_add <- roster_df_new %>% 
+   left_join(., player_info_df_new %>% select(player, NHL_ID, birthday), 
+             by = "player"
+            ) %>% 
+   data.frame()
+#
+#
+## Add additional information to pbp data
+ pbp_expand <- sc.pbp_expand(data = pbp_base_new)
+ pbp_expand <- sc.pbp_index(data = pbp_expand)
+>>>>>>> Updated with stylistic edits
 #
 #
 #

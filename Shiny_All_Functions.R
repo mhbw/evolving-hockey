@@ -2,6 +2,17 @@
 #####           SHINY All Functions           ||             09/22/18           #####
 #####################################################################################
 
+<<<<<<< HEAD
+=======
+## major notes and additions
+## thanks to the work of those before who did much of the important stuff here:
+## Manny, The Evolving Wild Team, etc
+## major changes are mostly that the xg metrics are bunk here, intentionally, for design reasons
+## stylistically need to add dplyr:: before select if you've got MASS installed
+
+
+library(xgboost)
+>>>>>>> Updated with stylistic edits
 # Basic Functions
 standardize <- function(metric) {
   
@@ -98,7 +109,11 @@ fun.pbp_expand <- function(data) {
            
            away_skaters = ifelse((grepl("penalty shot", tolower(event_description)) == TRUE) & event_team == home_team, 0, 
                                  ifelse((grepl("penalty shot", tolower(event_description)) == TRUE) & event_team == away_team, 1, away_skaters))
+<<<<<<< HEAD
            )
+=======
+    )
+>>>>>>> Updated with stylistic edits
   
   print("face_ID", quote = F)  
   
@@ -106,7 +121,11 @@ fun.pbp_expand <- function(data) {
   face_index <- hold %>% 
     filter(event_type %in% c(st.corsi_events, "FAC"),
            game_period < 5
+<<<<<<< HEAD
            ) %>%
+=======
+    ) %>%
+>>>>>>> Updated with stylistic edits
     arrange(game_id, event_index) %>%
     mutate(face_index = cumsum(event_type == "FAC")) %>%
     group_by(game_id, face_index) %>%
@@ -115,9 +134,15 @@ fun.pbp_expand <- function(data) {
            home_zonestart = ifelse(first(home_zone) == "Def", 1, 
                                    ifelse(first(home_zone) == "Neu", 2, 
                                           ifelse(first(home_zone) == "Off", 3, NA)))
+<<<<<<< HEAD
            ) %>%
     ungroup() %>% 
     select(game_id, event_index, home_zonestart) %>% 
+=======
+    ) %>%
+    ungroup() %>% 
+    dplyr::select(game_id, event_index, home_zonestart) %>% 
+>>>>>>> Updated with stylistic edits
     data.frame()
   
   # Join
@@ -126,7 +151,11 @@ fun.pbp_expand <- function(data) {
   
   hold <- left_join(hold, face_index, by = c("game_id", "event_index"))
   
+<<<<<<< HEAD
   }
+=======
+}
+>>>>>>> Updated with stylistic edits
 fun.pbp_index <- function(data) { 
   
   # Add shift/face/pen indexes & shift IDs
@@ -145,20 +174,34 @@ fun.pbp_index <- function(data) {
   hold <- pbp_hold %>% 
     filter(event_type %in% c("FAC", "GOAL", "BLOCK", "SHOT", "MISS", "HIT", "TAKE", "GIVE"), 
            game_period < 5
+<<<<<<< HEAD
            ) %>% 
+=======
+    ) %>% 
+>>>>>>> Updated with stylistic edits
     group_by(game_id, game_period, season,
              home_on_1, home_on_2, home_on_3, home_on_4, home_on_5, home_on_6, 
              away_on_1, away_on_2, away_on_3, away_on_4, away_on_5, away_on_6, 
              home_goalie, away_goalie, 
              face_index, shift_index, pen_index
+<<<<<<< HEAD
              ) %>% 
+=======
+    ) %>% 
+>>>>>>> Updated with stylistic edits
     mutate(shift_ID = round(first(event_index) * as.numeric(game_id))) %>% 
     summarise(shift_ID = first(shift_ID), 
               shift_length = last(game_seconds) - first(game_seconds)) %>% 
     ungroup() %>% 
+<<<<<<< HEAD
     select(game_id, game_period, season, shift_ID, face_index, 
            shift_index, pen_index, shift_length, home_on_1:away_goalie
            ) %>% 
+=======
+    dplyr::select(game_id, game_period, season, shift_ID, face_index, 
+           shift_index, pen_index, shift_length, home_on_1:away_goalie
+    ) %>% 
+>>>>>>> Updated with stylistic edits
     data.frame()
   
   
@@ -172,7 +215,11 @@ fun.pbp_index <- function(data) {
                                            "away_on_4","away_on_5", "away_on_6", 
                                            "home_goalie", "away_goalie", 
                                            "face_index", "shift_index", "pen_index"))
+<<<<<<< HEAD
   }
+=======
+}
+>>>>>>> Updated with stylistic edits
 fun.pbp_prep <- function(data, prep_type) {
   
   # Prep pbp for xG models (EV or UE) 
@@ -188,7 +235,11 @@ fun.pbp_prep <- function(data, prep_type) {
              !is.na(coords_y), 
              !(coords_x == 0 & coords_y == 0 & event_type %in% st.corsi_events & 
                  (pbp_distance != 90 & event_type %in% st.fenwick_events))
+<<<<<<< HEAD
              ) %>% 
+=======
+      ) %>% 
+>>>>>>> Updated with stylistic edits
       group_by(season, game_id, game_period) %>%
       arrange(event_index) %>% 
       mutate(seconds_since_last =  game_seconds - lag(game_seconds),
@@ -197,14 +248,22 @@ fun.pbp_prep <- function(data, prep_type) {
              event_strength_last = lag(game_strength_state), 
              coords_x_last =       lag(coords_x),
              coords_y_last =       lag(coords_y)
+<<<<<<< HEAD
              ) %>%
+=======
+      ) %>%
+>>>>>>> Updated with stylistic edits
       ungroup() %>%
       arrange(season, game_id, event_index) %>% 
       filter(event_type %in% st.fenwick_events, 
              game_strength_state %in% st.even_strength, 
              !is.na(coords_x_last), 
              !is.na(coords_y_last)
+<<<<<<< HEAD
              ) %>% 
+=======
+      ) %>% 
+>>>>>>> Updated with stylistic edits
       # Create priors
       mutate(same_team_last =     1 * (event_team == event_team_last),
              is_home =            1 * (event_team == home_team),
@@ -224,6 +283,7 @@ fun.pbp_prep <- function(data, prep_type) {
              flurry_1 = ifelse(flurry == 1 & lag(flurry_1) == 7, 8, flurry_1),
              flurry_1 = ifelse(flurry == 1 & lag(flurry_1) == 8, 9, flurry_1),
              flurry_1 = ifelse(flurry == 1 & lag(flurry_1) == 9, 10, flurry_1)
+<<<<<<< HEAD
              ) %>%
       select(-c(flurry)) %>% 
       rename(shot_distance = event_distance, 
@@ -231,6 +291,15 @@ fun.pbp_prep <- function(data, prep_type) {
              flurry = flurry_1
              ) %>% 
       select(game_id, event_index, season, game_date, game_period, game_seconds, 
+=======
+      ) %>%
+      dplyr::select(-c(flurry)) %>% 
+      rename(shot_distance = event_distance, 
+             shot_angle = event_angle,
+             flurry = flurry_1
+      ) %>% 
+      dplyr::select(game_id, event_index, season, game_date, game_period, game_seconds, 
+>>>>>>> Updated with stylistic edits
              game_strength_state, game_score_state, score_state, is_home, 
              event_player_1, home_goalie, away_goalie, 
              home_score, away_score, home_team, away_team, home_skaters, away_skaters, 
@@ -239,10 +308,17 @@ fun.pbp_prep <- function(data, prep_type) {
              event_team_last, same_team_last, event_strength_last, event_type_last, 
              seconds_since_last, distance_from_last, coords_x_last, coords_y_last,
              shift_ID, shift_length, flurry
+<<<<<<< HEAD
              ) %>% 
       data.frame()
     
     }
+=======
+      ) %>% 
+      data.frame()
+    
+  }
+>>>>>>> Updated with stylistic edits
   else if (prep_type == "UE") { 
     
     # Prep for UE xG model
@@ -254,7 +330,11 @@ fun.pbp_prep <- function(data, prep_type) {
              !is.na(coords_y), 
              !(coords_x == 0 & coords_y == 0 & event_type %in% st.corsi_events & 
                  (pbp_distance != 90 & event_type %in% st.fenwick_events))
+<<<<<<< HEAD
              ) %>% 
+=======
+      ) %>% 
+>>>>>>> Updated with stylistic edits
       group_by(season, game_id, game_period) %>%
       arrange(event_index) %>% 
       mutate(seconds_since_last =  game_seconds - lag(game_seconds),
@@ -264,11 +344,19 @@ fun.pbp_prep <- function(data, prep_type) {
              coords_x_last =       lag(coords_x),
              coords_y_last =       lag(coords_y),
              true_strength_state = paste0(home_skaters, "v", away_skaters)
+<<<<<<< HEAD
              ) %>% 
       group_by(season, game_id, pen_index) %>% 
       mutate(pen_seconds_since = (game_strength_state %in% st.pp_strength) * (game_seconds - first(game_seconds)), 
              pen_seconds_since = ifelse(pen_seconds_since > 0 & pen_seconds_since >= 300, 120, pen_seconds_since)
              ) %>% 
+=======
+      ) %>% 
+      group_by(season, game_id, pen_index) %>% 
+      mutate(pen_seconds_since = (game_strength_state %in% st.pp_strength) * (game_seconds - first(game_seconds)), 
+             pen_seconds_since = ifelse(pen_seconds_since > 0 & pen_seconds_since >= 300, 120, pen_seconds_since)
+      ) %>% 
+>>>>>>> Updated with stylistic edits
       ungroup() %>% 
       arrange(season, game_id, event_index) %>% 
       filter(event_type %in% st.fenwick_events, 
@@ -278,7 +366,11 @@ fun.pbp_prep <- function(data, prep_type) {
              
              !is.na(coords_x_last), 
              !is.na(coords_y_last) 
+<<<<<<< HEAD
              ) %>% 
+=======
+      ) %>% 
+>>>>>>> Updated with stylistic edits
       # Create priors
       mutate(same_team_last =     1 * (event_team == event_team_last),
              is_home =            1 * (event_team == home_team),
@@ -304,6 +396,7 @@ fun.pbp_prep <- function(data, prep_type) {
              flurry_1 = ifelse(flurry == 1 & lag(flurry_1) == 12, 13, flurry_1), 
              flurry_1 = ifelse(flurry == 1 & lag(flurry_1) == 13, 14, flurry_1),
              flurry_1 = ifelse(flurry == 1 & lag(flurry_1) == 14, 15, flurry_1)
+<<<<<<< HEAD
              ) %>%
       select(-c(flurry)) %>% 
       rename(shot_distance = event_distance, 
@@ -311,6 +404,15 @@ fun.pbp_prep <- function(data, prep_type) {
              flurry = flurry_1
              ) %>% 
       select(game_id, event_index, season, game_date, game_period, game_seconds, 
+=======
+      ) %>%
+      dplyr::select(-c(flurry)) %>% 
+      rename(shot_distance = event_distance, 
+             shot_angle = event_angle,
+             flurry = flurry_1
+      ) %>% 
+      dplyr::select(game_id, event_index, season, game_date, game_period, game_seconds, 
+>>>>>>> Updated with stylistic edits
              game_strength_state, true_strength_state, game_score_state, score_state, is_home, 
              event_player_1, home_goalie, away_goalie, 
              home_score, away_score, home_team, away_team, home_skaters, away_skaters, 
@@ -319,10 +421,17 @@ fun.pbp_prep <- function(data, prep_type) {
              event_team_last, same_team_last, event_strength_last, prior_event_EV, event_type_last, 
              seconds_since_last, pen_seconds_since, distance_from_last, coords_x_last, coords_y_last,
              shift_ID, shift_length, flurry
+<<<<<<< HEAD
              ) %>% 
       data.frame()
     
     }
+=======
+      ) %>% 
+      data.frame()
+    
+  }
+>>>>>>> Updated with stylistic edits
   else if (prep_type == "SH") { 
     
     # Prep for SH xG model
@@ -334,7 +443,11 @@ fun.pbp_prep <- function(data, prep_type) {
              !is.na(coords_y), 
              !(coords_x == 0 & coords_y == 0 & event_type %in% st.corsi_events & 
                  (pbp_distance != 90 & event_type %in% st.fenwick_events))
+<<<<<<< HEAD
              ) %>% 
+=======
+      ) %>% 
+>>>>>>> Updated with stylistic edits
       group_by(season, game_id, game_period) %>%
       arrange(event_index) %>% 
       mutate(seconds_since_last =  game_seconds - lag(game_seconds),
@@ -344,11 +457,19 @@ fun.pbp_prep <- function(data, prep_type) {
              coords_x_last =       lag(coords_x),
              coords_y_last =       lag(coords_y),
              shift_ID =            as.numeric(shift_ID)
+<<<<<<< HEAD
              ) %>% 
       group_by(season, game_id, pen_index) %>% 
       mutate(pen_seconds_since = (game_strength_state %in% st.pp_strength) * (game_seconds - first(game_seconds)), 
              pen_seconds_since = ifelse(pen_seconds_since > 0 & pen_seconds_since >= 300, 120, pen_seconds_since)
              ) %>% 
+=======
+      ) %>% 
+      group_by(season, game_id, pen_index) %>% 
+      mutate(pen_seconds_since = (game_strength_state %in% st.pp_strength) * (game_seconds - first(game_seconds)), 
+             pen_seconds_since = ifelse(pen_seconds_since > 0 & pen_seconds_since >= 300, 120, pen_seconds_since)
+      ) %>% 
+>>>>>>> Updated with stylistic edits
       ungroup() %>% 
       arrange(season, game_id, event_index) %>% 
       filter(event_type %in% st.fenwick_events, 
@@ -356,7 +477,11 @@ fun.pbp_prep <- function(data, prep_type) {
                event_team == home_team & game_strength_state %in% c("4v5", "3v5", "3v4"), 
              !is.na(coords_x_last), 
              !is.na(coords_y_last)
+<<<<<<< HEAD
              ) %>% 
+=======
+      ) %>% 
+>>>>>>> Updated with stylistic edits
       mutate(same_team_last =     1 * (event_team == event_team_last),
              is_home =            1 * (event_team == home_team),
              score_state =        ifelse(is_home == 1, home_score - away_score, away_score - home_score), 
@@ -381,6 +506,7 @@ fun.pbp_prep <- function(data, prep_type) {
              flurry_1 = ifelse(flurry == 1 & lag(flurry_1) == 12, 13, flurry_1), 
              flurry_1 = ifelse(flurry == 1 & lag(flurry_1) == 13, 14, flurry_1),
              flurry_1 = ifelse(flurry == 1 & lag(flurry_1) == 14, 15, flurry_1)
+<<<<<<< HEAD
              ) %>%
       select(-c(flurry)) %>% 
       rename(shot_distance = event_distance, 
@@ -388,6 +514,15 @@ fun.pbp_prep <- function(data, prep_type) {
              flurry = flurry_1
              ) %>% 
       select(game_id, event_index, season, game_date, game_period, game_seconds, 
+=======
+      ) %>%
+      dplyr::select(-c(flurry)) %>% 
+      rename(shot_distance = event_distance, 
+             shot_angle = event_angle,
+             flurry = flurry_1
+      ) %>% 
+      dplyr::select(game_id, event_index, season, game_date, game_period, game_seconds, 
+>>>>>>> Updated with stylistic edits
              game_strength_state, game_score_state, score_state, is_home, 
              event_player_1, home_goalie, away_goalie, 
              home_score, away_score, home_team, away_team, home_skaters, away_skaters, 
@@ -396,10 +531,17 @@ fun.pbp_prep <- function(data, prep_type) {
              event_team_last, same_team_last, event_strength_last, prior_event_EV, event_type_last, 
              seconds_since_last, pen_seconds_since, distance_from_last, coords_x_last, coords_y_last,
              shift_ID, shift_length, flurry
+<<<<<<< HEAD
              ) %>% 
       data.frame()
     
     }
+=======
+      ) %>% 
+      data.frame()
+    
+  }
+>>>>>>> Updated with stylistic edits
   else if (prep_type == "EN") { 
     
     # Prep for EN xG model
@@ -411,7 +553,11 @@ fun.pbp_prep <- function(data, prep_type) {
              !is.na(coords_y), 
              !(coords_x == 0 & coords_y == 0 & event_type %in% st.corsi_events & 
                  (pbp_distance != 90 & event_type %in% st.fenwick_events))
+<<<<<<< HEAD
              ) %>% 
+=======
+      ) %>% 
+>>>>>>> Updated with stylistic edits
       group_by(season, game_id, game_period) %>%
       arrange(event_index) %>% 
       mutate(seconds_since_last =  game_seconds - lag(game_seconds),
@@ -421,7 +567,11 @@ fun.pbp_prep <- function(data, prep_type) {
              coords_x_last =       lag(coords_x),
              coords_y_last =       lag(coords_y),
              shift_ID =            as.numeric(shift_ID)
+<<<<<<< HEAD
              ) %>% 
+=======
+      ) %>% 
+>>>>>>> Updated with stylistic edits
       group_by(season, game_id, pen_index) %>% 
       ungroup() %>% 
       arrange(season, game_id, event_index) %>% 
@@ -430,7 +580,11 @@ fun.pbp_prep <- function(data, prep_type) {
                (event_team == home_team & game_strength_state %in% c("5vE", "4vE", "3vE") & (home_skaters == 6 | away_skaters == 6)), 
              !is.na(coords_x_last), 
              !is.na(coords_y_last)
+<<<<<<< HEAD
              ) %>% 
+=======
+      ) %>% 
+>>>>>>> Updated with stylistic edits
       mutate(same_team_last =     1 * (event_team == event_team_last),
              is_home =            1 * (event_team == home_team),
              score_state =        ifelse(is_home == 1, home_score - away_score, away_score - home_score), 
@@ -454,6 +608,7 @@ fun.pbp_prep <- function(data, prep_type) {
              flurry_1 = ifelse(flurry == 1 & lag(flurry_1) == 12, 13, flurry_1), 
              flurry_1 = ifelse(flurry == 1 & lag(flurry_1) == 13, 14, flurry_1),
              flurry_1 = ifelse(flurry == 1 & lag(flurry_1) == 14, 15, flurry_1)
+<<<<<<< HEAD
              ) %>%
       select(-c(flurry)) %>% 
       rename(shot_distance = event_distance, 
@@ -461,6 +616,15 @@ fun.pbp_prep <- function(data, prep_type) {
              flurry = flurry_1
              ) %>% 
       select(game_id, event_index, season, game_date, game_period, game_seconds, 
+=======
+      ) %>%
+      dplyr::select(-c(flurry)) %>% 
+      rename(shot_distance = event_distance, 
+             shot_angle = event_angle,
+             flurry = flurry_1
+      ) %>% 
+      dplyr::select(game_id, event_index, season, game_date, game_period, game_seconds, 
+>>>>>>> Updated with stylistic edits
              game_strength_state, game_score_state, score_state, is_home, 
              event_player_1, home_goalie, away_goalie, 
              home_score, away_score, home_team, away_team, home_skaters, away_skaters, 
@@ -469,6 +633,7 @@ fun.pbp_prep <- function(data, prep_type) {
              event_team_last, same_team_last, event_strength_last, event_type_last, 
              seconds_since_last, distance_from_last, coords_x_last, coords_y_last,
              shift_ID, shift_length, flurry
+<<<<<<< HEAD
              ) %>% 
       filter(!is.na(shot_distance), 
              !is.na(shot_angle)
@@ -478,6 +643,17 @@ fun.pbp_prep <- function(data, prep_type) {
     }
   
   }
+=======
+      ) %>% 
+      filter(!is.na(shot_distance), 
+             !is.na(shot_angle)
+      ) %>% 
+      data.frame()
+    
+  }
+  
+}
+>>>>>>> Updated with stylistic edits
 fun.model_prep <- function(data, prep_type) { 
   
   # Prep model data frames (EV or UE)
@@ -524,8 +700,13 @@ fun.model_prep <- function(data, prep_type) {
              prior_hit_opp =   1 * (event_type_last == "HIT" & same_team_last == 0), 
              prior_hit_same =  1 * (event_type_last == "HIT" & same_team_last == 1), 
              prior_face =      1 * (event_type_last == "FAC")
+<<<<<<< HEAD
              ) %>% 
       select(is_goal,
+=======
+      ) %>% 
+      dplyr::select(is_goal,
+>>>>>>> Updated with stylistic edits
              shot_distance, shot_angle, is_home, 
              state_5v5:state_3v3, 
              score_down_4:score_up_4, 
@@ -534,7 +715,11 @@ fun.model_prep <- function(data, prep_type) {
              prior_shot_same:prior_face) %>% 
       data.matrix()
     
+<<<<<<< HEAD
     }
+=======
+  }
+>>>>>>> Updated with stylistic edits
   else if (prep_type == "UE") { 
     
     # Create UE dummy variables, returns a matrix.
@@ -578,18 +763,30 @@ fun.model_prep <- function(data, prep_type) {
              prior_take_opp =   1 * (event_type_last == "TAKE" & same_team_last == 0), 
              prior_hit_opp =    1 * (event_type_last == "HIT" & same_team_last == 0), 
              prior_face =       1 * (event_type_last == "FAC")
+<<<<<<< HEAD
              ) %>% 
       select(is_goal, 
+=======
+      ) %>% 
+      dplyr::select(is_goal, 
+>>>>>>> Updated with stylistic edits
              shot_distance, shot_angle, is_home, 
              state_5v4:state_6v4, 
              score_down_4:score_up_4, 
              game_seconds, game_period, coords_x, coords_y, coords_x_last, coords_y_last, 
              wrist_shot:wrap_shot, distance_from_last, seconds_since_last, prior_event_EV, 
              pen_seconds_since, prior_shot_same:prior_face
+<<<<<<< HEAD
              ) %>% 
       data.matrix()
     
     }
+=======
+      ) %>% 
+      data.matrix()
+    
+  }
+>>>>>>> Updated with stylistic edits
   else if (prep_type == "SH") { 
     
     # Create SH dummy variables, returns a matrix.
@@ -631,8 +828,13 @@ fun.model_prep <- function(data, prep_type) {
              prior_take_opp =   1 * (event_type_last == "TAKE" & same_team_last == 0), 
              prior_hit_opp =    1 * (event_type_last == "HIT" & same_team_last == 0), 
              prior_face =       1 * (event_type_last == "FAC")
+<<<<<<< HEAD
              ) %>% 
       select(is_goal, 
+=======
+      ) %>% 
+      dplyr::select(is_goal, 
+>>>>>>> Updated with stylistic edits
              shot_distance, shot_angle, is_home, 
              state_4v5:state_3v4, 
              score_down_4:score_up_4, 
@@ -641,7 +843,11 @@ fun.model_prep <- function(data, prep_type) {
              pen_seconds_since, prior_shot_same:prior_face) %>% 
       data.matrix()
     
+<<<<<<< HEAD
     }
+=======
+  }
+>>>>>>> Updated with stylistic edits
   else if (prep_type == "EN") { 
     
     # Create EN dummy variables, returns a matrix.
@@ -683,8 +889,13 @@ fun.model_prep <- function(data, prep_type) {
              prior_take_opp =   1 * (event_type_last == "TAKE" & same_team_last == 0), 
              prior_hit_opp =    1 * (event_type_last == "HIT" & same_team_last == 0), 
              prior_face =       1 * (event_type_last == "FAC")
+<<<<<<< HEAD
              ) %>% 
       select(is_goal, 
+=======
+      ) %>% 
+      dplyr::select(is_goal, 
+>>>>>>> Updated with stylistic edits
              shot_distance, shot_angle, is_home, 
              state_Ev5:state_Ev3, 
              score_down_4:score_up_4, 
@@ -693,9 +904,31 @@ fun.model_prep <- function(data, prep_type) {
              prior_shot_same:prior_face) %>% 
       data.matrix()
     
+<<<<<<< HEAD
     }
   
   }
+=======
+  }
+  
+} 
+
+
+### added by mhbw to make model_EV, model_UE, model_SH, model_EN functional
+
+## first create the data matrix
+## for this pull in the data as pulled down in the script 'EH_scrape_functions.R'
+## and renamed as pbp_base_new
+## other important note: this is no way intended as a valid usable model, nor should it be read to truly
+## replicate the work of the folks at evolving wild; it's a place holder to make the scrape function
+## essentially; ignore it and don't use features derived from it for any other model building or conclusions
+# Convert for use with XGBoost and predict goal probability
+
+## ----------------- ##
+##   Even-Strength   ##
+## ----------------- ##
+
+>>>>>>> Updated with stylistic edits
 
 # Full run
 fun.pbp_full_add <- function(data, model_EV, model_UE, model_SH, model_EN) { 
@@ -710,8 +943,12 @@ fun.pbp_full_add <- function(data, model_EV, model_UE, model_SH, model_EN) {
   # Initial prep of scraped pbp data.
   pbp_part <- fun.pbp_expand(data)
   pbp_part <- fun.pbp_index(pbp_part)
+<<<<<<< HEAD
   
   
+=======
+
+>>>>>>> Updated with stylistic edits
   # Convert for use with XGBoost and predict goal probability
   
   ## ----------------- ##
@@ -722,12 +959,38 @@ fun.pbp_full_add <- function(data, model_EV, model_UE, model_SH, model_EN) {
   pbp_prep_EV <- fun.pbp_prep(pbp_part, "EV")
   model_prep_EV <- fun.model_prep(pbp_prep_EV, "EV")
   model_prep_EV <- Matrix(model_prep_EV, sparse = TRUE)
+<<<<<<< HEAD
   
   pred_matrix_EV <- model_prep_EV[, 2:ncol(model_prep_EV)]
   xgb_matrix_EV <- xgb.DMatrix(data = pred_matrix_EV)
   
   pbp_prep_EV$pred_XGB_7 <- predict(object = model_EV, xgb_matrix_EV)
   pred_goal_EV <- select(pbp_prep_EV, game_id, event_index, pred_XGB_7)
+=======
+  is_goal_vect <- model_prep_EV[, 1]
+  pred_matrix_EV <- model_prep_EV[, 2:ncol(model_prep_EV)]
+  xgb_matrix_EV <- xgb.DMatrix(data = pred_matrix_EV,label=is_goal_vect)
+  param_7_EV <- list(objective = "binary:logistic", 
+                     eval_metric = "logloss", 
+                     eval_metric = "auc",    
+                     eta = .068, 
+                     gamma = .12,
+                     subsample = .78, 
+                     max.depth = 6,           
+                     colsample_bytree = .76,  
+                     min_child_weight = 5,   
+                     max_delta_step = 5,      
+                     nthread = 4)
+  
+  model_EV = xgb.train(data = xgb_matrix_EV, 
+                       params = param_7_EV, # Determined and set above
+                       nround = 189,
+                       verbose = 2
+  )
+  
+  pbp_prep_EV$pred_XGB_7 <- predict(object = model_EV, xgb_matrix_EV)
+  pred_goal_EV <- dplyr::select(pbp_prep_EV, game_id, event_index, pred_XGB_7)
+>>>>>>> Updated with stylistic edits
   
   
   ## ------------------- ##
@@ -738,14 +1001,31 @@ fun.pbp_full_add <- function(data, model_EV, model_UE, model_SH, model_EN) {
   pbp_prep_UE <- fun.pbp_prep(pbp_part, "UE")
   model_prep_UE <- fun.model_prep(pbp_prep_UE, "UE")
   model_prep_UE <- Matrix(model_prep_UE, sparse = TRUE)
+<<<<<<< HEAD
   
   pred_matrix_UE <- model_prep_UE[, 2:ncol(model_prep_UE)]
   
+=======
+  is_goal_vect <- model_prep_UE[, 1]
+  pred_matrix_UE <- model_prep_UE[, 2:ncol(model_prep_UE)]
+  param_7_EV <- list(objective = "binary:logistic", 
+                     eval_metric = "logloss", 
+                     eval_metric = "auc",    
+                     eta = .068, 
+                     gamma = .12,
+                     subsample = .78, 
+                     max.depth = 6,           
+                     colsample_bytree = .76,  
+                     min_child_weight = 5,   
+                     max_delta_step = 5,      
+                     nthread = 4)
+>>>>>>> Updated with stylistic edits
   # Deal with 1 row predict issue
   if (nrow(model_prep_UE) == 1) { 
     xgb_matrix_UE <- xgb.DMatrix(data = as.matrix(data.frame(as.list(pred_matrix_UE))))
     
     } else {
+<<<<<<< HEAD
     xgb_matrix_UE <- xgb.DMatrix(data = pred_matrix_UE)
     
     }
@@ -754,6 +1034,20 @@ fun.pbp_full_add <- function(data, model_EV, model_UE, model_SH, model_EN) {
   if (nrow(pbp_prep_UE) > 0) { 
     pbp_prep_UE$pred_XGB_7 <- predict(object = model_UE, xgb_matrix_UE)
     pred_goal_UE <- select(pbp_prep_UE, game_id, event_index, pred_XGB_7)
+=======
+    xgb_matrix_UE <- xgb.DMatrix(data = pred_matrix_UE,label = is_goal_vect)
+    
+    }
+  model_UE = xgb.train(data = xgb_matrix_UE, 
+                       params = param_7_EV, # Determined and set above
+                       nround = 189,
+                       verbose = 2
+  )
+  # Check to see there is data to predict
+  if (nrow(pbp_prep_UE) > 0) { 
+    pbp_prep_UE$pred_XGB_7 <- predict(object = model_UE, xgb_matrix_UE)
+    pred_goal_UE <- dplyr::select(pbp_prep_UE, game_id, event_index, pred_XGB_7)
+>>>>>>> Updated with stylistic edits
     
     } else { 
     pred_goal_UE <- NULL
@@ -768,13 +1062,30 @@ fun.pbp_full_add <- function(data, model_EV, model_UE, model_SH, model_EN) {
   pbp_prep_SH <- fun.pbp_prep(pbp_part, "SH")
   model_prep_SH <- fun.model_prep(pbp_prep_SH, "SH")
   model_prep_SH <- Matrix(model_prep_SH, sparse = TRUE)
+<<<<<<< HEAD
   
   pred_matrix_SH <- model_prep_SH[, 2:ncol(model_prep_SH)]
   
+=======
+  is_goal_vect <- model_prep_SH[, 1]
+  pred_matrix_SH <- model_prep_SH[, 2:ncol(model_prep_SH)]
+  param_7_EV <- list(objective = "binary:logistic", 
+                     eval_metric = "logloss", 
+                     eval_metric = "auc",    
+                     eta = .068, 
+                     gamma = .12,
+                     subsample = .78, 
+                     max.depth = 6,           
+                     colsample_bytree = .76,  
+                     min_child_weight = 5,   
+                     max_delta_step = 5,      
+                     nthread = 4)
+>>>>>>> Updated with stylistic edits
   # Deal with 1 row predict issue
   if (nrow(model_prep_SH) == 1) { 
     xgb_matrix_SH <- xgb.DMatrix(data = as.matrix(data.frame(as.list(pred_matrix_SH))))
     
+<<<<<<< HEAD
     } else {
     xgb_matrix_SH <- xgb.DMatrix(data = pred_matrix_SH)
     
@@ -795,10 +1106,34 @@ fun.pbp_full_add <- function(data, model_EV, model_UE, model_SH, model_EN) {
   ##   Empty Net   ##
   ## ------------- ##
   
+=======
+  } else {
+    xgb_matrix_SH <- xgb.DMatrix(data = pred_matrix_SH,label = is_goal_vect)
+    
+  }
+  model_SH = xgb.train(data = xgb_matrix_SH, 
+                       params = param_7_EV, # Determined and set above
+                       nround = 189,
+                       verbose = 2
+  )
+  # Check to see there is data to predict
+  if (nrow(pbp_prep_SH) > 0) { 
+    pbp_prep_SH$pred_XGB_7 <- predict(object = model_SH, xgb_matrix_SH)
+    pred_goal_SH <- dplyr::select(pbp_prep_SH, game_id, event_index, pred_XGB_7)
+    
+  } else { 
+    pred_goal_SH <- NULL
+    
+  }
+  ## ------------- ##
+  ##   Empty Net   ##
+  ## ------------- ##
+>>>>>>> Updated with stylistic edits
   print("predict_EN", quote = F)
   pbp_prep_EN <- fun.pbp_prep(pbp_part, "EN")
   model_prep_EN <- fun.model_prep(pbp_prep_EN, "EN")
   model_prep_EN <- Matrix(model_prep_EN, sparse = TRUE)
+<<<<<<< HEAD
   
   pred_matrix_EN <- model_prep_EN[, 2:ncol(model_prep_EN)]
   
@@ -821,6 +1156,43 @@ fun.pbp_full_add <- function(data, model_EV, model_UE, model_SH, model_EN) {
     
     }
   
+=======
+  is_goal_vect <- model_prep_EN[, 1]
+  pred_matrix_EN <- model_prep_EN[, 2:ncol(model_prep_EN)]
+  param_7_EV <- list(objective = "binary:logistic", 
+                     eval_metric = "logloss", 
+                     eval_metric = "auc",    
+                     eta = .068, 
+                     gamma = .12,
+                     subsample = .78, 
+                     max.depth = 6,           
+                     colsample_bytree = .76,  
+                     min_child_weight = 5,   
+                     max_delta_step = 5,      
+                     nthread = 4)
+  # Deal with 1 row predict issue
+  if (nrow(model_prep_EN) == 1) { 
+    xgb_matrix_EN <- xgb.DMatrix(data = as.matrix(data.frame(as.list(pred_matrix_EN))))
+    
+  } else {
+    xgb_matrix_EN <- xgb.DMatrix(data = pred_matrix_EN,label = is_goal_vect)
+    
+  }
+  model_EN = xgb.train(data = xgb_matrix_EN, 
+                       params = param_7_EV, # Determined and set above
+                       nround = 189,
+                       verbose = 2
+  )
+  # Check to see there is data to predict
+  if (nrow(pbp_prep_EN) > 0) { 
+    pbp_prep_EN$pred_XGB_7 <- predict(object = model_EN, xgb_matrix_EN)
+    pred_goal_EN <- dplyr::select(pbp_prep_EN, game_id, event_index, pred_XGB_7)
+    
+  } else { 
+    pred_goal_EN <- NULL
+    
+  }
+>>>>>>> Updated with stylistic edits
   
   ## ------------------ ##
   ##   Join / Combine   ##
@@ -850,6 +1222,10 @@ fun.pbp_full_add <- function(data, model_EV, model_UE, model_SH, model_EN) {
   
   }
 
+<<<<<<< HEAD
+=======
+pbp_full_xg <- fun.pbp_full_add(data=pbp_base_new)
+>>>>>>> Updated with stylistic edits
 
 ##################
 
@@ -1006,7 +1382,11 @@ fun.NHL_info_scrape <- function(season_) {
     mutate(position = ifelse(PositionCode == "D", 2, 1),
            current_age = floor((Sys.Date() - birthday) / 365.25) # updated to reflect 365.25
            ) %>% 
+<<<<<<< HEAD
     select(player, PositionCode, ShootsCatches, birthday, TeamsPlayedFor, 
+=======
+    dplyr::select(player, PositionCode, ShootsCatches, birthday, TeamsPlayedFor, 
+>>>>>>> Updated with stylistic edits
            BirthCity, BirthCountry, DraftOverallPickNo, DraftRoundNo, 
            DraftYear, Height, Weight, position, current_age
            ) %>% 
@@ -1048,7 +1428,11 @@ fun.NHL_info_scrape <- function(season_) {
     mutate(position = 3,
            current_age = floor((Sys.Date() - birthday) / 365.25) # updated to reflect 365.25
            ) %>% 
+<<<<<<< HEAD
     select(player, PositionCode, ShootsCatches, birthday, TeamsPlayedFor, 
+=======
+    dplyr::select(player, PositionCode, ShootsCatches, birthday, TeamsPlayedFor, 
+>>>>>>> Updated with stylistic edits
            BirthCity, BirthCountry, DraftOverallPickNo, DraftRoundNo, 
            DraftYear, Height, Weight, position, current_age
            ) %>% 
@@ -1087,7 +1471,11 @@ fun.all_sit_standard <- function(data_) {
     filter(game_period < 5, 
            event_length < 900
            ) %>% 
+<<<<<<< HEAD
     select(-c(face_index:shift_length)) %>% 
+=======
+    dplyr::select(-c(face_index:shift_length)) %>% 
+>>>>>>> Updated with stylistic edits
     mutate(event_length = ifelse(is.na(event_length), 0, event_length)) %>% 
     rename(pred_goal = pred_XGB_7)
   
@@ -1170,7 +1558,11 @@ fun.all_sit_standard <- function(data_) {
       filter(!is.na(player), 
              !is.na(game_date) # filtering to catch pbp data issues for all situations
              ) %>% 
+<<<<<<< HEAD
       select(player, game_id, game_date, season, Team, Opponent, is_home, TOI) %>% 
+=======
+      dplyr::select(player, game_id, game_date, season, Team, Opponent, is_home, TOI) %>% 
+>>>>>>> Updated with stylistic edits
       data.frame()
     
     return(join_return)
@@ -1289,7 +1681,11 @@ fun.all_sit_standard <- function(data_) {
       joined <- merged %>% 
         mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
         mutate(Points = G + A1 + A2) %>% 
+<<<<<<< HEAD
         select(player, game_id, season, Team, 
+=======
+        dplyr::select(player, game_id, season, Team, 
+>>>>>>> Updated with stylistic edits
                G, A1, A2, Points, iSF, iFF, iCF, ixG, 
                GIVE, TAKE
                ) %>% 
@@ -1347,7 +1743,11 @@ fun.all_sit_standard <- function(data_) {
       joined <- merged %>% 
         mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
         mutate(Points = G + A1 + A2) %>% 
+<<<<<<< HEAD
         select(player, game_id, season, Team, 
+=======
+        dplyr::select(player, game_id, season, Team, 
+>>>>>>> Updated with stylistic edits
                G, A1, A2, Points, iSF, iFF, iCF, ixG, 
                GIVE, TAKE
                ) %>% 
@@ -1451,7 +1851,11 @@ fun.all_sit_standard <- function(data_) {
       joined <- merged %>% 
         mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
         mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
+<<<<<<< HEAD
         select(player, game_id, season, Team, 
+=======
+        dplyr::select(player, game_id, season, Team, 
+>>>>>>> Updated with stylistic edits
                iBLK, iHF, iHA, 
                iPENT2, iPEND2, iPENT5, iPEND5
                ) %>% 
@@ -1503,7 +1907,11 @@ fun.all_sit_standard <- function(data_) {
       
       joined <- merged %>% 
         mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
+<<<<<<< HEAD
         select(player, game_id, season, Team, 
+=======
+        dplyr::select(player, game_id, season, Team, 
+>>>>>>> Updated with stylistic edits
                iBLK, iHF, iHA, 
                iPENT2, iPEND2, iPENT5, iPEND5
                ) %>% 
@@ -1583,12 +1991,20 @@ fun.all_sit_standard <- function(data_) {
   all <- test_join %>% 
     left_join(., goalieremove, "player") %>% 
     filter(is.na(is_goalie)) %>% 
+<<<<<<< HEAD
     select(-c(is_goalie)) %>% 
+=======
+    dplyr::select(-c(is_goalie)) %>% 
+>>>>>>> Updated with stylistic edits
     arrange(player, game_id) %>% 
     filter(!is.na(player), 
            !is.na(game_date) # filtering to catch pbp data issues for all situations
            ) %>% 
+<<<<<<< HEAD
     select(player, game_id, game_date, season, Team, Opponent, is_home,  
+=======
+    dplyr::select(player, game_id, game_date, season, Team, Opponent, is_home,  
+>>>>>>> Updated with stylistic edits
            TOI, G:ixG, iBLK, iHF, iHA, GIVE, TAKE, iPENT2:iPEND5, FOW, FOL, OZS, NZS, DZS, 
            t_TOI
            ) %>% 
@@ -1891,7 +2307,11 @@ fun.shotmetrics <- function(data) {
   all <- joined %>% 
     left_join(., goalieremove, "player") %>% 
     filter(is.na(is_goalie)) %>% 
+<<<<<<< HEAD
     select(-c(is_goalie)) %>% 
+=======
+    dplyr::select(-c(is_goalie)) %>% 
+>>>>>>> Updated with stylistic edits
     arrange(player, game_id) %>% 
     data.frame()
   
@@ -2029,7 +2449,11 @@ fun.counts <- function(data, venue) {
       mutate(Points = G + A1 + A2, 
              Points_adj = G_adj + A1_adj + A2_adj
              ) %>% 
+<<<<<<< HEAD
       select(player, game_id, season, Team, 
+=======
+      dplyr::select(player, game_id, season, Team, 
+>>>>>>> Updated with stylistic edits
              G, A1, A2, Points, G_adj, A1_adj, A2_adj, Points_adj,
              iSF, iCF, iFF, ixG, iCF_adj, ixG_adj, 
              GIVE_o, GIVE_n, GIVE_d, TAKE_o, TAKE_n, TAKE_d,
@@ -2106,7 +2530,11 @@ fun.counts <- function(data, venue) {
       mutate(Points = G + A1 + A2, 
              Points_adj = G_adj + A1_adj + A2_adj
              ) %>% 
+<<<<<<< HEAD
       select(player, game_id, season, Team, 
+=======
+      dplyr::select(player, game_id, season, Team, 
+>>>>>>> Updated with stylistic edits
              G, A1, A2, Points, G_adj, A1_adj, A2_adj, Points_adj,
              iSF, iCF, iFF, ixG, iCF_adj, ixG_adj, 
              GIVE_o, GIVE_n, GIVE_d, TAKE_o, TAKE_n, TAKE_d,
@@ -2223,7 +2651,11 @@ fun.penalty <- function(data, venue) {
     joined <- merged %>% 
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
       mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
+<<<<<<< HEAD
       select(player, game_id, season, Team, 
+=======
+      dplyr::select(player, game_id, season, Team, 
+>>>>>>> Updated with stylistic edits
              iPENT2, iPEND2, iPENT5, iPEND5, iBLK, 
              iHF_o, iHF_n, iHF_d, iHA_o, iHA_n, iHA_d, 
              iBLK_adj, iHF_adj, iHA_adj
@@ -2288,7 +2720,11 @@ fun.penalty <- function(data, venue) {
     joined <- merged %>% 
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
       mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
+<<<<<<< HEAD
       select(player, game_id, season, Team, 
+=======
+      dplyr::select(player, game_id, season, Team, 
+>>>>>>> Updated with stylistic edits
              iPENT2, iPEND2, iPENT5, iPEND5, iBLK, 
              iHF_o, iHF_n, iHF_d, iHA_o, iHA_n, iHA_d, 
              iBLK_adj, iHF_adj, iHA_adj
@@ -2312,7 +2748,11 @@ fun.combine_counts <- function(data) {
     filter(game_strength_state %in% st.even_strength, 
            game_period < 5
            ) %>% 
+<<<<<<< HEAD
     select(-c(face_index:shift_length)) %>% 
+=======
+    dplyr::select(-c(face_index:shift_length)) %>% 
+>>>>>>> Updated with stylistic edits
     mutate(scradj = home_score - away_score, 
            home_lead = ifelse(scradj >= 3, 3, 
                               ifelse(scradj <= -3, -3, scradj)),
@@ -2356,7 +2796,11 @@ fun.combine_counts <- function(data) {
     left_join(., counts_all,  by = c("player", "game_id", "season", "Team")) %>% 
     left_join(., faceoff_all, by = c("player", "game_id", "season", "Team")) %>% 
     left_join(., penalty_all, by = c("player", "game_id", "season", "Team")) %>% 
+<<<<<<< HEAD
     select(player, game_id, game_date, season, Team, Opponent, is_home, TOI, 
+=======
+    dplyr::select(player, game_id, game_date, season, Team, Opponent, is_home, TOI, 
+>>>>>>> Updated with stylistic edits
            G, A1, A2, Points, G_adj, A1_adj, A2_adj, Points_adj, 
            iSF, iFF, iCF, ixG, iCF_adj, ixG_adj, 
            iBLK, iBLK_adj, 
@@ -2665,7 +3109,11 @@ fun.shotmetrics_PP <- function(data) {
   all <- joined %>% 
     left_join(., goalieremove, "player") %>% 
     filter(is.na(is_goalie)) %>% 
+<<<<<<< HEAD
     select(-c(is_goalie)) %>% 
+=======
+    dplyr::select(-c(is_goalie)) %>% 
+>>>>>>> Updated with stylistic edits
     arrange(player, game_id) %>% 
     data.frame()
   
@@ -2805,7 +3253,11 @@ fun.counts_PP <- function(data, venue) {
       mutate(Points = G + A1 + A2, 
              Points_adj = G_adj + A1_adj + A2_adj
              ) %>% 
+<<<<<<< HEAD
       select(player, game_id, season, Team, 
+=======
+      dplyr::select(player, game_id, season, Team, 
+>>>>>>> Updated with stylistic edits
              G, A1, A2, Points, 
              G_adj, A1_adj, A2_adj, Points_adj,
              iSF, iCF, iFF, ixG, iCF_adj, ixG_adj, 
@@ -2883,7 +3335,11 @@ fun.counts_PP <- function(data, venue) {
       mutate(Points = G + A1 + A2, 
              Points_adj = G_adj + A1_adj + A2_adj
              ) %>% 
+<<<<<<< HEAD
       select(player, game_id, season, Team, 
+=======
+      dplyr::select(player, game_id, season, Team, 
+>>>>>>> Updated with stylistic edits
              G, A1, A2, Points, 
              G_adj, A1_adj, A2_adj, Points_adj,
              iSF, iCF, iFF, ixG, iCF_adj, ixG_adj, 
@@ -3006,7 +3462,11 @@ fun.penalty_PP <- function(data, venue) {
     joined <- merged %>% 
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
       mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
+<<<<<<< HEAD
       select(player, game_id, season, Team, 
+=======
+      dplyr::select(player, game_id, season, Team, 
+>>>>>>> Updated with stylistic edits
              iPENT2, iPEND2, iPENT5, iPEND5,
              iHF_o, iHF_n, iHF_d, 
              iHA_o, iHA_n, iHA_d, 
@@ -3072,7 +3532,11 @@ fun.penalty_PP <- function(data, venue) {
     joined <- merged %>% 
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
       mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
+<<<<<<< HEAD
       select(player, game_id, season, Team, 
+=======
+      dplyr::select(player, game_id, season, Team, 
+>>>>>>> Updated with stylistic edits
              iPENT2, iPEND2, iPENT5, iPEND5,
              iHF_o, iHF_n, iHF_d, 
              iHA_o, iHA_n, iHA_d, 
@@ -3097,7 +3561,11 @@ fun.combine_counts_PP <- function(data) {
     filter(game_strength_state %in% st.pp_strength, 
            game_period < 5
            ) %>% 
+<<<<<<< HEAD
     select(-c(face_index:shift_length)) %>% 
+=======
+    dplyr::select(-c(face_index:shift_length)) %>% 
+>>>>>>> Updated with stylistic edits
     mutate(scradj = home_score - away_score, 
            home_lead = ifelse(scradj >= 3, 3, 
                               ifelse(scradj <= -3, -3, scradj)),
@@ -3140,7 +3608,11 @@ fun.combine_counts_PP <- function(data) {
     left_join(., counts_all,  by = c("player", "game_id", "season", "Team")) %>% 
     left_join(., faceoff_all, by = c("player", "game_id", "season", "Team")) %>% 
     left_join(., penalty_all, by = c("player", "game_id", "season", "Team")) %>% 
+<<<<<<< HEAD
     select(player, game_id, game_date, season, Team, Opponent, is_home, 
+=======
+    dplyr::select(player, game_id, game_date, season, Team, Opponent, is_home, 
+>>>>>>> Updated with stylistic edits
            TOI, 
            G, A1, A2, Points, 
            G_adj, A1_adj, A2_adj, Points_adj, 
@@ -3453,7 +3925,11 @@ fun.shotmetrics_SH <- function(data) {
   all <- joined %>% 
     left_join(., goalieremove, "player") %>% 
     filter(is.na(is_goalie)) %>% 
+<<<<<<< HEAD
     select(-c(is_goalie)) %>% 
+=======
+    dplyr::select(-c(is_goalie)) %>% 
+>>>>>>> Updated with stylistic edits
     arrange(player, game_id) %>% 
     data.frame()
   
@@ -3584,7 +4060,11 @@ fun.counts_SH <- function(data, venue) {
     joined <- merged %>% 
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
       mutate(Points = G + A1 + A2) %>% 
+<<<<<<< HEAD
       select(player, game_id, season, Team, 
+=======
+      dplyr::select(player, game_id, season, Team, 
+>>>>>>> Updated with stylistic edits
              G, A1, A2, Points, 
              iSF, iCF, iFF, ixG, 
              GIVE_o, GIVE_n, GIVE_d, 
@@ -3652,7 +4132,11 @@ fun.counts_SH <- function(data, venue) {
     joined <- merged %>% 
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
       mutate(Points = G + A1 + A2) %>% 
+<<<<<<< HEAD
       select(player, game_id, season, Team, 
+=======
+      dplyr::select(player, game_id, season, Team, 
+>>>>>>> Updated with stylistic edits
              G, A1, A2, Points,
              iSF, iCF, iFF, ixG,
              GIVE_o, GIVE_n, GIVE_d, 
@@ -3777,7 +4261,11 @@ fun.penalty_SH <- function(data, venue) {
     joined <- merged %>% 
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
       mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
+<<<<<<< HEAD
       select(player, game_id, season, Team, 
+=======
+      dplyr::select(player, game_id, season, Team, 
+>>>>>>> Updated with stylistic edits
              iPENT2, iPEND2, iPENT5, iPEND5, 
              iBLK, iBLK_adj, 
              iHF_o, iHF_n, iHF_d, 
@@ -3847,7 +4335,11 @@ fun.penalty_SH <- function(data, venue) {
     joined <- merged %>% 
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
       mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
+<<<<<<< HEAD
       select(player, game_id, season, Team, 
+=======
+      dplyr::select(player, game_id, season, Team, 
+>>>>>>> Updated with stylistic edits
              iPENT2, iPEND2, iPENT5, iPEND5, 
              iBLK, iBLK_adj, 
              iHF_o, iHF_n, iHF_d, 
@@ -3873,7 +4365,11 @@ fun.combine_counts_SH <- function(data) {
     filter(game_strength_state %in% st.pp_strength, 
            game_period < 5
            ) %>% 
+<<<<<<< HEAD
     select(-c(face_index:shift_length)) %>% 
+=======
+    dplyr::select(-c(face_index:shift_length)) %>% 
+>>>>>>> Updated with stylistic edits
     mutate(scradj = home_score - away_score, 
            home_lead = ifelse(scradj >= 3, 3, 
                               ifelse(scradj <= -3, -3, scradj)),
@@ -3916,7 +4412,11 @@ fun.combine_counts_SH <- function(data) {
     left_join(., counts_all,  by = c("player", "game_id", "season", "Team")) %>% 
     left_join(., faceoff_all, by = c("player", "game_id", "season", "Team")) %>% 
     left_join(., penalty_all, by = c("player", "game_id", "season", "Team")) %>% 
+<<<<<<< HEAD
     select(player, game_id, game_date, season, Team, Opponent, is_home, TOI, 
+=======
+    dplyr::select(player, game_id, game_date, season, Team, Opponent, is_home, TOI, 
+>>>>>>> Updated with stylistic edits
            G, A1, A2, Points, 
            iSF, iFF, iCF, ixG,
            iBLK, iBLK_adj, 
@@ -4225,7 +4725,11 @@ fun.shotmetrics_EV_strength <- function(data, scr_adj_list) {
     all <- joined %>% 
       left_join(., goalieremove, "player") %>% 
       filter(is.na(is_goalie)) %>% 
+<<<<<<< HEAD
       select(-c(is_goalie)) %>% 
+=======
+      dplyr::select(-c(is_goalie)) %>% 
+>>>>>>> Updated with stylistic edits
       arrange(player, game_id) %>% 
       data.frame()
     
@@ -4359,7 +4863,11 @@ fun.counts_EV_strength <- function(data, venue) {
     joined <- merged %>% 
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
       mutate(Points = G + A1 + A2) %>% 
+<<<<<<< HEAD
       select(player, game_id, season, Team, 
+=======
+      dplyr::select(player, game_id, season, Team, 
+>>>>>>> Updated with stylistic edits
              G, A1, A2, Points, 
              iSF, iCF, iFF, ixG,
              GIVE_o, GIVE_n, GIVE_d, TAKE_o, TAKE_n, TAKE_d
@@ -4425,7 +4933,11 @@ fun.counts_EV_strength <- function(data, venue) {
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
       mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
       mutate(Points = G + A1 + A2) %>% 
+<<<<<<< HEAD
       select(player, game_id, season, Team, 
+=======
+      dplyr::select(player, game_id, season, Team, 
+>>>>>>> Updated with stylistic edits
              G, A1, A2, Points,
              iSF, iCF, iFF, ixG,
              GIVE_o, GIVE_n, GIVE_d, TAKE_o, TAKE_n, TAKE_d
@@ -4537,7 +5049,11 @@ fun.penalty_EV_strength <- function(data, venue) {
     joined <- merged %>% 
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
       mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
+<<<<<<< HEAD
       select(player, game_id, season, Team, 
+=======
+      dplyr::select(player, game_id, season, Team, 
+>>>>>>> Updated with stylistic edits
              iPENT2, iPEND2, iPENT5, iPEND5, iBLK, 
              iHF_o, iHF_n, iHF_d, iHA_o, iHA_n, iHA_d
              ) %>% 
@@ -4597,7 +5113,11 @@ fun.penalty_EV_strength <- function(data, venue) {
     joined <- merged %>% 
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
       mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
+<<<<<<< HEAD
       select(player, game_id, season, Team, 
+=======
+      dplyr::select(player, game_id, season, Team, 
+>>>>>>> Updated with stylistic edits
              iPENT2, iPEND2, iPENT5, iPEND5, iBLK, 
              iHF_o, iHF_n, iHF_d, iHA_o, iHA_n, iHA_d
              ) %>% 
@@ -4620,7 +5140,11 @@ fun.combine_counts_EV_strength <- function(data, strength, scr_adj_list) {
     filter(game_strength_state %in% strength, 
            game_period < 5
            ) %>% 
+<<<<<<< HEAD
     select(-c(face_index:shift_length)) %>% 
+=======
+    dplyr::select(-c(face_index:shift_length)) %>% 
+>>>>>>> Updated with stylistic edits
     mutate(scradj = home_score - away_score, 
            home_lead = ifelse(scradj >= 3, 3, 
                               ifelse(scradj <= -3, -3, scradj)),
@@ -4661,7 +5185,11 @@ fun.combine_counts_EV_strength <- function(data, strength, scr_adj_list) {
     left_join(., counts_all,  by = c("player", "game_id", "season", "Team")) %>% 
     left_join(., faceoff_all, by = c("player", "game_id", "season", "Team")) %>% 
     left_join(., penalty_all, by = c("player", "game_id", "season", "Team")) %>% 
+<<<<<<< HEAD
     select(player, game_id, game_date, season, Team, Opponent, is_home, TOI, 
+=======
+    dplyr::select(player, game_id, game_date, season, Team, Opponent, is_home, TOI, 
+>>>>>>> Updated with stylistic edits
            G, A1, A2, Points, 
            iSF, iFF, iCF, ixG,
            iBLK, 
@@ -4927,7 +5455,11 @@ fun.shotmetrics_PP_strength <- function(data, strength, scr_adj_list) {
   all <- joined %>% 
     left_join(., goalieremove, "player") %>% 
     filter(is.na(is_goalie)) %>% 
+<<<<<<< HEAD
     select(-c(is_goalie)) %>% 
+=======
+    dplyr::select(-c(is_goalie)) %>% 
+>>>>>>> Updated with stylistic edits
     arrange(player, game_id) %>% 
     data.frame()
   
@@ -5057,7 +5589,11 @@ fun.counts_PP_strength <- function(data, venue, strength) {
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
       mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
       mutate(Points = G + A1 + A2) %>% 
+<<<<<<< HEAD
       select(player, game_id, season, Team, 
+=======
+      dplyr::select(player, game_id, season, Team, 
+>>>>>>> Updated with stylistic edits
              G, A1, A2, Points, 
              iSF, iCF, iFF, ixG,
              GIVE_o, GIVE_n, GIVE_d, 
@@ -5123,7 +5659,11 @@ fun.counts_PP_strength <- function(data, venue, strength) {
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
       mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
       mutate(Points = G + A1 + A2) %>% 
+<<<<<<< HEAD
       select(player, game_id, season, Team, 
+=======
+      dplyr::select(player, game_id, season, Team, 
+>>>>>>> Updated with stylistic edits
              G, A1, A2, Points, 
              iSF, iCF, iFF, ixG,
              GIVE_o, GIVE_n, GIVE_d, 
@@ -5240,7 +5780,11 @@ fun.penalty_PP_strength <- function(data, venue, strength) {
     joined <- merged %>% 
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
       mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
+<<<<<<< HEAD
       select(player, game_id, season, Team, 
+=======
+      dplyr::select(player, game_id, season, Team, 
+>>>>>>> Updated with stylistic edits
              iPENT2, iPEND2, iPENT5, iPEND5,
              iHF_o, iHF_n, iHF_d, 
              iHA_o, iHA_n, iHA_d
@@ -5301,7 +5845,11 @@ fun.penalty_PP_strength <- function(data, venue, strength) {
     joined <- merged %>% 
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
       mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
+<<<<<<< HEAD
       select(player, game_id, season, Team, 
+=======
+      dplyr::select(player, game_id, season, Team, 
+>>>>>>> Updated with stylistic edits
              iPENT2, iPEND2, iPENT5, iPEND5,
              iHF_o, iHF_n, iHF_d, 
              iHA_o, iHA_n, iHA_d
@@ -5325,7 +5873,11 @@ fun.combine_counts_PP_strength <- function(data, strength, scr_adj_list) {
     filter(game_strength_state %in% c(strength, paste(rev(unlist(strsplit(strength, NULL))), collapse = "")), 
            game_period < 5
            ) %>% 
+<<<<<<< HEAD
     select(-c(face_index:shift_length)) %>% 
+=======
+    dplyr::select(-c(face_index:shift_length)) %>% 
+>>>>>>> Updated with stylistic edits
     mutate(scradj = home_score - away_score, 
            home_lead = ifelse(scradj >= 3, 3, 
                               ifelse(scradj <= -3, -3, scradj)),
@@ -5365,7 +5917,11 @@ fun.combine_counts_PP_strength <- function(data, strength, scr_adj_list) {
     left_join(., counts_all,  by = c("player", "game_id", "season", "Team")) %>% 
     left_join(., faceoff_all, by = c("player", "game_id", "season", "Team")) %>% 
     left_join(., penalty_all, by = c("player", "game_id", "season", "Team")) %>% 
+<<<<<<< HEAD
     select(player, game_id, game_date, season, Team, Opponent, is_home, 
+=======
+    dplyr::select(player, game_id, game_date, season, Team, Opponent, is_home, 
+>>>>>>> Updated with stylistic edits
            TOI, 
            G, A1, A2, Points, 
            iSF, iFF, iCF, ixG,
@@ -5636,7 +6192,11 @@ fun.shotmetrics_SH_strength <- function(data, strength, scr_adj_list) {
   all <- joined %>% 
     left_join(., goalieremove, "player") %>% 
     filter(is.na(is_goalie)) %>% 
+<<<<<<< HEAD
     select(-c(is_goalie)) %>% 
+=======
+    dplyr::select(-c(is_goalie)) %>% 
+>>>>>>> Updated with stylistic edits
     arrange(player, game_id) %>% 
     data.frame()
   
@@ -5764,7 +6324,11 @@ fun.counts_SH_strength <- function(data, venue, strength) {
     joined <- merged %>% 
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
       mutate(Points = G + A1 + A2) %>% 
+<<<<<<< HEAD
       select(player, game_id, season, Team, 
+=======
+      dplyr::select(player, game_id, season, Team, 
+>>>>>>> Updated with stylistic edits
              G, A1, A2, Points, 
              iSF, iCF, iFF, ixG, 
              GIVE_o, GIVE_n, GIVE_d, 
@@ -5828,7 +6392,11 @@ fun.counts_SH_strength <- function(data, venue, strength) {
     joined <- merged %>% 
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
       mutate(Points = G + A1 + A2) %>% 
+<<<<<<< HEAD
       select(player, game_id, season, Team, 
+=======
+      dplyr::select(player, game_id, season, Team, 
+>>>>>>> Updated with stylistic edits
              G, A1, A2, Points,
              iSF, iCF, iFF, ixG,
              GIVE_o, GIVE_n, GIVE_d, 
@@ -5947,7 +6515,11 @@ fun.penalty_SH_strength <- function(data, venue, strength) {
     joined <- merged %>% 
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
       mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
+<<<<<<< HEAD
       select(player, game_id, season, Team, 
+=======
+      dplyr::select(player, game_id, season, Team, 
+>>>>>>> Updated with stylistic edits
              iPENT2, iPEND2, iPENT5, iPEND5, 
              iBLK,
              iHF_o, iHF_n, iHF_d, 
@@ -6011,7 +6583,11 @@ fun.penalty_SH_strength <- function(data, venue, strength) {
     joined <- merged %>% 
       mutate_if(is.numeric, funs(replace(., is.na(.), 0))) %>% 
       mutate_if(is.logical, funs(replace(., is.na(.), 0))) %>% 
+<<<<<<< HEAD
       select(player, game_id, season, Team, 
+=======
+      dplyr::select(player, game_id, season, Team, 
+>>>>>>> Updated with stylistic edits
              iPENT2, iPEND2, iPENT5, iPEND5, 
              iBLK, 
              iHF_o, iHF_n, iHF_d, 
@@ -6036,7 +6612,11 @@ fun.combine_counts_SH_strength <- function(data, strength, scr_adj_list) {
     filter(game_strength_state %in% st.pp_strength, 
            game_period < 5
            ) %>% 
+<<<<<<< HEAD
     select(-c(face_index:shift_length)) %>% 
+=======
+    dplyr::select(-c(face_index:shift_length)) %>% 
+>>>>>>> Updated with stylistic edits
     mutate(scradj = home_score - away_score, 
            home_lead = ifelse(scradj >= 3, 3, 
                               ifelse(scradj <= -3, -3, scradj)),
@@ -6076,7 +6656,11 @@ fun.combine_counts_SH_strength <- function(data, strength, scr_adj_list) {
     left_join(., counts_all,  by = c("player", "game_id", "season", "Team")) %>% 
     left_join(., faceoff_all, by = c("player", "game_id", "season", "Team")) %>% 
     left_join(., penalty_all, by = c("player", "game_id", "season", "Team")) %>% 
+<<<<<<< HEAD
     select(player, game_id, game_date, season, Team, Opponent, is_home, TOI, 
+=======
+    dplyr::select(player, game_id, game_date, season, Team, Opponent, is_home, TOI, 
+>>>>>>> Updated with stylistic edits
            G, A1, A2, Points, 
            iSF, iFF, iCF, ixG,
            iBLK,  
@@ -6897,7 +7481,11 @@ fun.teammate <- function(pbp_data, strength) {
   
   return_df <- hold_H %>% 
     rbind(., hold_A) %>% 
+<<<<<<< HEAD
     select(player, teammate, game_id, game_date, season, Team, TOI) %>% 
+=======
+    dplyr::select(player, teammate, game_id, game_date, season, Team, TOI) %>% 
+>>>>>>> Updated with stylistic edits
     mutate(player =   ifelse(player == "SEBASTIAN.AHO" & Team == "NYI", "5EBASTIAN.AHO", player),      # FIX NYI AHO
            teammate = ifelse(teammate == "SEBASTIAN.AHO" & Team == "NYI", "5EBASTIAN.AHO", teammate)
            ) %>% 
@@ -7787,7 +8375,11 @@ fun.opponent_TOI <- function(pbp_data, strength) {
     filter(!player %in% goalie_vec, 
            !opponent %in% goalie_vec
            ) %>% 
+<<<<<<< HEAD
     select(player, opponent, game_id, game_date, season, Team, TOI) %>% 
+=======
+    dplyr::select(player, opponent, game_id, game_date, season, Team, TOI) %>% 
+>>>>>>> Updated with stylistic edits
     arrange(player, opponent, game_id) %>% 
     data.frame()
   
@@ -7920,7 +8512,11 @@ fun.goalie_games <- function(data) {
     left_join(joined_shots, ., by = c("player", "game_id", "season", "Team")) %>% 
     left_join(goalies, ., by = c("player", "game_id", "season", "Team")) %>% 
     ungroup() %>% 
+<<<<<<< HEAD
     select(player, game_id, game_date, season, Team, Opponent, is_home, 
+=======
+    dplyr::select(player, game_id, game_date, season, Team, Opponent, is_home, 
+>>>>>>> Updated with stylistic edits
            TOI, GA, SA, GA_, FA, xGA
            ) %>% 
     arrange(player) %>% 
@@ -7965,7 +8561,11 @@ fun.pen_setup <- function(data) {
              ) %>% 
       filter(event_type == "PENL") %>% 
       mutate(last_pen_time = ifelse(lag(game_seconds) != game_seconds, lag(game_seconds), 0)) %>%
+<<<<<<< HEAD
       select(game_id, event_index, last_pen_time, next_st_state1) %>% 
+=======
+      dplyr::select(game_id, event_index, last_pen_time, next_st_state1) %>% 
+>>>>>>> Updated with stylistic edits
       data.frame()
     
     pbp_part[is.na(pbp_part)] <- 0
@@ -8037,7 +8637,11 @@ fun.pen_setup <- function(data) {
                               (game_strength_state == "4v5" & next_st_state15 == "4v3")), 
                          0, cluster)
         ) %>% 
+<<<<<<< HEAD
       select(game_id, event_index, season, game_date, event_type, event_description, 
+=======
+      dplyr::select(game_id, event_index, season, game_date, event_type, event_description, 
+>>>>>>> Updated with stylistic edits
              event_detail, event_team, event_player_1, event_player_2, home_team, 
              away_team, home_lead, home_lead_state, game_period, game_seconds, 
              last_pen_time, game_strength_state, next_st_state15, pen_shot, 
@@ -8085,7 +8689,11 @@ fun.pen_assign <- function(data) {
   
   # create data.frame to check if this process needs to be completed
   x <- data %>% 
+<<<<<<< HEAD
     select(cluster, no_impact) %>% 
+=======
+    dplyr::select(cluster, no_impact) %>% 
+>>>>>>> Updated with stylistic edits
     mutate(check = 1 * (cluster == 1 & no_impact == 0))
   
   if (sum(na.omit(x$check)) > 0) { 
@@ -8094,16 +8702,27 @@ fun.pen_assign <- function(data) {
     test1 <- data %>% 
       filter(no_impact == 0, cluster == 1) %>% 
       mutate(pen_id = round((as.numeric(game_id) * as.numeric(game_seconds)) / 10000000, 2)) %>% 
+<<<<<<< HEAD
       select(game_id, event_index, pen_id, event_player_1, event_player_2)
     
     test1a <- test1 %>% 
       select(-c(game_id, event_index, event_player_2)) %>% 
+=======
+      dplyr::select(game_id, event_index, pen_id, event_player_1, event_player_2)
+    
+    test1a <- test1 %>% 
+      dplyr::select(-c(game_id, event_index, event_player_2)) %>% 
+>>>>>>> Updated with stylistic edits
       gather(Column, Value, -pen_id, na.rm = TRUE) %>%
       count(pen_id, Value)  %>% 
       rename(take = Value)
     
     test1b <- test1 %>% 
+<<<<<<< HEAD
       select(-c(game_id, event_index, event_player_1)) %>% 
+=======
+      dplyr::select(-c(game_id, event_index, event_player_1)) %>% 
+>>>>>>> Updated with stylistic edits
       gather(Column, Value, -pen_id, na.rm = TRUE) %>%
       count(pen_id, Value)  %>% 
       rename(draw = Value)
@@ -8112,14 +8731,22 @@ fun.pen_assign <- function(data) {
     
     # Determine order of penalties taken / drawn
     test2a <- test1c %>% 
+<<<<<<< HEAD
       select(pen_id, take, n.x) %>% 
+=======
+      dplyr::select(pen_id, take, n.x) %>% 
+>>>>>>> Updated with stylistic edits
       group_by(pen_id, take) %>% 
       summarise(take_n = as.numeric(sum(n.x))) %>% 
       rename(player = take) %>% 
       data.frame()
     
     test2b <- test1c %>%
+<<<<<<< HEAD
       select(pen_id, draw, n.y) %>% 
+=======
+      dplyr::select(pen_id, draw, n.y) %>% 
+>>>>>>> Updated with stylistic edits
       group_by(pen_id, draw) %>% 
       summarise(draw_n = as.numeric(sum(n.y))) %>% 
       rename(player = draw) %>% 
@@ -8138,18 +8765,30 @@ fun.pen_assign <- function(data) {
              offset2 = ifelse(lead(offset1) == 1 & offset1 == 0 & pen_id == lead(pen_id), 1, offset1), 
              offset3 = ifelse(is.na(offset2) & offset1 == 0, 0, offset2)
              ) %>% 
+<<<<<<< HEAD
       select(-c(offset1, offset2)) %>% 
       mutate(diff_fix = ifelse(is.na(offset3) & diff == 0 & lead(diff) < diff, -lead(diff), diff), 
              offset3 = ifelse(is.na(offset3), 0, offset3)
              ) %>% 
       select(pen_id:draw_n, diff_fix, offset3) %>% 
+=======
+      dplyr::select(-c(offset1, offset2)) %>% 
+      mutate(diff_fix = ifelse(is.na(offset3) & diff == 0 & lead(diff) < diff, -lead(diff), diff), 
+             offset3 = ifelse(is.na(offset3), 0, offset3)
+             ) %>% 
+      dplyr::select(pen_id:draw_n, diff_fix, offset3) %>% 
+>>>>>>> Updated with stylistic edits
       rename(offset = offset3) %>% 
       data.frame()
     
     # Remove further offsetting penalties
     test2d <- test2c %>% 
       filter(offset == 1) %>% 
+<<<<<<< HEAD
       select(pen_id, offset) %>% 
+=======
+      dplyr::select(pen_id, offset) %>% 
+>>>>>>> Updated with stylistic edits
       group_by(pen_id) %>% 
       summarise(offset = first(offset)) %>% 
       data.frame()
@@ -8157,14 +8796,22 @@ fun.pen_assign <- function(data) {
     # Assign
     test3 <- test2c %>% 
       filter(offset != 1) %>% 
+<<<<<<< HEAD
       select(-c(offset))
+=======
+      dplyr::select(-c(offset))
+>>>>>>> Updated with stylistic edits
     
     test3a <- test3 %>% 
       group_by(pen_id) %>% 
       arrange(pen_id, desc(diff_fix)) %>%
       slice(c(1, n())) %>%
       mutate(Type = c("most", "least")) %>% 
+<<<<<<< HEAD
       select(-c(take_n, draw_n, diff_fix)) %>%
+=======
+      dplyr::select(-c(take_n, draw_n, diff_fix)) %>%
+>>>>>>> Updated with stylistic edits
       spread(Type, player) %>% 
       rename(take_assign = least, 
              draw_assign = most
@@ -8191,11 +8838,19 @@ fun.pen_assign <- function(data) {
              first_assign = ifelse(offset == 1, 0, first_assign)
              ) %>% 
       ungroup() %>% 
+<<<<<<< HEAD
       select(-c(take_assign, draw_assign, n, test)) %>% 
       rename(take_assign = take_update, 
              draw_assign = draw_update
              ) %>% 
       select(game_id, event_index, offset, first_assign, take_assign, draw_assign) %>% 
+=======
+      dplyr::select(-c(take_assign, draw_assign, n, test)) %>% 
+      rename(take_assign = take_update, 
+             draw_assign = draw_update
+             ) %>% 
+      dplyr::select(game_id, event_index, offset, first_assign, take_assign, draw_assign) %>% 
+>>>>>>> Updated with stylistic edits
       data.frame()
     
     # Join Data
@@ -8209,7 +8864,11 @@ fun.pen_assign <- function(data) {
              cluster = ifelse(is.na(cluster), 0, cluster), 
              last_pen_time = ifelse(is.na(last_pen_time), 0, last_pen_time)
              ) %>% 
+<<<<<<< HEAD
       select(game_id:double, team_pen, no_impact2, cluster:draw_assign) %>% 
+=======
+      dplyr::select(game_id:double, team_pen, no_impact2, cluster:draw_assign) %>% 
+>>>>>>> Updated with stylistic edits
       rename(no_impact = no_impact2) %>% 
       data.frame()
     
@@ -8247,7 +8906,11 @@ fun.pen_value_main <- function(pen_data, pbp_data) {
            duplicate = ifelse(is.na(duplicate), 0, duplicate)
            ) %>% 
     filter(duplicate == 0) %>% 
+<<<<<<< HEAD
     select(-c(duplicate)) %>% 
+=======
+    dplyr::select(-c(duplicate)) %>% 
+>>>>>>> Updated with stylistic edits
     mutate(event_player_1 = ifelse(event_player_1 == 0, NA, event_player_1), 
            event_player_2 = ifelse(event_player_2 == 0, NA, event_player_2)
            ) %>% 
@@ -8387,7 +9050,11 @@ fun.pen_value_main <- function(pen_data, pbp_data) {
            duplicate = ifelse(is.na(duplicate), 0, duplicate)
            ) %>% 
     filter(duplicate == 0, first_assign > 0) %>% 
+<<<<<<< HEAD
     select(-c(duplicate)) %>% 
+=======
+    dplyr::select(-c(duplicate)) %>% 
+>>>>>>> Updated with stylistic edits
     mutate(event_player_1 = ifelse(event_player_1 == 0, NA, event_player_1), 
            event_player_2 = ifelse(event_player_2 == 0, NA, event_player_2), 
            verified1 = ifelse(first_assign == 1 & lead(game_seconds) == game_seconds & 
@@ -8407,22 +9074,38 @@ fun.pen_value_main <- function(pen_data, pbp_data) {
            verified3 = ifelse(is.na(verified3), 0, verified3), 
            assign_verify = verified1 + verified2 + verified3
            ) %>% 
+<<<<<<< HEAD
     select(game_id, event_index, assign_verify)
+=======
+    dplyr::select(game_id, event_index, assign_verify)
+>>>>>>> Updated with stylistic edits
   
   # Join verified
   pen_calc_main <- pen_calc_main %>% 
     left_join(., pen_calc_verify, by = c("game_id", "event_index")) %>% 
     mutate(assign_verify = ifelse(is.na(assign_verify), 0, assign_verify)) %>% 
+<<<<<<< HEAD
     select(game_id:draw_assign, assign_verify, time_diff:pen_value)
+=======
+    dplyr::select(game_id:draw_assign, assign_verify, time_diff:pen_value)
+>>>>>>> Updated with stylistic edits
   
   # Correct "Assigned" penalties (remove wrongly assigned)
   pen_calc_assign <- pen_calc_main %>% 
     filter(first_assign == 1) %>% 
+<<<<<<< HEAD
     select(game_id, event_index, take_assign, draw_assign)
   
   pbp_players <- pbp_data %>% 
     filter(event_type == "PENL") %>% 
     select(game_id, event_index, home_on_1:away_on_6)
+=======
+    dplyr::select(game_id, event_index, take_assign, draw_assign)
+  
+  pbp_players <- pbp_data %>% 
+    filter(event_type == "PENL") %>% 
+    dplyr::select(game_id, event_index, home_on_1:away_on_6)
+>>>>>>> Updated with stylistic edits
   
   pbp_players_join <- pen_calc_assign %>% 
     right_join(pbp_players, ., by = c("game_id", "event_index"))
@@ -8441,7 +9124,11 @@ fun.pen_value_main <- function(pen_data, pbp_data) {
                                        draw_assign == away_on_4 | draw_assign == away_on_5 | draw_assign == away_on_6)), 
                                1, 0)
            ) %>% 
+<<<<<<< HEAD
     select(-c(home_on_1:away_on_6, take_assign, draw_assign))
+=======
+    dplyr::select(-c(home_on_1:away_on_6, take_assign, draw_assign))
+>>>>>>> Updated with stylistic edits
   
   pen_calc_main <- pen_calc_main %>% 
     left_join(., pbp_players_join, by = c("game_id", "event_index")) %>% 
@@ -8449,7 +9136,11 @@ fun.pen_value_main <- function(pen_data, pbp_data) {
            no_impact3 = no_impact + no_impact2
            ) %>% 
     filter(no_impact3 != 1) %>% 
+<<<<<<< HEAD
     select(-c(no_impact2, no_impact3)) %>% 
+=======
+    dplyr::select(-c(no_impact2, no_impact3)) %>% 
+>>>>>>> Updated with stylistic edits
     data.frame()
   
   return(pen_calc_main)
@@ -8482,7 +9173,11 @@ fun.pen_value_xtra <- function(data) {
              no_impact = ifelse(pen_shot == 1, 0, no_impact)
              ) %>% 
       filter(duplicate == 0) %>% 
+<<<<<<< HEAD
       select(-c(duplicate)) %>% 
+=======
+      dplyr::select(-c(duplicate)) %>% 
+>>>>>>> Updated with stylistic edits
       mutate(event_player_1 = ifelse(event_player_1 == 0, NA, event_player_1), 
              event_player_2 = ifelse(event_player_2 == 0, NA, event_player_2)) %>%
       
@@ -8733,7 +9428,11 @@ fun.pen_value_sum <- function(main_data, xtra_data) {
            adj_pen_diff = adj_take + adj_draw, 
            season = as.character(season)
            ) %>% 
+<<<<<<< HEAD
     select(player, game_id, game_date, season, take_count, draw_count, take, draw, adj_take, adj_draw, adj_pen_diff) %>% 
+=======
+    dplyr::select(player, game_id, game_date, season, take_count, draw_count, take, draw, adj_take, adj_draw, adj_pen_diff) %>% 
+>>>>>>> Updated with stylistic edits
     arrange(player, game_id) %>% 
     data.frame()
   
@@ -8746,19 +9445,31 @@ fun.pen_value_sum_add <- function(pen_data, skater_data, goalie_data, position_d
   
   return_df <- pen_data %>% 
     left_join(., skater_data %>%                           ## Skaters 
+<<<<<<< HEAD
                 select(player, game_id, Team), 
+=======
+                dplyr::select(player, game_id, Team), 
+>>>>>>> Updated with stylistic edits
               by = c("player", "game_id")
               ) %>% 
     left_join(., position_data, by = "player") %>% 
     left_join(., goalie_data %>%                           ## Goalies
+<<<<<<< HEAD
                 select(player, game_id, Team) %>%  
+=======
+                dplyr::select(player, game_id, Team) %>%  
+>>>>>>> Updated with stylistic edits
                 rename(Team_goalie = Team), 
               by = c("player", "game_id")
               ) %>% 
     mutate(position = ifelse(is.na(position) & !is.na(Team_goalie), 3, position), 
            Team =     ifelse(is.na(Team) & !is.na(Team_goalie), Team_goalie, Team)
            ) %>% 
+<<<<<<< HEAD
     select(player, position, game_id, game_date, season, Team, take_count:adj_pen_diff)
+=======
+    dplyr::select(player, position, game_id, game_date, season, Team, take_count:adj_pen_diff)
+>>>>>>> Updated with stylistic edits
   
   }
 
@@ -8924,7 +9635,11 @@ fun.team_games_all_sit <- function(data) {
   games <- mergetest %>% 
     group_by(Team, Opponent, game_id, game_date, season, is_home) %>% 
     summarise_all(funs(sum)) %>% 
+<<<<<<< HEAD
     select(Team, Opponent, game_id, game_date, season, is_home, 
+=======
+    dplyr::select(Team, Opponent, game_id, game_date, season, is_home, 
+>>>>>>> Updated with stylistic edits
            TOI, GF:C_diff, PEND2:PENT5
            ) %>% 
     arrange(Team, game_id) %>% 
@@ -9116,7 +9831,11 @@ fun.team_games_EV <- function(data, strength, scr_adj_list) {
   games <- mergetest %>% 
     group_by(Team, Opponent, game_id, game_date, season, is_home) %>% 
     summarise_all(funs(sum)) %>% 
+<<<<<<< HEAD
     select(Team, Opponent, game_id, game_date, season, is_home, 
+=======
+    dplyr::select(Team, Opponent, game_id, game_date, season, is_home, 
+>>>>>>> Updated with stylistic edits
            TOI, TOI_5v5:TOI_3v3, GF:C_diff, GF_adj:C_diff_adj, PEND2:PENT5
            ) %>% 
     arrange(Team, game_id) %>% 
@@ -9128,13 +9847,21 @@ fun.team_games_EV <- function(data, strength, scr_adj_list) {
   # Remove columns not used in below strength states
   if (strength == "EV") { 
     games <- games %>% 
+<<<<<<< HEAD
       select(-c(GF:C_diff)) %>% 
+=======
+      dplyr::select(-c(GF:C_diff)) %>% 
+>>>>>>> Updated with stylistic edits
       rename_at(vars(GF_adj:C_diff_adj), funs(gsub("_adj", "", .)))
     
     }
   else if (strength != "EV") { 
     games <- games %>% 
+<<<<<<< HEAD
       select(-c(TOI_5v5:TOI_3v3))
+=======
+      dplyr::select(-c(TOI_5v5:TOI_3v3))
+>>>>>>> Updated with stylistic edits
     
     }
   
@@ -9159,7 +9886,11 @@ fun.team_games_PP <- function(data, strength, scr_adj_list) {
     filter(game_strength_state %in% strength_, 
            game_period < 5
            ) %>% 
+<<<<<<< HEAD
     select(-c(face_index:shift_length)) %>% 
+=======
+    dplyr::select(-c(face_index:shift_length)) %>% 
+>>>>>>> Updated with stylistic edits
     mutate(scradj = home_score - away_score, 
            home_lead = ifelse(scradj >= 3, 3, 
                               ifelse(scradj <= -3, -3, scradj)),
@@ -9287,7 +10018,11 @@ fun.team_games_PP <- function(data, strength, scr_adj_list) {
   games <- mergetest %>% 
     group_by(Team, Opponent, game_id, game_date, season, is_home) %>% 
     summarise_all(funs(sum)) %>% 
+<<<<<<< HEAD
     select(Team, Opponent, game_id, game_date, season, is_home, 
+=======
+    dplyr::select(Team, Opponent, game_id, game_date, season, is_home, 
+>>>>>>> Updated with stylistic edits
            TOI, TOI_5v4:TOI_4v3, 
            GF:CA, GF_adj:CF_adj, 
            PEND2:PENT5
@@ -9301,9 +10036,15 @@ fun.team_games_PP <- function(data, strength, scr_adj_list) {
   # Remove columns not used in below strength states
   if (strength == "PP") { 
     games <- games %>% 
+<<<<<<< HEAD
       select(-c(GF, xGF, SF, FF, CF)) %>% 
       rename_at(vars(GF_adj, xGF_adj, SF_adj, FF_adj, CF_adj), funs(gsub("_adj", "", .))) %>% 
       select(Team, Opponent, game_id, game_date, season, is_home, 
+=======
+      dplyr::select(-c(GF, xGF, SF, FF, CF)) %>% 
+      rename_at(vars(GF_adj, xGF_adj, SF_adj, FF_adj, CF_adj), funs(gsub("_adj", "", .))) %>% 
+      dplyr::select(Team, Opponent, game_id, game_date, season, is_home, 
+>>>>>>> Updated with stylistic edits
              TOI, TOI_5v4:TOI_4v3, 
              GF, GA, xGF, xGA, SF, SA, FF, FA, CF, CA, 
              PEND2:PENT5)
@@ -9311,7 +10052,11 @@ fun.team_games_PP <- function(data, strength, scr_adj_list) {
     }
   else if (strength != "PP") { 
     games <- games %>% 
+<<<<<<< HEAD
       select(-c(TOI_5v4:TOI_4v3))
+=======
+      dplyr::select(-c(TOI_5v4:TOI_4v3))
+>>>>>>> Updated with stylistic edits
     
     }
   
@@ -9336,7 +10081,11 @@ fun.team_games_SH <- function(data, strength, scr_adj_list) {
     filter(game_strength_state %in% strength_, 
            game_period < 5
            ) %>% 
+<<<<<<< HEAD
     select(-c(face_index:shift_length)) %>% 
+=======
+    dplyr::select(-c(face_index:shift_length)) %>% 
+>>>>>>> Updated with stylistic edits
     mutate(scradj = home_score - away_score, 
            home_lead = ifelse(scradj >= 3, 3, 
                               ifelse(scradj <= -3, -3, scradj)),
@@ -9465,7 +10214,11 @@ fun.team_games_SH <- function(data, strength, scr_adj_list) {
   games <- mergetest %>% 
     group_by(Team, Opponent, game_id, game_date, season, is_home) %>% 
     summarise_all(funs(sum)) %>% 
+<<<<<<< HEAD
     select(Team, Opponent, game_id, game_date, season, is_home, 
+=======
+    dplyr::select(Team, Opponent, game_id, game_date, season, is_home, 
+>>>>>>> Updated with stylistic edits
            TOI, TOI_4v5:TOI_3v4, GF:CA, GA_adj:CA_adj, PEND2:PENT5
            ) %>% 
     arrange(Team, game_id) %>% 
@@ -9477,9 +10230,15 @@ fun.team_games_SH <- function(data, strength, scr_adj_list) {
   # Remove columns not used in below strength states
   if (strength == "SH") { 
     games <- games %>% 
+<<<<<<< HEAD
       select(-c(GA, xGA, SA, FA, CA)) %>% 
       rename_at(vars(GA_adj, xGA_adj, SA_adj, FA_adj, CA_adj), funs(gsub("_adj", "", .))) %>% 
       select(Team, Opponent, game_id, game_date, season, is_home, 
+=======
+      dplyr::select(-c(GA, xGA, SA, FA, CA)) %>% 
+      rename_at(vars(GA_adj, xGA_adj, SA_adj, FA_adj, CA_adj), funs(gsub("_adj", "", .))) %>% 
+      dplyr::select(Team, Opponent, game_id, game_date, season, is_home, 
+>>>>>>> Updated with stylistic edits
              TOI, TOI_4v5:TOI_3v4, 
              GF, GA, xGF, xGA, SF, SA, FF, FA, CF, CA, 
              PEND2:PENT5)
@@ -9487,7 +10246,11 @@ fun.team_games_SH <- function(data, strength, scr_adj_list) {
     }
   else if (strength != "SH") { 
     games <- games %>% 
+<<<<<<< HEAD
       select(-c(TOI_4v5:TOI_3v4))
+=======
+      dplyr::select(-c(TOI_4v5:TOI_3v4))
+>>>>>>> Updated with stylistic edits
     
     }
   
@@ -9570,7 +10333,11 @@ fun.playercounts_season_all_sit <- function(data, position_data) {
            ZS_rate =  100 * OZS / (OZS + DZS)
            ) %>% 
     left_join(., position_data, by = "player") %>% 
+<<<<<<< HEAD
     select(player, position, season, Team, 
+=======
+    dplyr::select(player, position, season, Team, 
+>>>>>>> Updated with stylistic edits
            GP, TOI, TOI_GP, TOI_perc, 
            G, A1, A2, Points,
            iSF, iFF, iCF, ixG,
@@ -9657,7 +10424,11 @@ fun.playercounts_season_EV <- function(data, strength, per_60) {
       mutate_at(vars(GP, TOI_GP), funs(ifelse(is.na(.), 0, .))) %>% 
       mutate_if(is.numeric, funs(replace(., is.nan(.), 0))) %>% 
       mutate_if(is.numeric, funs(round(., 2))) %>% 
+<<<<<<< HEAD
       select(player, position, season, Team, 
+=======
+      dplyr::select(player, position, season, Team, 
+>>>>>>> Updated with stylistic edits
              GP, TOI, TOI_GP, TOI_perc, 
              G, A1, A2, Points, G_adj, A1_adj, A2_adj, Points_adj, 
              iSF, iFF, iCF, ixG, Tango, iCF_adj, ixG_adj, 
@@ -9747,7 +10518,11 @@ fun.playercounts_season_EV <- function(data, strength, per_60) {
       mutate_at(vars(GP, TOI_GP), funs(ifelse(is.na(.), 0, .))) %>% 
       mutate_if(is.numeric, funs(replace(., is.nan(.), 0))) %>% 
       mutate_if(is.numeric, funs(round(., 2))) %>% 
+<<<<<<< HEAD
       select(player, position, season, Team, 
+=======
+      dplyr::select(player, position, season, Team, 
+>>>>>>> Updated with stylistic edits
              GP, TOI, TOI_GP, TOI_perc, 
              G, A1, A2, Points, 
              iSF, iFF, iCF, ixG, Tango, 
@@ -9860,7 +10635,11 @@ fun.playercounts_season_PP <- function(data, strength, per_60) {
       mutate_at(vars(GP, TOI_GP), funs(ifelse(is.na(.), 0, .))) %>% 
       mutate_if(is.numeric, funs(replace(., is.nan(.), 0))) %>% 
       mutate_if(is.numeric, funs(round(., 2))) %>% 
+<<<<<<< HEAD
       select(player, position, season, Team, 
+=======
+      dplyr::select(player, position, season, Team, 
+>>>>>>> Updated with stylistic edits
              GP, TOI, TOI_GP, TOI_perc, 
              G, A1, A2, Points, G_adj, A1_adj, A2_adj, Points_adj, 
              iSF, iFF, iCF, ixG, Tango, iCF_adj, ixG_adj, 
@@ -9942,7 +10721,11 @@ fun.playercounts_season_PP <- function(data, strength, per_60) {
       mutate_at(vars(GP, TOI_GP), funs(ifelse(is.na(.), 0, .))) %>% 
       mutate_if(is.numeric, funs(replace(., is.nan(.), 0))) %>% 
       mutate_if(is.numeric, funs(round(., 2))) %>% 
+<<<<<<< HEAD
       select(player, position, season, Team, 
+=======
+      dplyr::select(player, position, season, Team, 
+>>>>>>> Updated with stylistic edits
              GP, TOI, TOI_GP, TOI_perc, 
              G, A1, A2, Points, 
              iSF, iFF, iCF, ixG, Tango, 
@@ -10053,7 +10836,11 @@ fun.playercounts_season_SH <- function(data, strength, per_60) {
       mutate_at(vars(GP, TOI_GP), funs(ifelse(is.na(.), 0, .))) %>% 
       mutate_if(is.numeric, funs(replace(., is.nan(.), 0))) %>% 
       mutate_if(is.numeric, funs(round(., 2))) %>% 
+<<<<<<< HEAD
       select(player, position, season, Team, 
+=======
+      dplyr::select(player, position, season, Team, 
+>>>>>>> Updated with stylistic edits
              GP, TOI, TOI_GP, TOI_perc, 
              G, A1, A2, Points, 
              iSF, iFF, iCF, ixG, Tango, 
@@ -10136,7 +10923,11 @@ fun.playercounts_season_SH <- function(data, strength, per_60) {
       mutate_at(vars(GP, TOI_GP), funs(ifelse(is.na(.), 0, .))) %>% 
       mutate_if(is.numeric, funs(replace(., is.nan(.), 0))) %>% 
       mutate_if(is.numeric, funs(round(., 2))) %>% 
+<<<<<<< HEAD
       select(player, position, season, Team, 
+=======
+      dplyr::select(player, position, season, Team, 
+>>>>>>> Updated with stylistic edits
              GP, TOI, TOI_GP, TOI_perc, 
              G, A1, A2, Points, 
              iSF, iFF, iCF, ixG, Tango, 
@@ -10283,7 +11074,11 @@ fun.relative_teammate <- function(TM_data, games_data, position_data, strength) 
       rename_at(vars(rel_TM_GF60_impact:rel_TM_xGA60_impact, rel_TM_GF60_state_impact:rel_TM_xGA60_state_impact), 
                 funs(gsub("60", "", .))
                 ) %>% 
+<<<<<<< HEAD
       select(player, position_p, season, Team, TOI_p, 
+=======
+      dplyr::select(player, position_p, season, Team, TOI_p, 
+>>>>>>> Updated with stylistic edits
              GF60:xGA60,
              GF60_state:xGA60_state,
              
@@ -10332,7 +11127,11 @@ fun.relative_teammate <- function(TM_data, games_data, position_data, strength) 
     
     # Teammate on-ice raw and per 60 numbers
     teammate_metrics_PP <- player_metrics_PP %>% 
+<<<<<<< HEAD
       #select(-c(position, GP, TOI)) %>% 
+=======
+      #dplyr::select(-c(position, GP, TOI)) %>% 
+>>>>>>> Updated with stylistic edits
       rename(teammate = player)
     
     # Calculate relative to teammate numbers
@@ -10390,7 +11189,11 @@ fun.relative_teammate <- function(TM_data, games_data, position_data, strength) 
       rename_at(vars(rel_TM_GF60_impact:rel_TM_xGF60_impact, rel_TM_GF60_state_impact:rel_TM_xGF60_state_impact), 
                 funs(gsub("60", "", .))
                 ) %>% 
+<<<<<<< HEAD
       select(player, position_p, season, Team, TOI_p, 
+=======
+      dplyr::select(player, position_p, season, Team, TOI_p, 
+>>>>>>> Updated with stylistic edits
              GF60:xGF60, 
              GF60_state:xGF60_state, 
              rel_TM_GF60:rel_TM_xGF60, rel_TM_GF60_state:rel_TM_xGF60_state, 
@@ -10431,7 +11234,11 @@ fun.relative_teammate <- function(TM_data, games_data, position_data, strength) 
     
     # Teammate on-ice raw and per 60 numbers
     teammate_metrics_SH <- player_metrics_SH %>% 
+<<<<<<< HEAD
       #select(-c(position, GP, TOI)) %>% 
+=======
+      #dplyr::select(-c(position, GP, TOI)) %>% 
+>>>>>>> Updated with stylistic edits
       rename(teammate = player)
     
     # Calculate relative to teammate numbers
@@ -10488,7 +11295,11 @@ fun.relative_teammate <- function(TM_data, games_data, position_data, strength) 
       rename_at(vars(rel_TM_GA60_impact:rel_TM_xGA60_impact, rel_TM_GA60_state_impact:rel_TM_xGA60_state_impact), 
                 funs(gsub("60", "", .))
                 ) %>% 
+<<<<<<< HEAD
       select(player, position_p, season, Team, TOI_p, 
+=======
+      dplyr::select(player, position_p, season, Team, TOI_p, 
+>>>>>>> Updated with stylistic edits
              GA60:xGA60, 
              GA60_state:xGA60_state, 
              rel_TM_GA60:rel_TM_xGA60, rel_TM_GA60_state:rel_TM_xGA60_state, 
@@ -10512,7 +11323,11 @@ fun.relative_teammate <- function(TM_data, games_data, position_data, strength) 
     
     # Player on-ice raw and per 60 numbers
     player_metrics_EV <- games_data %>% 
+<<<<<<< HEAD
       select(-c(onGF:onxGA)) %>% 
+=======
+      dplyr::select(-c(onGF:onxGA)) %>% 
+>>>>>>> Updated with stylistic edits
       rename_at(vars(onGF_adj:onxGA_adj), funs(gsub("_adj", "", .))) %>% 
       group_by(player, season, Team) %>% 
       mutate(GP = 1) %>% 
@@ -10588,7 +11403,11 @@ fun.relative_teammate <- function(TM_data, games_data, position_data, strength) 
       rename_at(vars(rel_TM_GF60_impact:rel_TM_xGA60_impact), 
                 funs(gsub("60", "", .))
                 ) %>% 
+<<<<<<< HEAD
       select(player, position_p, season, Team, TOI_p, 
+=======
+      dplyr::select(player, position_p, season, Team, TOI_p, 
+>>>>>>> Updated with stylistic edits
              GF60:xGA60,
              
              rel_TM_GF60:rel_TM_xGA60,
@@ -10615,7 +11434,11 @@ fun.relative_teammate <- function(TM_data, games_data, position_data, strength) 
     
     # Calculate relative to teammate
     player_metrics_PP <- games_data %>% 
+<<<<<<< HEAD
       select(-c(onGF:onxGA)) %>% 
+=======
+      dplyr::select(-c(onGF:onxGA)) %>% 
+>>>>>>> Updated with stylistic edits
       rename_at(vars(onGF_adj:onxGF_adj), funs(gsub("_adj", "", .))) %>% 
       filter(TOI > 0) %>% 
       group_by(player, season, Team) %>% 
@@ -10684,7 +11507,11 @@ fun.relative_teammate <- function(TM_data, games_data, position_data, strength) 
       rename_at(vars(rel_TM_GF60_impact:rel_TM_xGF60_impact), 
                 funs(gsub("60", "", .))
                 ) %>% 
+<<<<<<< HEAD
       select(player, position_p, season, Team, TOI_p, 
+=======
+      dplyr::select(player, position_p, season, Team, TOI_p, 
+>>>>>>> Updated with stylistic edits
              GF60:xGF60, 
              rel_TM_GF60:rel_TM_xGF60, 
              rel_TM_GF_impact:rel_TM_xGF_impact
@@ -10706,7 +11533,11 @@ fun.relative_teammate <- function(TM_data, games_data, position_data, strength) 
     
     # SH - Relative to Teammate "New"
     player_metrics_SH <- games_data %>% 
+<<<<<<< HEAD
       select(-c(onGF:onxGA)) %>% 
+=======
+      dplyr::select(-c(onGF:onxGA)) %>% 
+>>>>>>> Updated with stylistic edits
       rename_at(vars(onGA_adj:onxGA_adj), funs(gsub("_adj", "", .))) %>% 
       filter(TOI > 0) %>% 
       group_by(player, season, Team) %>% 
@@ -10776,7 +11607,11 @@ fun.relative_teammate <- function(TM_data, games_data, position_data, strength) 
       rename_at(vars(rel_TM_GA60_impact:rel_TM_xGA60_impact), 
                 funs(gsub("60", "", .))
                 ) %>% 
+<<<<<<< HEAD
       select(player, position_p, season, Team, TOI_p, 
+=======
+      dplyr::select(player, position_p, season, Team, TOI_p, 
+>>>>>>> Updated with stylistic edits
              GA60:xGA60, 
              rel_TM_GA60:rel_TM_xGA60, 
              rel_TM_GA_impact:rel_TM_xGA_impact
@@ -10824,7 +11659,11 @@ fun.goalie_sum_all_sit <- function(data) {
            GSAx = xGA - GA_
            ) %>% 
     mutate_if(is.numeric, funs(round(., 2))) %>% 
+<<<<<<< HEAD
     select(player:Team, TOI, 
+=======
+    dplyr::select(player:Team, TOI, 
+>>>>>>> Updated with stylistic edits
            qual, 
            GA, SA, 
            SV_perc, 
@@ -10851,7 +11690,11 @@ fun.team_sum_all_sit <- function(data) {
   
   hold <- data %>% 
     mutate(GP = 1) %>% 
+<<<<<<< HEAD
     select(-c(Opponent, game_id, game_date, is_home)) %>% 
+=======
+    dplyr::select(-c(Opponent, game_id, game_date, is_home)) %>% 
+>>>>>>> Updated with stylistic edits
     group_by(Team, season) %>% 
     summarise_all(funs(sum)) %>% 
     mutate(GF_perc =  100 * round(GF / (GF + GA), 4), 
@@ -10861,7 +11704,11 @@ fun.team_sum_all_sit <- function(data) {
            CF_perc =  100 * round(CF / (CF + CA), 4)
            ) %>% 
     mutate_if(is.numeric, funs(round(., 2))) %>% 
+<<<<<<< HEAD
     select(Team:TOI, GP, GF:C_diff, GF_perc:CF_perc, PEND2:PENT5) %>% 
+=======
+    dplyr::select(Team:TOI, GP, GF:C_diff, GF_perc:CF_perc, PEND2:PENT5) %>% 
+>>>>>>> Updated with stylistic edits
     mutate(PEN2_diff = PEND2 - PENT2) %>% 
     data.frame()
   
@@ -10884,7 +11731,11 @@ fun.team_sum_EV <- function(data, strength) {
     
     # Summed for season
     sum <- data %>% 
+<<<<<<< HEAD
       select(-c(Opponent, game_id, game_date, is_home)) %>% 
+=======
+      dplyr::select(-c(Opponent, game_id, game_date, is_home)) %>% 
+>>>>>>> Updated with stylistic edits
       group_by(Team, season) %>% 
       summarise_all(funs(sum)) %>% 
       mutate(GF_perc =  100 * round(GF / (GF + GA), 4), 
@@ -10896,7 +11747,11 @@ fun.team_sum_EV <- function(data, strength) {
              ) %>% 
       mutate_if(is.numeric, funs(round(., 2))) %>% 
       right_join(GP_count, ., by = c("Team", "season")) %>% 
+<<<<<<< HEAD
       select(Team:TOI_3v3, skaters, GF:C_diff, GF_perc:CF_perc, PEND2:PENT5) %>% 
+=======
+      dplyr::select(Team:TOI_3v3, skaters, GF:C_diff, GF_perc:CF_perc, PEND2:PENT5) %>% 
+>>>>>>> Updated with stylistic edits
       mutate(PEN2_diff = PEND2 - PENT2) %>% 
       data.frame()
     
@@ -10915,7 +11770,11 @@ fun.team_sum_EV <- function(data, strength) {
     
     # Summed for season
     sum <- data %>% 
+<<<<<<< HEAD
       select(-c(Opponent, game_id, game_date, is_home)) %>% 
+=======
+      dplyr::select(-c(Opponent, game_id, game_date, is_home)) %>% 
+>>>>>>> Updated with stylistic edits
       group_by(Team, season) %>% 
       summarise_all(funs(sum)) %>% 
       mutate(GF_perc =  100 * round(GF / (GF + GA), 4), 
@@ -10932,7 +11791,11 @@ fun.team_sum_EV <- function(data, strength) {
              ) %>% 
       mutate_if(is.numeric, funs(round(., 2))) %>% 
       right_join(GP_count, ., by = c("Team", "season")) %>% 
+<<<<<<< HEAD
       select(Team:TOI, GF:C_diff, GF_adj:C_diff_adj, GF_perc:CF_perc, GF_perc_adj:CF_perc_adj, PEND2:PENT5) %>% 
+=======
+      dplyr::select(Team:TOI, GF:C_diff, GF_adj:C_diff_adj, GF_perc:CF_perc, GF_perc_adj:CF_perc_adj, PEND2:PENT5) %>% 
+>>>>>>> Updated with stylistic edits
       mutate(PEN2_diff = PEND2 - PENT2) %>% 
       data.frame()
     
@@ -10957,13 +11820,21 @@ fun.team_sum_PP <- function(data, strength) {
     
     # Summed for season
     sum <- data %>% 
+<<<<<<< HEAD
       select(-c(Opponent, game_id, game_date, is_home)) %>% 
+=======
+      dplyr::select(-c(Opponent, game_id, game_date, is_home)) %>% 
+>>>>>>> Updated with stylistic edits
       group_by(Team, season) %>% 
       summarise_all(funs(sum)) %>% 
       mutate(skaters =  5 * (TOI_5v4 / TOI) + 5 * (TOI_5v3 / TOI) + 4 * (TOI_4v3 / TOI)) %>% 
       mutate_if(is.numeric, funs(round(., 2))) %>% 
       right_join(GP_count, ., by = c("Team", "season")) %>% 
+<<<<<<< HEAD
       select(Team:TOI_4v3, skaters, GF:CA, PEND2:PENT5) %>% 
+=======
+      dplyr::select(Team:TOI_4v3, skaters, GF:CA, PEND2:PENT5) %>% 
+>>>>>>> Updated with stylistic edits
       mutate(PEN2_diff = PEND2 - PENT2) %>% 
       data.frame()
     
@@ -10982,12 +11853,20 @@ fun.team_sum_PP <- function(data, strength) {
     
     # Summed for season
     sum <- data %>% 
+<<<<<<< HEAD
       select(-c(Opponent, game_id, game_date, is_home)) %>% 
+=======
+      dplyr::select(-c(Opponent, game_id, game_date, is_home)) %>% 
+>>>>>>> Updated with stylistic edits
       group_by(Team, season) %>% 
       summarise_all(funs(sum)) %>% 
       mutate_if(is.numeric, funs(round(., 2))) %>% 
       right_join(GP_count, ., by = c("Team", "season")) %>% 
+<<<<<<< HEAD
       select(Team:TOI, GF:CA, GF_adj:CF_adj, PEND2:PENT5) %>% 
+=======
+      dplyr::select(Team:TOI, GF:CA, GF_adj:CF_adj, PEND2:PENT5) %>% 
+>>>>>>> Updated with stylistic edits
       mutate(PEN2_diff = PEND2 - PENT2) %>% 
       data.frame()
     
@@ -11012,13 +11891,21 @@ fun.team_sum_SH <- function(data, strength) {
     
     # Summed for season
     sum <- data %>% 
+<<<<<<< HEAD
       select(-c(Opponent, game_id, game_date, is_home)) %>% 
+=======
+      dplyr::select(-c(Opponent, game_id, game_date, is_home)) %>% 
+>>>>>>> Updated with stylistic edits
       group_by(Team, season) %>% 
       summarise_all(funs(sum)) %>% 
       mutate(skaters =  4 * (TOI_4v5 / TOI) + 3 * (TOI_3v5 / TOI) + 3 * (TOI_3v4 / TOI)) %>% 
       mutate_if(is.numeric, funs(round(., 2))) %>% 
       right_join(GP_count, ., by = c("Team", "season")) %>% 
+<<<<<<< HEAD
       select(Team:TOI_3v4, skaters, GF:CA, PEND2:PENT5) %>% 
+=======
+      dplyr::select(Team:TOI_3v4, skaters, GF:CA, PEND2:PENT5) %>% 
+>>>>>>> Updated with stylistic edits
       mutate(PEN2_diff = PEND2 - PENT2) %>% 
       data.frame()
     
@@ -11037,12 +11924,20 @@ fun.team_sum_SH <- function(data, strength) {
     
     # Summed for season
     sum <- data %>% 
+<<<<<<< HEAD
       select(-c(Opponent, game_id, game_date, is_home)) %>% 
+=======
+      dplyr::select(-c(Opponent, game_id, game_date, is_home)) %>% 
+>>>>>>> Updated with stylistic edits
       group_by(Team, season) %>% 
       summarise_all(funs(sum)) %>% 
       mutate_if(is.numeric, funs(round(., 2))) %>% 
       right_join(GP_count, ., by = c("Team", "season")) %>% 
+<<<<<<< HEAD
       select(Team:TOI, GF:CA, GA_adj:CA_adj, PEND2:PENT5) %>% 
+=======
+      dplyr::select(Team:TOI, GF:CA, GA_adj:CA_adj, PEND2:PENT5) %>% 
+>>>>>>> Updated with stylistic edits
       mutate(PEN2_diff = PEND2 - PENT2) %>% 
       data.frame()
     
@@ -11084,7 +11979,11 @@ fun.team_RAPM <- function(data) {
                                 ifelse(scradj <= -3, -3, scradj))
              ) %>% 
       rename(pred_goal = pred_XGB_7) %>% 
+<<<<<<< HEAD
       select(game_id, event_index, season, 
+=======
+      dplyr::select(game_id, event_index, season, 
+>>>>>>> Updated with stylistic edits
              home_team, away_team, 
              game_strength_state,
              event_length, 
@@ -11242,7 +12141,11 @@ fun.team_RAPM <- function(data) {
              state_3v3 = 1 * (game_strength_state == st.3v3),
              is_home = 1
              ) %>% 
+<<<<<<< HEAD
       select(-c(game_id, off_lead, shift_ID)) %>% 
+=======
+      dplyr::select(-c(game_id, off_lead, shift_ID)) %>% 
+>>>>>>> Updated with stylistic edits
       data.matrix()
     
     
@@ -11345,7 +12248,11 @@ fun.team_RAPM <- function(data) {
              state_3v3 = 1 * (game_strength_state == st.3v3),
              is_home = 0
              ) %>% 
+<<<<<<< HEAD
       select(-c(game_id, off_lead, shift_ID)) %>% 
+=======
+      dplyr::select(-c(game_id, off_lead, shift_ID)) %>% 
+>>>>>>> Updated with stylistic edits
       data.matrix()
     
     
@@ -11530,7 +12437,11 @@ fun.team_RAPM <- function(data) {
   APM_all_GF <- APM_test_GF_d %>% 
     left_join(., APM_test_GF_o, by = "APM_names") %>% 
     mutate(GPM = GF - GA) %>% 
+<<<<<<< HEAD
     select(APM_names, GF, GA, GPM) %>% 
+=======
+    dplyr::select(APM_names, GF, GA, GPM) %>% 
+>>>>>>> Updated with stylistic edits
     rename(player = APM_names)
   
   
@@ -11562,7 +12473,11 @@ fun.team_RAPM <- function(data) {
   APM_all_xG <- APM_test_xG_d %>% 
     left_join(., APM_test_xG_o, by = "APM_names") %>% 
     mutate(xGPM = xGF - xGA) %>% 
+<<<<<<< HEAD
     select(APM_names, xGF, xGA, xGPM) %>% 
+=======
+    dplyr::select(APM_names, xGF, xGA, xGPM) %>% 
+>>>>>>> Updated with stylistic edits
     rename(player = APM_names)
   
   
@@ -11594,7 +12509,11 @@ fun.team_RAPM <- function(data) {
   APM_all_CF <- APM_test_CF_d %>% 
     left_join(., APM_test_CF_o, by = "APM_names") %>% 
     mutate(CPM = CF - CA) %>% 
+<<<<<<< HEAD
     select(APM_names, CF, CA, CPM) %>% 
+=======
+    dplyr::select(APM_names, CF, CA, CPM) %>% 
+>>>>>>> Updated with stylistic edits
     rename(player = APM_names)
   
   
@@ -11642,7 +12561,11 @@ fun.team_RAPM <- function(data) {
       group_by(Team, season) %>% 
       summarise_at(vars(TOI_5v5:GP), funs(sum)) %>% 
       mutate(skaters = 5 * (TOI_5v5 / TOI) + 4 * (TOI_4v4 / TOI) + 3 * (TOI_3v3 / TOI)) %>% 
+<<<<<<< HEAD
       select(Team, season, GP, TOI, TOI_5v5:TOI_3v3, skaters) %>% 
+=======
+      dplyr::select(Team, season, GP, TOI, TOI_5v5:TOI_3v3, skaters) %>% 
+>>>>>>> Updated with stylistic edits
       data.frame()
     
     }
@@ -11719,7 +12642,11 @@ fun.team_RAPM_PP_SH <- function(data) {
                                 ifelse(scradj <= -3, -3, scradj))
              ) %>% 
       rename(pred_goal = pred_XGB_7) %>% 
+<<<<<<< HEAD
       select(game_id, event_index, season, 
+=======
+      dplyr::select(game_id, event_index, season, 
+>>>>>>> Updated with stylistic edits
              home_team, away_team, 
              event_length, 
              event_team, 
@@ -11921,7 +12848,11 @@ fun.team_RAPM_PP_SH <- function(data) {
            state_4v3 = 1 * (game_strength_state %in% st.4v3),
            is_home = 1
            ) %>% 
+<<<<<<< HEAD
     select(-c(game_id, off_lead, shift_ID)) %>% 
+=======
+    dplyr::select(-c(game_id, off_lead, shift_ID)) %>% 
+>>>>>>> Updated with stylistic edits
     data.matrix()
   
   
@@ -12051,7 +12982,11 @@ fun.team_RAPM_PP_SH <- function(data) {
            state_4v3 = 1 * (game_strength_state %in% st.4v3),
            is_home = 1
            ) %>% 
+<<<<<<< HEAD
     select(-c(game_id, off_lead, shift_ID)) %>% 
+=======
+    dplyr::select(-c(game_id, off_lead, shift_ID)) %>% 
+>>>>>>> Updated with stylistic edits
     data.matrix()
   
   
@@ -12181,7 +13116,11 @@ fun.team_RAPM_PP_SH <- function(data) {
            state_4v3 = 1 * (game_strength_state %in% st.4v3),
            is_home = 0
            ) %>% 
+<<<<<<< HEAD
     select(-c(game_id, off_lead, shift_ID)) %>% 
+=======
+    dplyr::select(-c(game_id, off_lead, shift_ID)) %>% 
+>>>>>>> Updated with stylistic edits
     data.matrix()
   
   
@@ -12311,7 +13250,11 @@ fun.team_RAPM_PP_SH <- function(data) {
            state_4v3 = 1 * (game_strength_state %in% st.4v3),
            is_home = 0
            ) %>% 
+<<<<<<< HEAD
     select(-c(game_id, off_lead, shift_ID)) %>% 
+=======
+    dplyr::select(-c(game_id, off_lead, shift_ID)) %>% 
+>>>>>>> Updated with stylistic edits
     data.matrix()
   
   
@@ -12548,7 +13491,11 @@ fun.team_RAPM_PP_SH <- function(data) {
     left_join(., APM_test_GF_PPD, by = "APM_names") %>% 
     left_join(., APM_test_GF_SHO, by = "APM_names") %>% 
     left_join(., APM_test_GF_SHD, by = "APM_names") %>% 
+<<<<<<< HEAD
     select(player = APM_names, PPO_GF, SHD_GF, SHO_GF, PPD_GF)
+=======
+    dplyr::select(player = APM_names, PPO_GF, SHD_GF, SHO_GF, PPD_GF)
+>>>>>>> Updated with stylistic edits
   
   # Rename
   APM_PP_all_GF$player <- names_match_PP$player[match(APM_PP_all_GF$player, names_match_PP$ID)]
@@ -12593,7 +13540,11 @@ fun.team_RAPM_PP_SH <- function(data) {
     left_join(., APM_test_xG_PPD, by = "APM_names") %>% 
     left_join(., APM_test_xG_SHO, by = "APM_names") %>% 
     left_join(., APM_test_xG_SHD, by = "APM_names") %>% 
+<<<<<<< HEAD
     select(player = APM_names, PPO_xG, SHD_xG, SHO_xG, PPD_xG)
+=======
+    dplyr::select(player = APM_names, PPO_xG, SHD_xG, SHO_xG, PPD_xG)
+>>>>>>> Updated with stylistic edits
   
   # Rename
   APM_PP_all_xG$player <- names_match_PP$player[match(APM_PP_all_xG$player, names_match_PP$ID)]
@@ -12638,7 +13589,11 @@ fun.team_RAPM_PP_SH <- function(data) {
     left_join(., APM_test_CF_PPD, by = "APM_names") %>% 
     left_join(., APM_test_CF_SHO, by = "APM_names") %>% 
     left_join(., APM_test_CF_SHD, by = "APM_names") %>% 
+<<<<<<< HEAD
     select(APM_names, PPO_CF, SHD_CF, SHO_CF, PPD_CF) %>% 
+=======
+    dplyr::select(APM_names, PPO_CF, SHD_CF, SHO_CF, PPD_CF) %>% 
+>>>>>>> Updated with stylistic edits
     rename(player = APM_names)
   
   # Rename
@@ -12687,7 +13642,11 @@ fun.team_RAPM_PP_SH <- function(data) {
       group_by(Team, season) %>% 
       summarise_at(vars(TOI_5v4:GP_PP), funs(sum)) %>% 
       mutate(skaters_PP = round(5 * (TOI_5v4 / TOI_PP) + 5 * (TOI_5v3 / TOI_PP) + 4 * (TOI_4v3 / TOI_PP), 3)) %>% 
+<<<<<<< HEAD
       select(Team, season, GP_PP, TOI_PP, TOI_5v4:TOI_4v3, skaters_PP) %>% 
+=======
+      dplyr::select(Team, season, GP_PP, TOI_PP, TOI_5v4:TOI_4v3, skaters_PP) %>% 
+>>>>>>> Updated with stylistic edits
       mutate_at(vars(GP_PP:TOI_4v3), funs(round(., 2))) %>% 
       data.frame()
     
@@ -12726,7 +13685,11 @@ fun.team_RAPM_PP_SH <- function(data) {
       group_by(Team, season) %>% 
       summarise_at(vars(TOI_4v5:GP_SH), funs(sum)) %>% 
       mutate(skaters_SH = round(4 * (TOI_4v5 / TOI_SH) + 3 * (TOI_3v5 / TOI_SH) + 3 * (TOI_3v4 / TOI_SH), 3)) %>% 
+<<<<<<< HEAD
       select(Team, season, GP_SH, TOI_SH, TOI_4v5:TOI_3v4, skaters_SH) %>% 
+=======
+      dplyr::select(Team, season, GP_SH, TOI_SH, TOI_4v5:TOI_3v4, skaters_SH) %>% 
+>>>>>>> Updated with stylistic edits
       mutate_at(vars(GP_SH:TOI_3v4), funs(round(., 2))) %>% 
       data.frame()
     
@@ -12742,11 +13705,19 @@ fun.team_RAPM_PP_SH <- function(data) {
   
   # Combine
   APM_combine_PP <- APM_PP_all_GF %>% 
+<<<<<<< HEAD
     select(player, PPO_GF, PPD_GF) %>% 
     left_join(., select(APM_PP_all_xG, player, PPO_xG, PPD_xG), by = "player") %>% 
     left_join(., select(APM_PP_all_CF, player, PPO_CF, PPD_CF), by = "player") %>% 
     rename(Team = player) %>% 
     left_join(select(team_TOI_PP, Team, season, GP_PP, TOI_PP, TOI_5v4:skaters_PP), ., by = "Team") %>% 
+=======
+    dplyr::select(player, PPO_GF, PPD_GF) %>% 
+    left_join(., dplyr::select(APM_PP_all_xG, player, PPO_xG, PPD_xG), by = "player") %>% 
+    left_join(., dplyr::select(APM_PP_all_CF, player, PPO_CF, PPD_CF), by = "player") %>% 
+    rename(Team = player) %>% 
+    left_join(dplyr::select(team_TOI_PP, Team, season, GP_PP, TOI_PP, TOI_5v4:skaters_PP), ., by = "Team") %>% 
+>>>>>>> Updated with stylistic edits
     mutate(GF_expand = round(PPO_GF * (TOI_PP / 60), 2),  
            xGF_expand = round(PPO_xG * (TOI_PP / 60), 2), 
            CF_expand = round(PPO_CF * (TOI_PP / 60), 2)
@@ -12754,11 +13725,19 @@ fun.team_RAPM_PP_SH <- function(data) {
     mutate_if(is.numeric, funs(round(., 3)))
   
   APM_combine_SH <- APM_PP_all_GF %>% 
+<<<<<<< HEAD
     select(player, SHD_GF, SHO_GF) %>% 
     left_join(., select(APM_PP_all_xG, player, SHD_xG, SHO_xG), by = "player") %>% 
     left_join(., select(APM_PP_all_CF, player, SHD_CF, SHO_CF), by = "player") %>% 
     rename(Team = player) %>% 
     left_join(select(team_TOI_PP, Team, season, GP_SH, TOI_SH, TOI_4v5:skaters_SH), ., by = "Team") %>% 
+=======
+    dplyr::select(player, SHD_GF, SHO_GF) %>% 
+    left_join(., dplyr::select(APM_PP_all_xG, player, SHD_xG, SHO_xG), by = "player") %>% 
+    left_join(., dplyr::select(APM_PP_all_CF, player, SHD_CF, SHO_CF), by = "player") %>% 
+    rename(Team = player) %>% 
+    left_join(dplyr::select(team_TOI_PP, Team, season, GP_SH, TOI_SH, TOI_4v5:skaters_SH), ., by = "Team") %>% 
+>>>>>>> Updated with stylistic edits
     mutate(GA_expand = round(SHD_GF * (TOI_SH / 60), 2),  
            xGA_expand = round(SHD_xG * (TOI_SH / 60), 2), 
            CA_expand = round(SHD_CF * (TOI_SH / 60), 2)
@@ -12823,7 +13802,11 @@ fun.ALL_EV_GAA <- function() {
   ## ------------- ##
   
   eval_pred_EVO_F <- pred_EVO_F_join %>% 
+<<<<<<< HEAD
     select(player:GP)
+=======
+    dplyr::select(player:GP)
+>>>>>>> Updated with stylistic edits
   
   
   eval_pred_EVO_F$pred_1 <- predict(object = mod_list_EVO_F$lm, 
@@ -12860,7 +13843,11 @@ fun.ALL_EV_GAA <- function() {
   ## ------------- ##
   
   eval_pred_EVD_F <- pred_EVD_F_join %>% 
+<<<<<<< HEAD
     select(player:GP)
+=======
+    dplyr::select(player:GP)
+>>>>>>> Updated with stylistic edits
   
   eval_pred_EVD_F$pred_1 <- predict(object = mod_list_EVD_F$bagEarth, 
                                     pred_EVD_F_join[, features_EVD_F_large],
@@ -12911,7 +13898,11 @@ fun.ALL_EV_GAA <- function() {
   
   # EV FINAL JOIN: Forwards
   EV_F_team_final <- EV_F_overall %>% 
+<<<<<<< HEAD
     left_join(., team_strength_RAPM_EV %>% select(season, Team, TOI, skaters, GF, xGA), 
+=======
+    left_join(., team_strength_RAPM_EV %>% dplyr::select(season, Team, TOI, skaters, GF, xGA), 
+>>>>>>> Updated with stylistic edits
               by = c("season", "Team"), 
               suffix = c("_player", "_team")
               ) %>% 
@@ -12928,7 +13919,11 @@ fun.ALL_EV_GAA <- function() {
            def_diff =      EVD_AA_adj - EVD_AA
            ) %>% 
     rename(TOI = TOI_player) %>% 
+<<<<<<< HEAD
     select(player:GP, 
+=======
+    dplyr::select(player:GP, 
+>>>>>>> Updated with stylistic edits
            TOI_perc_EV = TOI_perc_tot, 
            SPM_EVO_60 = EVO_60, 
            SPM_EVD_60 = EVD_60, 
@@ -12963,7 +13958,11 @@ fun.ALL_EV_GAA <- function() {
   ## ------------- ##
   
   eval_pred_EVO_D <- pred_EVO_D_join %>% 
+<<<<<<< HEAD
     select(player:GP)
+=======
+    dplyr::select(player:GP)
+>>>>>>> Updated with stylistic edits
   
   
   eval_pred_EVO_D$pred_1 <- predict(object = mod_list_EVO_D$lm, 
@@ -12999,7 +13998,11 @@ fun.ALL_EV_GAA <- function() {
   ## ------------- ##
   
   eval_pred_EVD_D <- pred_EVD_D_join %>% 
+<<<<<<< HEAD
     select(player:GP)
+=======
+    dplyr::select(player:GP)
+>>>>>>> Updated with stylistic edits
   
   eval_pred_EVD_D$pred_1 <- predict(object = mod_list_EVD_D$lm, 
                                     pred_EVD_D_join[, features_EVD_D_small],
@@ -13049,7 +14052,11 @@ fun.ALL_EV_GAA <- function() {
   
   # EV FINAL JOIN: Defensemen
   EV_D_team_final <- EV_D_overall %>% 
+<<<<<<< HEAD
     left_join(., team_strength_RAPM_EV %>% select(season, Team, TOI, skaters, GF, xGA), 
+=======
+    left_join(., team_strength_RAPM_EV %>% dplyr::select(season, Team, TOI, skaters, GF, xGA), 
+>>>>>>> Updated with stylistic edits
               by = c("season", "Team"), 
               suffix = c("_player", "_team")
               ) %>% 
@@ -13066,7 +14073,11 @@ fun.ALL_EV_GAA <- function() {
            def_diff =      EVD_AA_adj - EVD_AA
            ) %>% 
     rename(TOI = TOI_player) %>% 
+<<<<<<< HEAD
     select(player:GP, 
+=======
+    dplyr::select(player:GP, 
+>>>>>>> Updated with stylistic edits
            TOI_perc_EV = TOI_perc_tot, 
            SPM_EVO_60 = EVO_60, 
            SPM_EVD_60 = EVD_60, 
@@ -13108,7 +14119,11 @@ fun.ALL_PP_GAA <- function() {
   ####################
   
   eval_pred_PPO_F <- pred_PPO_F_join %>% 
+<<<<<<< HEAD
     select(player:TOI_GP) 
+=======
+    dplyr::select(player:TOI_GP) 
+>>>>>>> Updated with stylistic edits
   
   # Predict
   eval_pred_PPO_F$pred_1 <- predict(object = mod_list_PPO_F$cubist, 
@@ -13153,7 +14168,11 @@ fun.ALL_PP_GAA <- function() {
   
   # PP RAPM Team Strength
   PPO_F_team_final <- PPO_F_overall %>% 
+<<<<<<< HEAD
     left_join(., team_strength_PP_full_AA %>% select(season, Team, t_TOI_PP, skaters_PP, PPO_GF_AA_team), by = c("Team", "season")) %>% 
+=======
+    left_join(., team_strength_PP_full_AA %>% dplyr::select(season, Team, t_TOI_PP, skaters_PP, PPO_GF_AA_team), by = c("Team", "season")) %>% 
+>>>>>>> Updated with stylistic edits
     group_by(player, season) %>% 
     mutate(TOI_perc_tot =  TOI / t_TOI_PP, 
            adj_off =       (1.3 * PPO_GF_AA_team - (TOI_perc_tot * PPO_AA_60)) / skaters_PP, 
@@ -13161,7 +14180,11 @@ fun.ALL_PP_GAA <- function() {
            PPO_AA_adj =    (PPO_AA_60_adj / 60) * TOI, 
            off_diff =      PPO_AA_adj - PPO_AA
            ) %>% 
+<<<<<<< HEAD
     select(player:GP, 
+=======
+    dplyr::select(player:GP, 
+>>>>>>> Updated with stylistic edits
            TOI_perc_PP = TOI_perc_tot, 
            SPM_PPO_60 = PPO_60, 
            SPM_PPO_AA_60 = PPO_AA_60, 
@@ -13186,7 +14209,11 @@ fun.ALL_PP_GAA <- function() {
   ####################
   
   eval_pred_PPO_D <- pred_PPO_D_join %>% 
+<<<<<<< HEAD
     select(player:TOI_GP) 
+=======
+    dplyr::select(player:TOI_GP) 
+>>>>>>> Updated with stylistic edits
   
   # Predict
   eval_pred_PPO_D$pred_1 <- predict(object = mod_list_PPO_D$lm, 
@@ -13232,7 +14259,11 @@ fun.ALL_PP_GAA <- function() {
   
   # PP RAPM Team Strength
   PPO_D_team_final <- PPO_D_overall %>% 
+<<<<<<< HEAD
     left_join(., team_strength_PP_full_AA %>% select(season, Team, t_TOI_PP, skaters_PP, PPO_GF_AA_team), by = c("Team", "season")) %>% 
+=======
+    left_join(., team_strength_PP_full_AA %>% dplyr::select(season, Team, t_TOI_PP, skaters_PP, PPO_GF_AA_team), by = c("Team", "season")) %>% 
+>>>>>>> Updated with stylistic edits
     group_by(player, season) %>% 
     mutate(TOI_perc_tot =  TOI / t_TOI_PP, 
            adj_off =       (1.3 * PPO_GF_AA_team - (TOI_perc_tot * PPO_AA_60)) / skaters_PP, 
@@ -13240,7 +14271,11 @@ fun.ALL_PP_GAA <- function() {
            PPO_AA_adj =    (PPO_AA_60_adj / 60) * TOI, 
            off_diff =      PPO_AA_adj - PPO_AA
            ) %>% 
+<<<<<<< HEAD
     select(player:GP, 
+=======
+    dplyr::select(player:GP, 
+>>>>>>> Updated with stylistic edits
            TOI_perc_PP = TOI_perc_tot, 
            SPM_PPO_60 = PPO_60, 
            SPM_PPO_AA_60 = PPO_AA_60, 
@@ -13276,7 +14311,11 @@ fun.ALL_SH_GAA <- function() {
   ####################
   
   eval_pred_SHD_F <- pred_SHD_F_join %>% 
+<<<<<<< HEAD
     select(player:TOI_GP) 
+=======
+    dplyr::select(player:TOI_GP) 
+>>>>>>> Updated with stylistic edits
   
   # Predict
   eval_pred_SHD_F$pred_1 <- predict(object = mod_list_SHD_F$cubist, 
@@ -13320,7 +14359,11 @@ fun.ALL_SH_GAA <- function() {
   
   # PP RAPM Team Strength
   SHD_F_team_final <- SHD_F_overall %>% 
+<<<<<<< HEAD
     left_join(., team_strength_SH_full_AA %>% select(season, Team, t_TOI_SH, skaters_SH, SHD_xG_AA_team), by = c("Team", "season")) %>% 
+=======
+    left_join(., team_strength_SH_full_AA %>% dplyr::select(season, Team, t_TOI_SH, skaters_SH, SHD_xG_AA_team), by = c("Team", "season")) %>% 
+>>>>>>> Updated with stylistic edits
     group_by(player, season) %>% 
     mutate(TOI_perc_tot =  TOI / t_TOI_SH, 
            adj_def =       (1.3 * SHD_xG_AA_team - (TOI_perc_tot * SHD_AA_60)) / skaters_SH, 
@@ -13329,7 +14372,11 @@ fun.ALL_SH_GAA <- function() {
            SHD_AA =        -1 * SHD_AA,
            def_diff =      SHD_AA_adj - SHD_AA
            ) %>% 
+<<<<<<< HEAD
     select(player:GP, 
+=======
+    dplyr::select(player:GP, 
+>>>>>>> Updated with stylistic edits
            TOI_perc_SH = TOI_perc_tot, 
            SPM_SHD_60 = SHD_60, 
            SPM_SHD_AA_60 = SHD_AA_60, 
@@ -13354,7 +14401,11 @@ fun.ALL_SH_GAA <- function() {
   ####################
   
   eval_pred_SHD_D <- pred_SHD_D_join %>% 
+<<<<<<< HEAD
     select(player:TOI_GP) 
+=======
+    dplyr::select(player:TOI_GP) 
+>>>>>>> Updated with stylistic edits
   
   # Predict
   eval_pred_SHD_D$pred_1 <- predict(object = mod_list_SHD_D$cubist, 
@@ -13398,7 +14449,11 @@ fun.ALL_SH_GAA <- function() {
   
   # PP RAPM Team Strength
   SHD_D_team_final <- SHD_D_overall %>% 
+<<<<<<< HEAD
     left_join(., team_strength_SH_full_AA %>% select(season, Team, t_TOI_SH, skaters_SH, SHD_xG_AA_team), by = c("Team", "season")) %>% 
+=======
+    left_join(., team_strength_SH_full_AA %>% dplyr::select(season, Team, t_TOI_SH, skaters_SH, SHD_xG_AA_team), by = c("Team", "season")) %>% 
+>>>>>>> Updated with stylistic edits
     group_by(player, season) %>% 
     mutate(TOI_perc_tot =  TOI / t_TOI_SH, 
            adj_def =       (1.3 * SHD_xG_AA_team - (TOI_perc_tot * SHD_AA_60)) / skaters_SH, 
@@ -13407,7 +14462,11 @@ fun.ALL_SH_GAA <- function() {
            SHD_AA =        -1 * SHD_AA,
            def_diff =      SHD_AA_adj - SHD_AA
            ) %>% 
+<<<<<<< HEAD
     select(player:GP, 
+=======
+    dplyr::select(player:GP, 
+>>>>>>> Updated with stylistic edits
            TOI_perc_SH = TOI_perc_tot, 
            SPM_SHD_60 = SHD_60, 
            SPM_SHD_AA_60 = SHD_AA_60, 
@@ -13522,7 +14581,11 @@ fun.shooting_RAPM <- function(pbp_data, strength_) {
              player = paste0(goalie, ".", Team)
              ) %>% 
       ungroup() %>% 
+<<<<<<< HEAD
       select(player, qual) %>% 
+=======
+      dplyr::select(player, qual) %>% 
+>>>>>>> Updated with stylistic edits
       data.frame()
     
     }
@@ -13552,7 +14615,11 @@ fun.shooting_RAPM <- function(pbp_data, strength_) {
       summarise(iFF = sum(event_type %in% st.fenwick_events)) %>% 
       mutate(qual = 1 * (iFF > qual_cut)) %>% 
       rename(player = event_player_1) %>% 
+<<<<<<< HEAD
       select(player, qual) %>% 
+=======
+      dplyr::select(player, qual) %>% 
+>>>>>>> Updated with stylistic edits
       data.frame()
     
     qualified_return <- qualified %>% 
@@ -13614,7 +14681,11 @@ fun.shooting_RAPM <- function(pbp_data, strength_) {
                shooter_is_D =    1 * (position == 2) 
                ) %>% 
         left_join(., btb, by = c("game_id")) %>% 
+<<<<<<< HEAD
         select(is_goal, pred_goal,
+=======
+        dplyr::select(is_goal, pred_goal,
+>>>>>>> Updated with stylistic edits
                shooter, 
                goalie, 
                state_5v5, state_4v4, state_3v3, 
@@ -13682,7 +14753,11 @@ fun.shooting_RAPM <- function(pbp_data, strength_) {
   # Determine non-qualified players
   exclude <- names_match %>% 
     filter(ID > 10000, qual == 0) %>% 
+<<<<<<< HEAD
     select(ID)
+=======
+    dplyr::select(ID)
+>>>>>>> Updated with stylistic edits
   
   exclude <- as.vector(exclude[, 1])
   
@@ -13789,7 +14864,11 @@ fun.shooting_RAPM <- function(pbp_data, strength_) {
            season = season_
            ) %>% 
     left_join(., player_position, by = "player") %>% 
+<<<<<<< HEAD
     select(player, position, season, iFF, coefficient, prob, GAA) %>% 
+=======
+    dplyr::select(player, position, season, iFF, coefficient, prob, GAA) %>% 
+>>>>>>> Updated with stylistic edits
     data.frame()
   
   GAA_Goalies <- pbp_part %>% 
@@ -13805,7 +14884,11 @@ fun.shooting_RAPM <- function(pbp_data, strength_) {
            position = 3, 
            season =   season_
            ) %>% 
+<<<<<<< HEAD
     select(player, position, season, Team, FA, coefficient, prob, GAA) %>% 
+=======
+    dplyr::select(player, position, season, Team, FA, coefficient, prob, GAA) %>% 
+>>>>>>> Updated with stylistic edits
     data.frame()
   
   
@@ -13933,7 +15016,11 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
       group_by(player) %>% 
       summarise(TOI = sum(TOI) / 60) %>% 
       mutate(qual = ifelse(TOI >= cutoff, 1, 0)) %>% 
+<<<<<<< HEAD
       select(player, qual) %>% 
+=======
+      dplyr::select(player, qual) %>% 
+>>>>>>> Updated with stylistic edits
       data.frame()
     
     }
@@ -13951,7 +15038,11 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
       mutate(qual = ifelse(TOI >= f_cut & position == 1, 1, 
                            ifelse(TOI >= d_cut & position == 2, 1, 0))
              ) %>% 
+<<<<<<< HEAD
       select(player, qual)
+=======
+      dplyr::select(player, qual)
+>>>>>>> Updated with stylistic edits
     
     qualified_return <- qualified %>% 
       rbind(., goalie_data) %>% 
@@ -13983,7 +15074,11 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
              home_zonestart = ifelse(is.na(home_zonestart), 0, home_zonestart)
              ) %>% 
       rename(pred_goal = pred_XGB_7) %>% 
+<<<<<<< HEAD
       select(game_id, event_index, 
+=======
+      dplyr::select(game_id, event_index, 
+>>>>>>> Updated with stylistic edits
              home_on_1:away_on_6, 
              home_goalie, away_goalie, 
              home_team, away_team, 
@@ -14084,7 +15179,11 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
   # Determine non-qualified players
   exclude <- names_match %>% 
     filter(ID > 10000, qual == 0) %>% 
+<<<<<<< HEAD
     select(ID)
+=======
+    dplyr::select(ID)
+>>>>>>> Updated with stylistic edits
   
   exclude <- as.vector(exclude[, 1])
   
@@ -14203,7 +15302,11 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
              state_3v3 = 1 * (game_strength_state == st.3v3),
              is_home = 1
              ) %>% 
+<<<<<<< HEAD
       select(-c(game_id, off_lead, shift_ID)) %>% 
+=======
+      dplyr::select(-c(game_id, off_lead, shift_ID)) %>% 
+>>>>>>> Updated with stylistic edits
       data.matrix()
     
     
@@ -14322,7 +15425,11 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
              state_3v3 = 1 * (game_strength_state == st.3v3),
              is_home = 0
              ) %>% 
+<<<<<<< HEAD
       select(-c(game_id, off_lead, shift_ID)) %>% 
+=======
+      dplyr::select(-c(game_id, off_lead, shift_ID)) %>% 
+>>>>>>> Updated with stylistic edits
       data.matrix()
     
     
@@ -14389,9 +15496,15 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
   player_base_ <- pbp_goalie %>% 
     rename(TOI = TOI_goalie) %>% 
     mutate(position = 3) %>% 
+<<<<<<< HEAD
     select(player, TOI, position) %>% 
     rbind(select(qual_skater, player, TOI, position)) %>% 
     left_join(., select(names_match, player, ID), by = "player") %>% 
+=======
+    dplyr::select(player, TOI, position) %>% 
+    rbind(dplyr::select(qual_skater, player, TOI, position)) %>% 
+    left_join(., dplyr::select(names_match, player, ID), by = "player") %>% 
+>>>>>>> Updated with stylistic edits
     arrange(player) %>% 
     data.frame()
   
@@ -14448,7 +15561,11 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
   goalie_names <- names_match %>% 
     filter(position == 3) %>% 
     mutate(ID = paste0(ID, ".d")) %>% 
+<<<<<<< HEAD
     select(ID)
+=======
+    dplyr::select(ID)
+>>>>>>> Updated with stylistic edits
   goalie_names <- as.vector(goalie_names$ID)
   
   # Filter out goalies - xG
@@ -14549,7 +15666,11 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
     APM_all <- APM_test_d %>% 
       left_join(., APM_test_o, by = "APM_names") %>% 
       mutate(GPM = Off_GF - Def_GF) %>% 
+<<<<<<< HEAD
       select(APM_names, Off_GF, Def_GF, GPM)
+=======
+      dplyr::select(APM_names, Off_GF, Def_GF, GPM)
+>>>>>>> Updated with stylistic edits
     
     APM_all$APM_names <- names_data$player[match(APM_all$APM_names, names_data$ID)]
     
@@ -14594,7 +15715,11 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
            Off_GF = ifelse(Off_GF != 0 & position == 3, 0, Off_GF), 
            GPM = ifelse(player == "MARC-ANDRE.FLEURY", Off_GF - Def_GF, GPM)
            ) %>% 
+<<<<<<< HEAD
     select(player, position, TOI, TOI.GP, 
+=======
+    dplyr::select(player, position, TOI, TOI.GP, 
+>>>>>>> Updated with stylistic edits
            Off_GF:GPM, O_impact_GF:GF_impact
            ) %>% 
     mutate_at(vars(Off_GF:GPM), funs(round(., 3))) %>% 
@@ -14630,7 +15755,11 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
     APM_all <- APM_test_d %>% 
       left_join(., APM_test_o, by = "APM_names") %>% 
       mutate(xGPM = Off_xG - Def_xG) %>% 
+<<<<<<< HEAD
       select(APM_names, Off_xG, Def_xG, xGPM)
+=======
+      dplyr::select(APM_names, Off_xG, Def_xG, xGPM)
+>>>>>>> Updated with stylistic edits
     
     APM_all$APM_names <- names_data$player[match(APM_all$APM_names, names_data$ID)]
     
@@ -14671,7 +15800,11 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
            D_impact_xG =  Def_xG * (TOI / 60), 
            xG_impact = O_impact_xG - D_impact_xG
            ) %>% 
+<<<<<<< HEAD
     select(player, position, TOI, TOI.GP, 
+=======
+    dplyr::select(player, position, TOI, TOI.GP, 
+>>>>>>> Updated with stylistic edits
            Off_xG:xGPM, O_impact_xG:xG_impact
            ) %>% 
     mutate_at(vars(Off_xG:xGPM), funs(round(., 3))) %>% 
@@ -14706,7 +15839,11 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
     APM_all <- APM_test_d %>% 
       left_join(., APM_test_o, by = "APM_names") %>% 
       mutate(CPM = Off_CF - Def_CF) %>% 
+<<<<<<< HEAD
       select(APM_names, Off_CF, Def_CF, CPM)
+=======
+      dplyr::select(APM_names, Off_CF, Def_CF, CPM)
+>>>>>>> Updated with stylistic edits
     
     APM_all$APM_names <- names_data$player[match(APM_all$APM_names, names_data$ID)]
     
@@ -14747,7 +15884,11 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
            D_impact_CF =  Def_CF * (TOI / 60), 
            CF_impact = O_impact_CF - D_impact_CF
            ) %>% 
+<<<<<<< HEAD
     select(player, position, TOI, TOI.GP, 
+=======
+    dplyr::select(player, position, TOI, TOI.GP, 
+>>>>>>> Updated with stylistic edits
            Off_CF:CPM, O_impact_CF:CF_impact
            ) %>% 
     mutate_at(vars(Off_CF:CPM), funs(round(., 3))) %>% 
@@ -14767,7 +15908,11 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
     mutate(Team = paste0(Team, collapse = "/")) %>% 
     group_by(player, Team) %>% 
     summarise(TOI = sum(TOI)) %>% 
+<<<<<<< HEAD
     select(player, Team) %>% 
+=======
+    dplyr::select(player, Team) %>% 
+>>>>>>> Updated with stylistic edits
     data.frame()
   
   goalie_teams <- rbind(
@@ -14800,17 +15945,28 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
     left_join(., APM_xG, by = c("player", "position", "TOI", "TOI.GP")) %>% 
     left_join(., APM_CF, by = c("player", "position", "TOI", "TOI.GP")) %>% 
     mutate(season = unique(games_data$season)) %>% 
+<<<<<<< HEAD
     select(player, position, season, Team, TOI,  
+=======
+    dplyr::select(player, position, season, Team, TOI,  
+>>>>>>> Updated with stylistic edits
            Off_GF:GPM, Off_xG:xGPM, Off_CF:CPM, 
            O_impact_GF, D_impact_GF, GF_impact, 
            O_impact_xG, D_impact_xG, xG_impact, 
            O_impact_CF, D_impact_CF, CF_impact)
   
   APM_EV_join_rates <- APM_EV_join %>% 
+<<<<<<< HEAD
     select(player:TOI, Off_GF:GPM, Off_xG:xGPM, Off_CF:CPM)
   
   APM_EV_join_impact <- APM_EV_join %>% 
     select(player:TOI, O_impact_GF, D_impact_GF, GF_impact, 
+=======
+    dplyr::select(player:TOI, Off_GF:GPM, Off_xG:xGPM, Off_CF:CPM)
+  
+  APM_EV_join_impact <- APM_EV_join %>% 
+    dplyr::select(player:TOI, O_impact_GF, D_impact_GF, GF_impact, 
+>>>>>>> Updated with stylistic edits
            O_impact_xG, D_impact_xG, xG_impact, 
            O_impact_CF, D_impact_CF, CF_impact)
   
@@ -14818,7 +15974,11 @@ fun.RAPM_EV_all <- function(pbp_data, games_data) {
     filter(position == 3) %>% 
     left_join(., goalie_teams, by = "player") %>% 
     mutate(season = unique(games_data$season)) %>% 
+<<<<<<< HEAD
     select(player, position, season, Team, TOI, Def_GF, D_impact_GF)
+=======
+    dplyr::select(player, position, season, Team, TOI, Def_GF, D_impact_GF)
+>>>>>>> Updated with stylistic edits
   
   
   ## ----------------------------- ##
@@ -14982,7 +16142,11 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
       group_by(player) %>% 
       summarise(TOI = sum(TOI) / 60) %>% 
       mutate(qual = ifelse(TOI >= cutoff, 1, 0)) %>% 
+<<<<<<< HEAD
       #select(player, qual) %>% 
+=======
+      #dplyr::select(player, qual) %>% 
+>>>>>>> Updated with stylistic edits
       data.frame()
     
     }
@@ -14999,7 +16163,11 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
       mutate(qual = ifelse(TOI >= f_cut & position == 1, 1, 
                            ifelse(TOI >= d_cut & position == 2, 1, 0))
              ) %>% 
+<<<<<<< HEAD
       select(player, TOI, qual)
+=======
+      dplyr::select(player, TOI, qual)
+>>>>>>> Updated with stylistic edits
     
     return(Qualified)
   
@@ -15018,7 +16186,11 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
       mutate(qual = ifelse(TOI >= f_cut & position == 1, 1, 
                            ifelse(TOI >= d_cut & position == 2, 1, 0))
              ) %>% 
+<<<<<<< HEAD
       select(player, TOI, qual)
+=======
+      dplyr::select(player, TOI, qual)
+>>>>>>> Updated with stylistic edits
     
     Qualified <- rbind(Qualified, goalie_qual)
     
@@ -15046,7 +16218,11 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
              home_zonestart = ifelse(is.na(home_zonestart), 0, home_zonestart)
              ) %>% 
       rename(pred_goal = pred_XGB_7) %>% 
+<<<<<<< HEAD
       select(game_id, event_index, 
+=======
+      dplyr::select(game_id, event_index, 
+>>>>>>> Updated with stylistic edits
              home_on_1:away_on_6, 
              home_goalie, away_goalie, 
              home_team, away_team, 
@@ -15136,7 +16312,11 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
     all <- teams %>% 
       rbind(., skaters, goalies, event, strength) %>% 
       filter(player != 0) %>% 
+<<<<<<< HEAD
       left_join(., select(qual_data, player, qual), by = "player") %>% 
+=======
+      left_join(., dplyr::select(qual_data, player, qual), by = "player") %>% 
+>>>>>>> Updated with stylistic edits
       mutate(qual = ifelse(is.na(qual), 0, qual)) %>% 
       arrange(ID)
     
@@ -15217,7 +16397,11 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
     all <- teams %>% 
       rbind(., skaters, goalies, event, strength) %>% 
       filter(player != 0) %>% 
+<<<<<<< HEAD
       left_join(., select(qual_data, player, qual), by = "player") %>% 
+=======
+      left_join(., dplyr::select(qual_data, player, qual), by = "player") %>% 
+>>>>>>> Updated with stylistic edits
       mutate(qual = ifelse(is.na(qual), 0, qual)) %>% 
       arrange(ID)
     
@@ -15232,21 +16416,33 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
   # Determine non-qualified players for Powerplay
   exclude_PP <- names_match_PP %>% 
     filter(ID > 10000, qual == 0) %>% 
+<<<<<<< HEAD
     select(ID)
+=======
+    dplyr::select(ID)
+>>>>>>> Updated with stylistic edits
   
   exclude_PP <- as.vector(exclude_PP[, 1])
   
   # Determine non-qualified players for Shorthanded
   exclude_SH <- names_match_SH %>% 
     filter(ID > 10000, qual == 0) %>% 
+<<<<<<< HEAD
     select(ID)
+=======
+    dplyr::select(ID)
+>>>>>>> Updated with stylistic edits
   
   exclude_SH <- as.vector(exclude_SH[, 1])
   
   # Identify goalies to add to PPD columns (PP/SH RAPM specific)
   qual_goalies <- names_match_SH %>%
     filter(position == 3, qual == 1) %>% 
+<<<<<<< HEAD
     select(ID)
+=======
+    dplyr::select(ID)
+>>>>>>> Updated with stylistic edits
   
   qual_goalies <- as.vector(qual_goalies[, 1])
   
@@ -15418,7 +16614,11 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
              state_4v3 = 1 * (game_strength_state %in% st.4v3), 
              is_home = 1
              ) %>% 
+<<<<<<< HEAD
       select(-c(game_id, off_lead, shift_ID)) %>% 
+=======
+      dplyr::select(-c(game_id, off_lead, shift_ID)) %>% 
+>>>>>>> Updated with stylistic edits
       data.matrix()
     
     
@@ -15563,7 +16763,11 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
              state_4v3 = 1 * (game_strength_state %in% st.4v3),
              is_home = 1
              ) %>% 
+<<<<<<< HEAD
       select(-c(game_id, off_lead, shift_ID)) %>% 
+=======
+      dplyr::select(-c(game_id, off_lead, shift_ID)) %>% 
+>>>>>>> Updated with stylistic edits
       data.matrix()
     
     
@@ -15708,7 +16912,11 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
              state_4v3 = 1 * (game_strength_state %in% st.4v3),
              is_home = 0
              ) %>% 
+<<<<<<< HEAD
       select(-c(game_id, off_lead, shift_ID)) %>% 
+=======
+      dplyr::select(-c(game_id, off_lead, shift_ID)) %>% 
+>>>>>>> Updated with stylistic edits
       data.matrix()
     
     
@@ -15853,7 +17061,11 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
              state_4v3 = 1 * (game_strength_state %in% st.4v3),
              is_home = 0
              ) %>% 
+<<<<<<< HEAD
       select(-c(game_id, off_lead, shift_ID)) %>% 
+=======
+      dplyr::select(-c(game_id, off_lead, shift_ID)) %>% 
+>>>>>>> Updated with stylistic edits
       data.matrix()
     
     
@@ -15966,16 +17178,28 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
   # All players TOI and position in RAPM design matrix
   player_base_PP_ <- pbp_goalie %>% 
     mutate(position = 3) %>% 
+<<<<<<< HEAD
     select(player, TOI, position) %>% 
     rbind(select(qual_skater_PP, player, TOI, position)) %>% 
     left_join(., select(names_match_PP, player, ID), by = "player") %>% 
+=======
+    dplyr::select(player, TOI, position) %>% 
+    rbind(dplyr::select(qual_skater_PP, player, TOI, position)) %>% 
+    left_join(., dplyr::select(names_match_PP, player, ID), by = "player") %>% 
+>>>>>>> Updated with stylistic edits
     arrange(player)
   
   player_base_SH_ <- pbp_goalie %>% 
     mutate(position = 3) %>% 
+<<<<<<< HEAD
     select(player, TOI, position) %>% 
     rbind(select(qual_skater_SH, player, TOI, position)) %>% 
     left_join(., select(names_match_SH, player, ID), by = "player") %>% 
+=======
+    dplyr::select(player, TOI, position) %>% 
+    rbind(dplyr::select(qual_skater_SH, player, TOI, position)) %>% 
+    left_join(., dplyr::select(names_match_SH, player, ID), by = "player") %>% 
+>>>>>>> Updated with stylistic edits
     arrange(player)
   
   gc()
@@ -16175,7 +17399,11 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
              TOI_PP = round(TOI_PP, 2), 
              TOI_SH = round(TOI_SH, 2)
              ) %>% 
+<<<<<<< HEAD
       select(player, position, TOI_PP, TOI_SH, PPO, SHD, SHO, PPD, PPO_impact:PPD_impact) %>% 
+=======
+      dplyr::select(player, position, TOI_PP, TOI_SH, PPO, SHD, SHO, PPD, PPO_impact:PPD_impact) %>% 
+>>>>>>> Updated with stylistic edits
       mutate_at(vars(PPO:PPD), funs(round(., 3))) %>% 
       mutate_at(vars(PPO_impact:PPD_impact), funs(round(., 2))) %>% 
       rename_at(vars(PPO:PPD_impact), funs(paste0(., "_GF"))) %>% 
@@ -16283,7 +17511,11 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
              TOI_PP = round(TOI_PP, 2), 
              TOI_SH = round(TOI_SH, 2)
              ) %>% 
+<<<<<<< HEAD
       select(player, position, TOI_PP, TOI_SH, PPO, SHD, SHO, PPD, PPO_impact:PPD_impact) %>% 
+=======
+      dplyr::select(player, position, TOI_PP, TOI_SH, PPO, SHD, SHO, PPD, PPO_impact:PPD_impact) %>% 
+>>>>>>> Updated with stylistic edits
       mutate_at(vars(PPO:PPD), funs(round(., 3))) %>% 
       mutate_at(vars(PPO_impact:PPD_impact), funs(round(., 2))) %>% 
       rename_at(vars(PPO:PPD_impact), funs(paste0(., "_xG"))) %>% 
@@ -16391,7 +17623,11 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
              TOI_PP = round(TOI_PP, 2), 
              TOI_SH = round(TOI_SH, 2)
              ) %>% 
+<<<<<<< HEAD
       select(player, position, TOI_PP, TOI_SH, PPO, SHD, SHO, PPD, PPO_impact:PPD_impact) %>% 
+=======
+      dplyr::select(player, position, TOI_PP, TOI_SH, PPO, SHD, SHO, PPD, PPO_impact:PPD_impact) %>% 
+>>>>>>> Updated with stylistic edits
       mutate_at(vars(PPO:PPD), funs(round(., 3))) %>% 
       mutate_at(vars(PPO_impact:PPD_impact), funs(round(., 2))) %>% 
       rename_at(vars(PPO:PPD_impact), funs(paste0(., "_CF"))) %>% 
@@ -16416,7 +17652,11 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
     mutate(Team = paste0(Team, collapse = "/")) %>% 
     group_by(player, Team) %>% 
     summarise(TOI = sum(TOI)) %>% 
+<<<<<<< HEAD
     select(player, Team) %>% 
+=======
+    dplyr::dplyr::select(player, Team) %>% 
+>>>>>>> Updated with stylistic edits
     data.frame()
   
   goalie_teams <- rbind(
@@ -16449,23 +17689,38 @@ fun.RAPM_PP_SH_all <- function(pbp_data, games_data_PP, games_data_SH) {
     left_join(., APM_PP_xG, by = c("player", "position", "TOI_PP", "TOI_SH")) %>% 
     left_join(., APM_PP_CF, by = c("player", "position", "TOI_PP", "TOI_SH")) %>% 
     mutate(season = unique(games_data_PP$season)) %>% 
+<<<<<<< HEAD
     select(player, position, season, Team, TOI_PP, TOI_SH,  
+=======
+    dplyr::dplyr::select(player, position, season, Team, TOI_PP, TOI_SH,  
+>>>>>>> Updated with stylistic edits
            PPO_GF:PPD_GF, PPO_xG:PPD_xG, PPO_CF:PPD_CF, 
            PPO_impact_GF:PPD_impact_GF, 
            PPO_impact_xG:PPD_impact_xG, 
            PPO_impact_CF:PPD_impact_CF)
   
   APM_PP_join_rates <- APM_PP_join %>% 
+<<<<<<< HEAD
     select(player, position, season, Team, TOI_PP, TOI_SH, PPO_GF:PPD_GF, PPO_xG:PPD_xG, PPO_CF:PPD_CF)
   
   APM_PP_join_impact <- APM_PP_join %>% 
     select(player, position, season, Team, TOI_PP, TOI_SH, PPO_impact_GF:PPD_impact_GF, PPO_impact_xG:PPD_impact_xG, PPO_impact_CF:PPD_impact_CF)
+=======
+    dplyr::dplyr::select(player, position, season, Team, TOI_PP, TOI_SH, PPO_GF:PPD_GF, PPO_xG:PPD_xG, PPO_CF:PPD_CF)
+  
+  APM_PP_join_impact <- APM_PP_join %>% 
+    dplyr::dplyr::select(player, position, season, Team, TOI_PP, TOI_SH, PPO_impact_GF:PPD_impact_GF, PPO_impact_xG:PPD_impact_xG, PPO_impact_CF:PPD_impact_CF)
+>>>>>>> Updated with stylistic edits
   
   APM_PP_goalies <- APM_PP_GF %>% 
     filter(position == 3) %>% 
     left_join(., goalie_teams, by = "player") %>% 
     mutate(season = unique(games_data_PP$season)) %>% 
+<<<<<<< HEAD
     select(player, position, season, Team, 
+=======
+    dplyr::dplyr::select(player, position, season, Team, 
+>>>>>>> Updated with stylistic edits
            SHD_GF, PPD_GF)
   
   
